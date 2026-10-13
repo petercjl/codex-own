@@ -111,7 +111,7 @@ export async function install({version,adopt=false,archive,manifest}={}) {
     const result=switchApp({p,source,version:m.version,adopt});
     if(process.platform==='darwin')execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-f',p.target],{stdio:'pipe'});
     else shortcut(p);
-    fs.rmSync(stage,{recursive:true,force:true});progress('安装完成');return result;
+    fs.rmSync(stage,{recursive:true,force:true});progress('安装完成');return {...result,downloadSource:archive?'local-archive':'registry.npmjs.org'};
   });
 }
 export function shortcut(p) {
