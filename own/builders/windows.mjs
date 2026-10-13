@@ -20,12 +20,12 @@ const pkg=JSON.parse(asar.extractFile(archive,'package.json'));
 const changes=new Map();
 pkg.name='codex-own';pkg.productName='codex-own';pkg.description='Independent DeepSeek desktop';
 changes.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
-changes.set(pkg.main,Buffer.from('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main).toString()));
+changes.set(pkg.main,Buffer.from('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString()));
 changes.set('.vite/build/own-runtime-win.cjs',fs.readFileSync(path.join(root,'own/runtime/windows.cjs')));
 let shellPatches=0,updaterPatches=0;
 function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const x of v)walk(x,fn);else if(v&&typeof v==='object')walk(v,fn)}}
-for(const name of asar.listPackage(archive).map(n=>n.slice(1)).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js'))){
- let s=changes.has(name)?changes.get(name).toString():asar.extractFile(archive,name).toString(),before=s;
+for(const name of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js'))){
+ let s=changes.has(name)?changes.get(name).toString():asar.extractFile(archive,name.replaceAll('/',path.sep)).toString(),before=s;
  if(name.includes('startup-requirements-')){const needle='Object.assign(process.env,l.userEnv),';if(s.split(needle).length!==2)throw Error('Shell import contract changed');s=s.replace(needle,needle+'require("./own-runtime-win.cjs").apply(),');shellPatches++}
  if(s.includes('shouldIncludeUpdater')){
   const edits=[];walk(acorn.parse(s,{ecmaVersion:'latest',sourceType:'module'}),n=>{
@@ -46,7 +46,7 @@ function pack(dir,prefix=''){
   const file=prefix+name;
   if(entry.files){pack(entry,file+'/');continue}
   if(entry.unpacked||entry.link)continue;
-  const data=changes.get(file)||asar.extractFile(archive,file);
+  const data=changes.get(file)||asar.extractFile(archive,file.replaceAll('/',path.sep));
   entry.size=data.length;entry.offset=String(offset);offset+=data.length;
   const blockSize=4194304,blocks=[];for(let i=0;i<data.length;i+=blockSize)blocks.push(hash(data.subarray(i,i+blockSize)));
   entry.integrity={algorithm:'SHA256',hash:hash(data),blockSize,blocks};buffers.push(data);

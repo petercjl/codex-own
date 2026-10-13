@@ -10,6 +10,7 @@ const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),acorn=require('acorn');
 const {collectPatches}=require('../../scripts/patch-i18n.js');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const extract=(archive,file)=>asar.extractFile(archive,file.replaceAll('/',path.sep));
 
 export function patchTranslationGate(source) {
   if(!source.includes('enable_i18n'))return {source,count:0};
@@ -18,10 +19,10 @@ export function patchTranslationGate(source) {
   return {source,count:patches.length};
 }
 export function inspectTranslations(archive) {
-  const files=asar.listPackage(archive).map(n=>n.slice(1));
+  const files=asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,''));
   const gates=[];
   for(const name of files.filter(n=>n.startsWith('webview/assets/')&&n.endsWith('.js'))){
-    const source=asar.extractFile(archive,name).toString('utf8');
+    const source=extract(archive,name).toString('utf8');
     const {count}=patchTranslationGate(source);
     if(count)gates.push({name,count});
   }
@@ -56,7 +57,7 @@ export async function repairWindowsTranslations(app,{backupRoot=os.tmpdir()}={})
   function pack(dir,prefix=''){
     for(const [name,e] of Object.entries(dir.files)){
       const file=prefix+name;if(e.files){pack(e,file+'/');continue;}if(e.unpacked||e.link)continue;
-      let data=asar.extractFile(archive,file);
+      let data=extract(archive,file);
       if(file.startsWith('webview/assets/')&&file.endsWith('.js')){
         const patched=patchTranslationGate(data.toString('utf8'));count+=patched.count;
         if(patched.count)data=Buffer.from(patched.source);

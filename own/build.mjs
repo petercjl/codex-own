@@ -37,7 +37,7 @@ else{
   const allowed=['node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node','node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node'];
   if(!missing.length||missing.some(n=>!allowed.includes(n)))throw syncError;
  }
- for(const [n,e]of files){if(e.link||e.unpacked)continue;const f=path.join(extract,n);fs.mkdirSync(path.dirname(f),{recursive:true});const b=asar.extractFile(archive,n);if(e.integrity?.hash&&sha(b)!==e.integrity.hash)throw Error('Source integrity mismatch '+n);fs.writeFileSync(f,b);}
+ for(const [n,e]of files){if(e.link||e.unpacked)continue;const f=path.join(extract,n);fs.mkdirSync(path.dirname(f),{recursive:true});const b=asar.extractFile(archive,n.replaceAll('/',path.sep));if(e.integrity?.hash&&sha(b)!==e.integrity.hash)throw Error('Source integrity mismatch '+n);fs.writeFileSync(f,b);}
  run(process.execPath,['scripts/patch-all.js',platform]);
  source=path.join(output,'prepared');fs.cpSync(original,source,{recursive:true,verbatimSymlinks:true,errorOnExist:true,force:false});
  const resources=path.join(source,mac?'Contents/Resources':'resources'),dest=path.join(resources,'app.asar');
