@@ -40,7 +40,7 @@ jobs:
           OWN_VERSION: ${{ inputs.version }}
           OWN_UPSTREAM_SHA: ${{ inputs.upstream }}
         run: node own/build.mjs
-      - name: Verify initial migration artifact
+      - name: Verify prepared desktop artifacts
         if: ${{ inputs.existing }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,5 +53,5 @@ jobs:
           path: |
             out/own-release-*/codex-own-*.tar.gz
             out/own-release-*/manifest-*.json
-          if-no-files-found: ${{ inputs.existing && matrix.platform == 'win32-x64' && 'warn' || 'error' }}
+          if-no-files-found: error
           retention-days: 3

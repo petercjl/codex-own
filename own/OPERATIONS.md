@@ -14,7 +14,7 @@ No upstream changes means no new publication. New upstream changes are merged in
 
 Use the installed npm-release-kit from the own/ package root, with --workflow own-release.yml. Stable releases use latest, prereleases use next. Never use local npm publish for a substantive release. The only initial local publication is the separately authorized minimal bootstrap placeholder.
 
-Desktop assets are on versioned GitHub releases own-vX.Y.Z. npm versions and desktop artifact manifests must match. Draft assets are verified on macOS/Windows CI before activation. First 0.1.0 migration release contains the previously validated macOS ARM64 app; Windows unit checks run but no Windows application is distributed for this initial version. Subsequent automatic candidates require both platforms. The Windows GUI remains unverified unless a real application smoke is recorded.
+Desktop assets are on versioned GitHub releases own-vX.Y.Z. npm versions and desktop artifact manifests must match. Draft assets are verified on macOS/Windows CI before activation. Releases from 0.1.1 distribute macOS ARM64 and Windows x64 desktop artifacts. Both platforms are required. Windows prepared artifacts also pass an installation/configuration smoke using the packed npm CLI in an isolated Windows user-data tree. The Windows GUI remains unverified unless a real application smoke is recorded.
 
 If publication has an unknown outcome, inspect the npm exact version/tag, Git tag, Actions run and GitHub Release before retrying. A successful npm publication with still-draft desktop assets requires activating that same verified release, not bumping a new version. Monitor output includes version, tag, run URL and evidence.
 

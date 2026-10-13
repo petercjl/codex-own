@@ -7,10 +7,11 @@ const dir=path.resolve('out',`own-release-${version}-${key}`);fs.mkdirSync(dir,{
 const gh=(args)=>execFileSync('gh',args,{stdio:'inherit'});
 gh(['release','download',`own-v${version}`,'--repo','petercjl/codex-own','--pattern','manifest.json','--dir',dir]);
 const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json')));
-if(!manifest.platforms[key]){if(key==='win32-x64'&&version==='0.1.0'){console.log('Initial macOS migration release; Windows app not distributed in this version');process.exit(0);}throw Error('Missing platform '+key);}
+if(!manifest.platforms[key])throw Error('Missing platform '+key);
 const a=validateManifest(manifest,key),file=path.join(dir,path.basename(new URL(a.url).pathname));
 gh(['release','download',`own-v${version}`,'--repo','petercjl/codex-own','--pattern',path.basename(file),'--dir',dir]);
 if(fs.statSync(file).size!==a.size||await digestFile(file)!==a.sha256)throw Error('Artifact mismatch');
+if(key==='win32-x64')execFileSync(process.execPath,['own/ci/test-windows-install.mjs',file,path.join(dir,'manifest.json')],{stdio:'inherit'});
 const dest=path.join(dir,'unpacked');unpack(file,dest);execFileSync(process.execPath,['own/test-app.mjs',path.join(dest,a.entry)],{stdio:'inherit'});
 if(key==='darwin-arm64')execFileSync('codesign',['--verify','--deep','--strict',path.join(dest,a.entry)],{stdio:'inherit'});
 fs.writeFileSync(path.join(dir,`manifest-${key}.json`),JSON.stringify({...manifest,platforms:{[key]:a}}),{flag:'wx'});
