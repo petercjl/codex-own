@@ -61,6 +61,12 @@ jobs:
             gh release upload "own-v$OWN_VERSION" out/verified/manifest.json
             find out/verified -name '*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
           fi
+          gh release view "own-v$OWN_VERSION" --json assets --jq '.assets[].name' > out/desktop-assets-present.txt
+          while IFS= read -r file; do
+            if ! rg --fixed-strings --line-regexp "$(basename "$file")" out/desktop-assets-present.txt >/dev/null; then
+              gh release upload "own-v$OWN_VERSION" "$file"
+            fi
+          done < <(find out/verified -name 'codex-own-*.tar.gz')
           node own/ci/publish-npm-assets.mjs out/verified
           node own/ci/verify-npm-assets.mjs out/verified/npm-manifest.json
           cp out/verified/npm-manifest.json own/release.json
