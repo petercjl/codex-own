@@ -1,0 +1,83 @@
+name: Publish codex-own npm
+on:
+  workflow_dispatch:
+    inputs:
+      release: {description: 'patch, minor, major or exact semver', type: string, default: patch, required: true}
+      tag: {description: 'npm dist-tag', type: choice, options: [latest, next], default: latest, required: true}
+      existing: {description: 'Verify previously prepared versioned desktop artifacts', type: boolean, default: true}
+permissions:
+  contents: read
+concurrency:
+  group: codex-own-npm-publish
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'petercjl/codex-own' && github.ref == 'refs/heads/own-main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      ref: ${{ steps.version.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v6
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24', package-manager-cache: false}
+      - id: version
+        env: {RELEASE: '${{ inputs.release }}'}
+        run: |
+          echo "version=$(node own/ci/version.mjs "$RELEASE")" >> "$GITHUB_OUTPUT"
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  qa:
+    needs: prepare
+    uses: ./.github/workflows/own-build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.ref }}
+      version: ${{ needs.prepare.outputs.version }}
+      existing: ${{ inputs.existing }}
+  publish:
+    needs: [prepare, qa]
+    runs-on: ubuntu-latest
+    permissions: {contents: write, id-token: write}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: own-main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', registry-url: 'https://registry.npmjs.org', package-manager-cache: false}
+      - run: npm install --global npm@latest
+      - run: npm ci --prefix own
+      - uses: actions/download-artifact@v7
+        with: {path: verified}
+      - name: Finalize verified desktop manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWN_VERSION: ${{ needs.prepare.outputs.version }}
+          EXPECTED_REF: ${{ needs.prepare.outputs.ref }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_REF"
+          node own/ci/combine.mjs verified "$OWN_VERSION"
+          if ! gh release view "own-v$OWN_VERSION" >/dev/null 2>&1; then
+            gh release create "own-v$OWN_VERSION" --draft --target "$EXPECTED_REF" --title "codex-own $OWN_VERSION" --notes 'Verified desktop artifacts.'
+            gh release upload "own-v$OWN_VERSION" verified/manifest.json
+            find verified -name '*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
+          fi
+          cp verified/manifest.json own/release.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add own/release.json
+          git diff --cached --quiet || git commit -m 'chore: record verified desktop manifest'
+          git push origin HEAD:own-main
+      - name: Publish through npm Trusted Publishing
+        working-directory: own
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: npx --yes --package @petercjl/npm-release-kit npm-release-kit ci publish --release "$RELEASE_VERSION" --tag "$RELEASE_TAG"
+      - name: Verify registry and activate desktop release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWN_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          node own/ci/verify-registry.mjs "$OWN_VERSION" "$RELEASE_TAG"
+          gh release edit "own-v$OWN_VERSION" --draft=false --notes 'Verified desktop artifacts and npm manager released.'

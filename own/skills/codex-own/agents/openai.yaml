@@ -1,0 +1,3 @@
+interface:
+  display_name: "codex-own 安装与更新"
+  short_description: "安装、更新和检查独立的 codex-own 桌面应用"

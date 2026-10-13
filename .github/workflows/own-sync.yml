@@ -1,0 +1,66 @@
+name: codex-own daily upstream merge
+on:
+  schedule:
+    - cron: '10 4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: codex-own-upstream-sync
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'petercjl/codex-own'
+    runs-on: ubuntu-latest
+    permissions: {contents: write, pull-requests: write}
+    outputs:
+      changed: ${{ steps.sync.outputs.changed }}
+      ref: ${{ steps.sync.outputs.ref }}
+      upstream: ${{ steps.sync.outputs.upstream }}
+      base: ${{ steps.sync.outputs.base }}
+      pr: ${{ steps.sync.outputs.pr }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: own-main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24', package-manager-cache: false}
+      - id: sync
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: node own/ci/sync.mjs
+      - id: version
+        if: steps.sync.outputs.changed == 'true'
+        run: echo "version=$(node own/ci/version.mjs patch)" >> "$GITHUB_OUTPUT"
+  verify:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    uses: ./.github/workflows/own-build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.ref }}
+      upstream: ${{ needs.prepare.outputs.upstream }}
+      version: ${{ needs.prepare.outputs.version }}
+  merge:
+    needs: [prepare, verify]
+    runs-on: ubuntu-latest
+    permissions: {contents: write, pull-requests: write, actions: write}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: own-main, fetch-depth: 0}
+      - uses: actions/download-artifact@v7
+        with: {path: candidate}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24', package-manager-cache: false}
+      - name: Merge verified candidate and prepare release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_BASE: ${{ needs.prepare.outputs.base }}
+          EXPECTED_HEAD: ${{ needs.prepare.outputs.ref }}
+          OWN_VERSION: ${{ needs.prepare.outputs.version }}
+          OWN_PR: ${{ needs.prepare.outputs.pr }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_BASE"
+          node own/ci/combine.mjs candidate "$OWN_VERSION"
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$OWN_PR/merge" -f sha="$EXPECTED_HEAD" -f merge_method=merge --jq 'if .merged then .sha else error(.message) end'
+          gh release create "own-v$OWN_VERSION" --target own-main --title "codex-own $OWN_VERSION" --notes 'Verified upstream candidate; npm publication pending.' --draft
+          find candidate -type f \( -name '*.tar.gz' -o -name 'manifest.json' \) -exec gh release upload "own-v$OWN_VERSION" {} +
+          gh workflow run own-release.yml --ref own-main -f release="$OWN_VERSION" -f tag=latest -f existing=true

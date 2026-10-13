@@ -1,0 +1,41 @@
+{
+  "name": "@petercjl/codex-own",
+  "version": "0.0.0-dev.0",
+  "description": "Independent codex-own desktop installation and update manager",
+  "type": "module",
+  "bin": {
+    "codex-own": "bin/codex-own.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skills",
+    "capabilities.json",
+    "release.json",
+    "README.md",
+    "defaults"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/petercjl/codex-own.git",
+    "directory": "own"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check bin/codex-own.mjs && node --check lib/manager.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/asar": "4.0.1",
+    "acorn": "8.15.0",
+    "pe-library": "1.0.1",
+    "plist": "3.1.0",
+    "resedit": "3.0.2"
+  }
+}

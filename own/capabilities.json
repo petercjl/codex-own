@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "package": "@petercjl/codex-own",
+  "commands": [
+    "install",
+    "configure",
+    "update check",
+    "update install",
+    "launch",
+    "rollback",
+    "doctor",
+    "skill source",
+    "skill status",
+    "skill install",
+    "skill update"
+  ],
+  "platforms": {
+    "darwin-arm64": "implemented",
+    "win32-x64": "implemented"
+  },
+  "dataPolicy": "independent external directories; preserve credentials and conversations",
+  "updatePolicy": "explicit update; pinned verified build; refuse running app; backup before switch; restore data snapshot for rollback",
+  "authentication": "npm install does not grant model access; existing independent credentials remain local"
+}

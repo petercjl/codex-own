@@ -1,0 +1,57 @@
+name: codex-own candidate verification
+on:
+  workflow_call:
+    inputs:
+      ref: {type: string, required: true}
+      version: {type: string, required: true}
+      upstream: {type: string, required: false, default: ''}
+      existing: {type: boolean, required: false, default: false}
+permissions:
+  contents: read
+jobs:
+  qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, platform: darwin-arm64}
+          - {os: windows-latest, platform: win32-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run: {shell: bash}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: '${{ inputs.ref }}', fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24', package-manager-cache: false}
+      - run: npm ci --prefix own
+      - run: npm run check --prefix own && npm test --prefix own
+      - name: Build updated upstream candidate
+        if: ${{ !inputs.existing }}
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+          OWN_UPSTREAM_SHA: ${{ inputs.upstream }}
+        run: |
+          npm ci
+          if [ "$RUNNER_OS" = macOS ]; then brew install sevenzip; else cp '/c/Program Files/7-Zip/7z.exe' '/c/Program Files/7-Zip/7zz.exe'; printf '%s\n' 'C:\Program Files\7-Zip' >> "$GITHUB_PATH"; fi
+      - if: ${{ !inputs.existing }}
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+          OWN_UPSTREAM_SHA: ${{ inputs.upstream }}
+        run: node own/build.mjs
+      - name: Verify initial migration artifact
+        if: ${{ inputs.existing }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWN_VERSION: ${{ inputs.version }}
+          OWN_PLATFORM: ${{ matrix.platform }}
+        run: node own/ci/verify-existing.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: own-${{ matrix.platform }}
+          path: |
+            out/own-release-*/codex-own-*.tar.gz
+            out/own-release-*/manifest-*.json
+          if-no-files-found: ${{ inputs.existing && matrix.platform == 'win32-x64' && 'warn' || 'error' }}
+          retention-days: 3

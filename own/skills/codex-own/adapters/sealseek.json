@@ -1,0 +1,21 @@
+{
+  "schema": "portable-skill-adapter",
+  "platform": "sealseek",
+  "mappings": [
+    {
+      "capability_id": "command.execute",
+      "status": "implemented",
+      "features": [
+        "node22",
+        "exit-status",
+        "json-output"
+      ],
+      "implementation": {
+        "kind": "cli",
+        "command": "codex-own",
+        "instructions": "Resolve from the installed npm bin directory or PATH. Verify version, capabilities and doctor. Invoke through the host terminal and parse JSON; retain nonzero exits."
+      }
+    }
+  ],
+  "compatibility": "CLI contract implemented; fresh Agent conversation discovery and Windows GUI remain untested."
+}

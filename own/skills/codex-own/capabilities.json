@@ -1,0 +1,39 @@
+{
+  "schema": "portable-skill-capabilities",
+  "schema_version": "1.0.0",
+  "skill": "codex-own",
+  "target_platforms": [
+    "codex",
+    "sealseek"
+  ],
+  "capabilities": [
+    {
+      "id": "command.execute",
+      "purpose": "Invoke the installed desktop lifecycle CLI",
+      "required": true,
+      "required_features": [
+        "node22",
+        "exit-status",
+        "json-output"
+      ],
+      "input_fields": [
+        "command",
+        "arguments"
+      ],
+      "output_fields": [
+        "ok",
+        "metadata",
+        "warnings"
+      ],
+      "side_effects": {
+        "external_mutation": true,
+        "may_cost_money": false,
+        "authorization": "Only requested install, update, configuration or recovery; read-only checks otherwise."
+      },
+      "errors": [
+        "CAPABILITY_UNAVAILABLE",
+        "OPERATION_FAILED"
+      ]
+    }
+  ]
+}
