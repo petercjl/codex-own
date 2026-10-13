@@ -1,19 +1,41 @@
 {
   "schema": 1,
   "repository": "petercjl/codex-own",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "platforms": {
     "darwin-arm64": {
       "entry": "codex-own.app",
-      "url": "https://github.com/petercjl/codex-own/releases/download/own-v0.1.0/codex-own-darwin-arm64.tar.gz",
+      "url": "https://github.com/petercjl/codex-own/releases/download/own-v0.1.1/codex-own-darwin-arm64.tar.gz",
       "sha256": "6512d6d2e8ef46f64339ca1233fe833a067329cf006b17b3a0aa1bd27fd8e457",
       "size": 781692456
+    },
+    "win32-x64": {
+      "entry": "app",
+      "url": "https://github.com/petercjl/codex-own/releases/download/own-v0.1.1/codex-own-win32-x64.tar.gz",
+      "sha256": "f110a1e7e0f7c1e184ccc8733674d00280ecae02762530b07ca3b7d2547a4259",
+      "size": 920368892
     }
   },
   "provenance": {
     "darwin-arm64": {
-      "upstreamCommit": "a899ae46dd608826bdc9647fb488615c47168428",
-      "kind": "adopted-verified-local-build"
+      "darwin-arm64": {
+        "sourceRelease": "own-v0.1.0"
+      },
+      "win32-x64": {
+        "kind": "prepared-independent-build",
+        "desktopVersion": "26.1007.21434",
+        "guiAcceptance": "user-pending"
+      }
+    },
+    "win32-x64": {
+      "darwin-arm64": {
+        "sourceRelease": "own-v0.1.0"
+      },
+      "win32-x64": {
+        "kind": "prepared-independent-build",
+        "desktopVersion": "26.1007.21434",
+        "guiAcceptance": "user-pending"
+      }
     }
   }
 }
