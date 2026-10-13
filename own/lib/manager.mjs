@@ -40,9 +40,17 @@ export async function download(url,dest,expected) {
 export function checkEntries(names) {
   for(const n of names){const p=n.replaceAll('\\','/');if(p.startsWith('/')||/^[a-z]:/i.test(p)||p.split('/').includes('..'))fail('UNSAFE_ARCHIVE','Unsafe archive entry');}
 }
+export function tarExecutable(platform=process.platform,env=process.env,exists=fs.existsSync) {
+  if(platform!=='win32')return 'tar';
+  const root=env.SystemRoot||env.SYSTEMROOT||env.windir||env.WINDIR;
+  if(!root)fail('DEPENDENCY_MISSING','Windows system directory is unavailable');
+  const executable=path.win32.join(root,'System32','tar.exe');
+  if(!exists(executable))fail('DEPENDENCY_MISSING','Windows system tar.exe is required');
+  return executable;
+}
 export function unpack(archive,dest) {
-  const names=execFileSync('tar',['-tf',archive],{encoding:'utf8',maxBuffer:30*1024*1024}).split('\n').filter(Boolean);checkEntries(names);
-  fs.mkdirSync(dest);execFileSync('tar',['-xf',archive,'-C',dest],{stdio:'pipe'});
+  const names=execFileSync(tarExecutable(),['-tf',archive],{encoding:'utf8',maxBuffer:30*1024*1024}).split('\n').filter(Boolean);checkEntries(names);
+  fs.mkdirSync(dest);execFileSync(tarExecutable(),['-xf',archive,'-C',dest],{stdio:'pipe'});
   // Bundled framework links may be relative but must stay within the extracted tree.
   function walk(p){for(const x of fs.readdirSync(p,{withFileTypes:true})){const f=path.join(p,x.name);if(x.isSymbolicLink()){const resolved=path.resolve(path.dirname(f),fs.readlinkSync(f));if(!resolved.startsWith(dest+path.sep))fail('UNSAFE_ARCHIVE','Escaping symlink');}else if(x.isDirectory())walk(f);}}
   walk(dest);
@@ -118,4 +126,4 @@ export async function rollback({restoreData=false}={}){const p=paths();return lo
   const preserved=path.join(path.dirname(p.target),'.codex-own-before-rollback-'+crypto.randomUUID());fs.renameSync(p.target,preserved);fs.renameSync(prev.app,p.target);
   for(const n of ['core','desktop']){const snap=path.join(prev.data,n);if(fs.existsSync(p[n]))fs.renameSync(p[n],path.join(p.root,n+'.before-rollback-'+crypto.randomUUID()));if(fs.existsSync(snap))fs.cpSync(snap,p[n],{recursive:true,force:false,errorOnExist:true});}
   writeState(p,{...(prev.state||{schema:1,identity:'local.codex-own',version:'adopted-legacy',target:p.target}),previous:null});return {ok:true,preserved,dataBackup:backup};});}
-export function doctor(){const p=paths(),s=state(p);let tar=true;try{execFileSync('tar',['--version'],{stdio:'pipe'});}catch{tar=false;}const pending=fs.existsSync(p.manager)?fs.readdirSync(p.manager).filter(n=>/^transaction-.*\.json$/.test(n)&&!n.endsWith('.complete.json')&&!fs.existsSync(path.join(p.manager,n.replace('.json','.complete.json')))):[];return {ok:tar&&!pending.length,managerVersion:pkg.version,platform:p.platform,supported:['darwin-arm64','win32-x64'].includes(p.platform),installed:s?.version||null,paths:p,tar,pendingTransactions:pending,lock:fs.existsSync(path.join(p.manager,'operation.lock')),configured:fs.existsSync(path.join(p.core,'auth.json')),windowsGuiTested:false};}
+export function doctor(){const p=paths(),s=state(p);let tar=true;try{execFileSync(tarExecutable(),['--version'],{stdio:'pipe'});}catch{tar=false;}const pending=fs.existsSync(p.manager)?fs.readdirSync(p.manager).filter(n=>/^transaction-.*\.json$/.test(n)&&!n.endsWith('.complete.json')&&!fs.existsSync(path.join(p.manager,n.replace('.json','.complete.json')))):[];return {ok:tar&&!pending.length,managerVersion:pkg.version,platform:p.platform,supported:['darwin-arm64','win32-x64'].includes(p.platform),installed:s?.version||null,paths:p,tar,pendingTransactions:pending,lock:fs.existsSync(path.join(p.manager,'operation.lock')),configured:fs.existsSync(path.join(p.core,'auth.json')),windowsGuiTested:false};}
