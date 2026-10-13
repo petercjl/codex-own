@@ -24,31 +24,44 @@ function safeCache(file) {
   if (fs.existsSync(file) && (!fs.lstatSync(file).isFile() || fs.lstatSync(file).isSymbolicLink()))
     throw Object.assign(new Error('Unexpected npm asset cache entry'), {code:'UNSAFE_PATH'});
 }
-export async function assembleNpmAsset(asset, dest, cache, tar, {download = verifiedDownload, report = progress} = {}) {
+export async function assembleNpmAsset(asset, dest, cache, tar, {download = verifiedDownload, report = progress, concurrency = 4} = {}) {
   validateParts(asset);
   fs.mkdirSync(cache, {recursive:true, mode:0o700});
-  const files = [];
-  for (const [i, part] of asset.parts.entries()) {
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4) throw new Error('Invalid download concurrency');
+  const controller = new AbortController();
+  async function fetchPart(part, i) {
     report(`npm 资源分片 ${i+1}/${asset.parts.length}`);
     const file = path.join(cache, `${part.sha256}.bin`);
     safeCache(file);
     if (fs.existsSync(file) && fs.statSync(file).size === part.size && await fileHash(file) === part.sha256) {
-      report('复用已校验分片'); files.push(file); continue;
+      report(`[${i+1}/${asset.parts.length}] 复用已校验分片`); return file;
     }
     if (fs.existsSync(file)) fs.unlinkSync(file);
     const scratch = fs.mkdtempSync(path.join(cache, 'fetch-'));
     try {
       const archive = path.join(scratch, 'package.tgz');
-      await download(part.url, archive, {size:part.archiveSize, sha256:part.archiveSha256});
+      await download(part.url, archive, {size:part.archiveSize, sha256:part.archiveSha256}, {signal:controller.signal, report:message=>report(`[${i+1}/${asset.parts.length}] ${message}`)});
       // Extract only the fixed payload entry, never arbitrary paths from a package tarball.
       execFileSync(tar, ['-xf', archive, '-C', scratch, 'package/payload.bin'], {stdio:'pipe'});
       const payload = path.join(scratch, 'package', 'payload.bin');
       safeCache(payload);
       if (fs.statSync(payload).size !== part.size || await fileHash(payload) !== part.sha256)
         throw Object.assign(new Error('npm payload checksum mismatch'), {code:'CHECKSUM_MISMATCH'});
-      fs.renameSync(payload, file); files.push(file);
+      fs.renameSync(payload, file); return file;
     } finally { fs.rmSync(scratch, {recursive:true,force:true}); }
   }
+  const unique = [...new Map(asset.parts.map((part,i)=>[part.sha256,{part,i}])).values()];
+  const completed = new Map(); let cursor = 0, failure;
+  async function worker() {
+    while(!controller.signal.aborted && cursor < unique.length) {
+      const {part,i}=unique[cursor++];
+      try { completed.set(part.sha256,await fetchPart(part,i)); }
+      catch(e) { if(!failure)failure=e;controller.abort();throw e; }
+    }
+  }
+  await Promise.allSettled(Array.from({length:Math.min(concurrency,unique.length)},worker));
+  if(failure)throw failure;
+  const files=asset.parts.map(part=>completed.get(part.sha256));
   report('合并并校验完整桌面安装包');
   const output = fs.createWriteStream(dest, {flags:'wx',mode:0o600});
   async function* chunks() { for (const f of files) yield* fs.createReadStream(f); }

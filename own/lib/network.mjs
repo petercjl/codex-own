@@ -13,17 +13,19 @@ export async function fileHash(file) {
   return h.digest('hex');
 }
 export async function verifiedDownload(url, dest, expected, {
-  fetcher = networkFetch, report = progress, idleMs = 30000, attempts = 3, retryMs = 1000,
+  fetcher = networkFetch, report = progress, idleMs = 30000, attempts = 3, retryMs = 1000, signal,
 } = {}) {
   const error = (code, message) => Object.assign(new Error(message), {code});
   if (fs.existsSync(dest)) throw error('TARGET_EXISTS', 'Download destination already exists');
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    if(signal?.aborted)throw error('CANCELLED','Download group cancelled');
     const controller = new AbortController();
     let file, bytes = 0, timer, cancelled = false;
     const start = Date.now();
     const cancel = () => { cancelled = true; controller.abort(); };
     const reset = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), idleMs); };
     const tick = () => report(`下载 ${Math.floor(bytes / expected.size * 100)}% · ${(bytes / 1048576).toFixed(1)} / ${(expected.size / 1048576).toFixed(1)} MiB · ${((Date.now()-start)/1000).toFixed(0)}s`);
+    signal?.addEventListener('abort',cancel,{once:true});
     process.once('SIGINT', cancel);
     process.once('SIGTERM', cancel);
     const interval = setInterval(tick, 3000);
@@ -55,6 +57,7 @@ export async function verifiedDownload(url, dest, expected, {
       if (cancelled) throw error('CANCELLED', 'Download cancelled. Verified earlier parts are retained; rerun the install command to continue.');
     } finally {
       clearTimeout(timer); clearInterval(interval);
+      signal?.removeEventListener('abort',cancel);
       process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
       if (file) await file.close();
     }

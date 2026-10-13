@@ -29,6 +29,7 @@
     "cache": "verified platform parts retained for retries",
     "progress": "stderr; final result JSON on stdout",
     "idleTimeoutSeconds": 30,
-    "downloadAttempts": 3
+    "downloadAttempts": 3,
+    "parallelDownloads": 4
   }
 }

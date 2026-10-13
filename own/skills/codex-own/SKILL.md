@@ -29,3 +29,5 @@ For installation-only acceptance, verify doctor, version, target and shortcut wi
 - Manage this bundled Skill through `skill status/install/update --agent codex|sealseek`. For another Agent use its configured `--target-root`, not a guessed path. Unknown existing Skill targets are refused, managed updates retain backups and customized UI metadata.
 
 The portable contract uses a terminal that can invoke the same CLI on either Agent. Agent-specific scheduling and publication are repository operations, outside ordinary installation. Runtime must not rewrite its own source. A recurring failure belongs in an authorized implementation/test change.
+
+Downloads use at most four parallel npm payload requests, label progress by part, preserve archive order, and cancel active peer downloads on failure.

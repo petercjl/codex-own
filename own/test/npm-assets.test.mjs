@@ -30,8 +30,8 @@ test('checksum mismatch never becomes a successful download',async t=>{
   await assert.rejects(verifiedDownload(url,dest,{size:1,sha256:'a'.repeat(64)},{fetcher:fetch,report:()=>{}}),{code:'CHECKSUM_MISMATCH'});
   assert.equal(fs.existsSync(dest),false);
 });
-function fixture(t){
-  const dir=temp(t),payload=Buffer.from('a reproducible desktop archive fixture'),sha256=hash(payload);
+function fixture(t, suffix=''){
+  const dir=temp(t),payload=Buffer.from('a reproducible desktop archive fixture'+suffix),sha256=hash(payload);
   fs.mkdirSync(path.join(dir,'package'));fs.writeFileSync(path.join(dir,'package','payload.bin'),payload);
   const tar=tarExecutable(),tgz=path.join(dir,'package.tgz');execFileSync(tar,['-czf',tgz,'-C',dir,'package']);
   const data=fs.readFileSync(tgz),part={sha256,size:payload.length,url:payloadURL(sha256),archiveSize:data.length,archiveSha256:hash(data)};
@@ -63,4 +63,20 @@ test('persistent npm HTTP failure preserves status in the final error',async t=>
   const dest=path.join(temp(t),'part'),url=await server(t,(_,r)=>{r.writeHead(503);r.end();});
   await assert.rejects(verifiedDownload(url,dest,{size:1,sha256:'a'.repeat(64)},{fetcher:fetch,report:()=>{},retryMs:1}),e=>e.code==='DOWNLOAD_FAILED'&&e.message.includes('HTTP 503'));
   assert.equal(fs.existsSync(dest),false);
+});
+
+test('parallel assembly bounds downloads, preserves order, and cancels peers on failure',async t=>{
+  const fixtures=Array.from({length:6},(_,i)=>fixture(t,String(i))),dir=temp(t),data=Buffer.concat(fixtures.map(f=>f.payload));
+  const asset={entry:'app',size:data.length,sha256:hash(data),parts:fixtures.flatMap(f=>f.asset.parts)};
+  let active=0,peak=0;
+  const download=async(url,file)=>{active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,15));fs.writeFileSync(file,fixtures.find(f=>f.asset.parts[0].url===url).data,{flag:'wx'});active--;};
+  await assembleNpmAsset(asset,path.join(dir,'archive'),path.join(dir,'cache'),tarExecutable(),{download,report:()=>{},concurrency:3});
+  assert.equal(peak,3);assert.deepEqual(fs.readFileSync(path.join(dir,'archive')),data);
+  let cancelled=0;
+  const broken=async(url,file,expected,{signal})=>{
+    if(url===asset.parts[0].url){await new Promise(r=>setTimeout(r,10));throw Object.assign(Error('broken'),{code:'DOWNLOAD_FAILED'});}
+    await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>{cancelled++;reject(Error('cancelled'));},{once:true}));
+  };
+  await assert.rejects(assembleNpmAsset(asset,path.join(dir,'bad'),path.join(dir,'bad-cache'),tarExecutable(),{download:broken,report:()=>{},concurrency:3}),{code:'DOWNLOAD_FAILED'});
+  assert.equal(cancelled,2);assert.equal(fs.existsSync(path.join(dir,'bad')),false);
 });
