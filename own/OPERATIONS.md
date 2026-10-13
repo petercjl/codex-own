@@ -2,7 +2,7 @@
 
 Repository: https://github.com/petercjl/codex-own
 Default product branch: own-main. Upstream: Haleclipse/CodexDesktop-Rebuild master.
-Package: @petercjl/codex-own, root own/. Canonical workflows live in the repository root .github/workflows; own/.github/workflows contains the npm-release-kit initialization reference.
+Package: @petercjl/codex-own, root own/. Canonical workflows live in the repository root .github/workflows; own/.github/workflows links to the same canonical workflows for package-root tooling.
 
 ## Daily ownership
 

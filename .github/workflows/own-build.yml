@@ -40,6 +40,11 @@ jobs:
           OWN_VERSION: ${{ inputs.version }}
           OWN_UPSTREAM_SHA: ${{ inputs.upstream }}
         run: node own/build.mjs
+      - name: Verify Windows candidate installation
+        if: ${{ !inputs.existing && matrix.platform == 'win32-x64' }}
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+        run: node own/ci/test-windows-install.mjs "out/own-release-$OWN_VERSION-win32-x64/codex-own-win32-x64.tar.gz" "out/own-release-$OWN_VERSION-win32-x64/manifest-win32-x64.json"
       - name: Verify prepared desktop artifacts
         if: ${{ inputs.existing }}
         env:
