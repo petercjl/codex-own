@@ -69,6 +69,13 @@ jobs:
           done < <(find out/verified -name 'codex-own-*.tar.gz')
           node own/ci/publish-npm-assets.mjs out/verified
           node own/ci/verify-npm-assets.mjs out/verified/npm-manifest.json
+          if ! grep -Fx 'manifest.prepared.json' out/desktop-assets-present.txt >/dev/null; then
+            test ! -e out/manifest-input-backup
+            gh release download "own-v$OWN_VERSION" --pattern manifest.json --dir out/manifest-input-backup
+            mv out/manifest-input-backup/manifest.json out/manifest-input-backup/manifest.prepared.json
+            gh release upload "own-v$OWN_VERSION" out/manifest-input-backup/manifest.prepared.json
+          fi
+          gh release upload "own-v$OWN_VERSION" out/verified/manifest.json --clobber
           cp out/verified/npm-manifest.json own/release.json
           node --input-type=module -e "import fs from 'node:fs';const f='own/package.json',p=JSON.parse(fs.readFileSync(f));p.ownDesktopManifest=JSON.parse(fs.readFileSync('own/release.json'));fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');"
           git config user.name 'github-actions[bot]'

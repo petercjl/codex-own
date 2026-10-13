@@ -25,4 +25,5 @@ test('prepared desktop with visible selector but disabled translation fails rele
   assert.equal(inspectTranslations(archive).gates.length,1);assert.throws(()=>verifyTranslations(app),{code:'I18N_NOT_READY'});
   fs.writeFileSync(initial,patchTranslationGate(fs.readFileSync(initial,'utf8')).source);await asar.createPackage(source,archive);
   assert.equal(verifyTranslations(app).ok,true);
+  assert.equal(asar.statFile(archive,path.join('webview','assets','app-initial-test.js')).size,fs.statSync(initial).size);
 });

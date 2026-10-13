@@ -19,6 +19,8 @@ export function patchTranslationGate(source) {
   return {source,count:patches.length};
 }
 export function inspectTranslations(archive) {
+  // ASAR caches headers by filename; a repaired archive has a new header.
+  asar.uncache(archive);
   const files=asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,''));
   const gates=[];
   for(const name of files.filter(n=>n.startsWith('webview/assets/')&&n.endsWith('.js'))){
