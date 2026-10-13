@@ -7,7 +7,7 @@ description: Install, update, launch and diagnose the independent codex-own desk
 
 Input: the requested install, update, diagnosis or recovery action, existing installation state, optional supplied API key file, and user authorization. Output: manager and desktop versions, verified installation paths, backup evidence and unresolved errors. Package installation alone does not configure model access.
 
-Use the installed `codex-own` CLI. Resolve its current bundled instructions with `codex-own skill source --json`; probe `version`, `capabilities` and `doctor`. Requires Node.js 22+, tar, a supported desktop OS and network for downloads. macOS ARM64 and Windows x64 are implementation targets; a diagnostic result does not prove Windows GUI compatibility.
+Use the installed `codex-own` CLI. Resolve its current bundled instructions with `codex-own skill source --json`; probe `version`, `capabilities` and `doctor`. Requires Node.js 22+, tar, a supported desktop OS and access to registry.npmjs.org. Install the latest manager from npm; it downloads only the current platform’s desktop payloads from npm. Internal payload prereleases are data, not CLI entry points. macOS ARM64 and Windows x64 are implementation targets; a diagnostic result does not prove Windows GUI compatibility.
 
 ## Main line
 
@@ -16,10 +16,13 @@ Use the installed `codex-own` CLI. Resolve its current bundled instructions with
 3. For an authorized update, quit codex-own gracefully and run `codex-own update install --yes`. Do not terminate the original Codex. The manager and desktop versions are separate. Updating the npm manager alone does not update the desktop application.
 4. Read `doctor` and `version`, retain the returned backup locations, then use `codex-own launch` when requested. Verify startup separately from installer success.
 
+For installation-only acceptance, verify doctor, version, target and shortcut without configuring credentials or launching the GUI unless requested. Progress goes to stderr; final results remain JSON on stdout.
+
 ## Recovery and boundaries
 
 - APP_RUNNING: request or perform authorized graceful exit, then return to step 3.
 - CHECKSUM_MISMATCH, UNMANAGED_TARGET, UNSAFE_PATH, or incompatible patches: stop; preserve the current application.
+- DOWNLOAD_FAILED: inspect npm registry connectivity and retry the same command; verified payload parts are reused. Ctrl+C during download cancels and releases the operation lock. Keep TLS verification enabled.
 - BUSY or pending transactions: inspect the recorded transaction and process before recovery; do not blindly delete locks or replay an installation.
 - Rollback requires `codex-own rollback --restore-data --yes`. Explain that this restores the matching old data snapshot; newer data is preserved separately. Obtain authorization covering this restoration, then verify state.
 - Credentials and conversation data stay outside Git and npm. Never print API keys. Never modify original Codex directories or global model environment variables.

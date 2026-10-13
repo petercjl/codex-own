@@ -61,10 +61,13 @@ jobs:
             gh release upload "own-v$OWN_VERSION" out/verified/manifest.json
             find out/verified -name '*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
           fi
-          cp out/verified/manifest.json own/release.json
+          node own/ci/publish-npm-assets.mjs out/verified
+          node own/ci/verify-npm-assets.mjs out/verified/npm-manifest.json
+          cp out/verified/npm-manifest.json own/release.json
+          node --input-type=module -e "import fs from 'node:fs';const f='own/package.json',p=JSON.parse(fs.readFileSync(f));p.ownDesktopManifest=JSON.parse(fs.readFileSync('own/release.json'));fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add own/release.json
+          git add own/release.json own/package.json
           git diff --cached --quiet || git commit -m 'chore: record verified desktop manifest'
           git push origin HEAD:own-main
       - name: Publish through npm Trusted Publishing

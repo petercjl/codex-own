@@ -1,6 +1,6 @@
 # codex-own
 
-独立桌面应用的 npm 安装与更新工具。支持 Mac ARM64 和 Windows x64。Node.js 22 或以上为必要环境。
+独立桌面应用的 npm 安装与更新工具。支持 Mac ARM64 和 Windows x64。Node.js 22 或以上为必要环境。管理工具和桌面资源均从 registry.npmjs.org 下载；安装不需要 Agent。
 
 ## 在 Mac 上通过 Terminal 安装和更新
 
@@ -16,7 +16,7 @@ npm --version
 npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
 ```
 
-第二步：首次安装桌面应用。此步骤会下载程序，完成后应用位于 /Applications/codex-own.app。
+第二步：首次安装桌面应用。此步骤从 npm 下载当前平台的桌面资源并显示进度，完成后应用位于 /Applications/codex-own.app。
 
 ```bash
 "$HOME/.local/bin/codex-own" install --yes
@@ -28,13 +28,13 @@ npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
 "$HOME/.local/bin/codex-own" install --adopt --yes
 ```
 
-第三步：配置 API Key。将单独的 Key 文件放到下载目录，命名为 codex-own-api-key.txt，文件只包含一行有效的 DashScope API Key。文件在其他位置时修改命令中的路径。已有可用配置可以跳过这一步；配置前先退出 codex-own。
+可选：使用模型前配置 API Key。仅验证安装时跳过。将单独的 Key 文件放到下载目录，命名为 codex-own-api-key.txt，文件只包含一行有效的 DashScope API Key。文件在其他位置时修改命令中的路径。已有可用配置可以跳过这一步；配置前先退出 codex-own。
 
 ```bash
 "$HOME/.local/bin/codex-own" configure --api-key-file "$HOME/Downloads/codex-own-api-key.txt" --yes
 ```
 
-第四步：检查并启动。doctor 输出安装路径和配置状态，version 分别显示管理工具与桌面版本；两者版本号可以不同。
+安装验收：运行 doctor 和 version。两条命令分别检查状态和报告版本。需要使用应用时再运行 launch。doctor 输出安装路径和配置状态，version 分别显示管理工具与桌面版本；两者版本号可以不同。
 
 ```bash
 "$HOME/.local/bin/codex-own" doctor
@@ -65,7 +65,7 @@ npm.cmd --version
 npm.cmd install --global @petercjl/codex-own@latest
 ```
 
-第二步：安装桌面应用。先解析 npm 工具的实际路径，再调用安装命令。$codexOwn 变量只在当前 PowerShell 窗口有效；新开窗口后请重新执行赋值行。
+第二步：安装桌面应用。先解析 npm 工具的实际路径，再调用安装命令。桌面资源全部从 npm 下载，依次显示分片下载进度、校验、解压和安装阶段。$codexOwn 变量只在当前 PowerShell 窗口有效；新开窗口后请重新执行赋值行。
 
 ```powershell
 $codexOwn = Join-Path (npm.cmd prefix --global) "codex-own.cmd"
@@ -78,13 +78,13 @@ $codexOwn = Join-Path (npm.cmd prefix --global) "codex-own.cmd"
 & $codexOwn install --adopt --yes
 ```
 
-第三步：将单独的 API Key 文件放到下载目录，命名为 codex-own-api-key.txt。文件只包含一行有效的 DashScope API Key。文件在其他位置时修改路径；已有可用配置可以跳过这一步。配置前先退出 codex-own。
+可选：使用模型前配置 API Key。仅验证安装时跳过。将单独的 API Key 文件放到下载目录，命名为 codex-own-api-key.txt。文件只包含一行有效的 DashScope API Key。文件在其他位置时修改路径；已有可用配置可以跳过这一步。配置前先退出 codex-own。
 
 ```powershell
 & $codexOwn configure --api-key-file "$HOME\Downloads\codex-own-api-key.txt" --yes
 ```
 
-第四步：检查并启动。安装后也可从开始菜单打开 codex-own。
+安装验收：运行 doctor 和 version。两条命令分别检查状态和报告版本。需要使用应用时再运行 launch。安装后也可从开始菜单打开 codex-own。
 
 ```powershell
 & $codexOwn doctor
@@ -106,6 +106,6 @@ $codexOwn = Join-Path (npm.cmd prefix --global) "codex-own.cmd"
 & $codexOwn launch
 ```
 
-故障记录：如果某一步出现错误，先停止后续操作，保留错误输出，并运行 doctor 和 version。反馈时附上这些输出与弹窗截图；API Key 文件只用于配置。
+故障处理：下载时每 3 秒显示进度，连续 30 秒没有数据会重试当前分片，最多 3 次。失败后可重跑安装命令，已经校验的分片会被复用。Ctrl+C 可取消下载。npm 安装若出现缓存 ENOENT，先运行 npm.cmd cache verify，再重试 npm 安装。安装完成的标准是结果 ok 为 true、doctor 显示 installed 版本且 lock 为 false，并生成开始菜单快捷方式；单纯安装验收无需 API Key、模型请求或启动应用。
 
 管理工具与桌面版本分别报告。API Key 和用户数据保存在 npm 包之外。更多命令见 `codex-own help`。

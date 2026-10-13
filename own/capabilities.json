@@ -20,5 +20,15 @@
   },
   "dataPolicy": "independent external directories; preserve credentials and conversations",
   "updatePolicy": "explicit update; pinned verified build; refuse running app; backup before switch; restore data snapshot for rollback",
-  "authentication": "npm install does not grant model access; existing independent credentials remain local"
+  "authentication": "npm install does not grant model access; existing independent credentials remain local",
+  "distribution": {
+    "runtimeHosts": [
+      "registry.npmjs.org"
+    ],
+    "desktopAssets": "content-addressed npm payload prereleases; install latest manager only",
+    "cache": "verified platform parts retained for retries",
+    "progress": "stderr; final result JSON on stdout",
+    "idleTimeoutSeconds": 30,
+    "downloadAttempts": 3
+  }
 }

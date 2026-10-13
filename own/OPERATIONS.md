@@ -27,3 +27,7 @@ The manager uses exclusive operation locks and transaction records. Interrupted 
 ## Verification boundaries
 
 Unit tests are in own/test; actual isolated bundled CLI handshake is own/test-app.mjs. Passing package tests does not establish desktop GUI success. Upstream bundle identity or patch match changes fail closed. Do not bypass failed checks to satisfy the daily schedule.
+
+## npm-only runtime distribution
+
+Stable managers embed schema-2 desktop manifests and expose the same manifest in npm metadata as ownDesktopManifest. Runtime downloads are pinned to registry.npmjs.org; GitHub artifacts remain build/release inputs only. Desktop archives are split into at most 128 MiB chunks. Each content-addressed payload is a prerelease of the same npm package, 0.0.0-payload.h<SHA256>, published through the existing OIDC workflow under desktop-assets. They contain only package metadata and payload.bin, have no CLI, and never change latest. End users install @petercjl/codex-own@latest. Exact-version registry integrity and full reassembly are verified before publishing the stable manager. Existing identical payloads are reused; failed payload publication never triggers a version bump or unverified manager release. Runtime retries keep verified chunks, print progress on stderr, and preserve the JSON result on stdout.

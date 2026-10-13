@@ -37,5 +37,8 @@
     "pe-library": "1.0.1",
     "plist": "3.1.0",
     "resedit": "3.0.2"
+  },
+  "dependencies": {
+    "undici": "7.30.0"
   }
 }
