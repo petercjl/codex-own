@@ -15,7 +15,6 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { parse } = require("acorn");
 const { locateBundles, relPath, SRC_DIR } = require("./patch-util");
 
 // ──────────────────────────────────────────────
@@ -153,6 +152,7 @@ function locateTargets(platform) {
 // ──────────────────────────────────────────────
 
 function main() {
+  const { parse } = require("acorn");
   const args = process.argv.slice(2);
   const isCheck = args.includes("--check");
   const platform = args.find((a) => ["mac-arm64", "mac-x64", "win"].includes(a));
@@ -208,4 +208,5 @@ function main() {
   }
 }
 
-main();
+module.exports = { collectPatches };
+if (require.main === module) main();

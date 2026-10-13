@@ -4,6 +4,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
+import {verifyTranslations} from './i18n.mjs';
 const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -80,4 +81,5 @@ fs.copyFileSync(path.join(root,'resources/own/deepseek-models.json'),path.join(o
 fs.writeFileSync(path.join(out,'api-key.example.txt'),'Replace this line with your DashScope API key.\r\n',{flag:'wx'});
 const manifest={identity:'local.codex-own',version:pkg.version,architecture:'x64',exeSha256:hash(fs.readFileSync(outputExe)),asarSha256:hash(updated),asarHeaderHash:headerHash,windowsRuntimeTested:false,shellPatches,updaterPatches};
 fs.writeFileSync(path.join(app,'codex-own-build.json'),JSON.stringify(manifest,null,2),{flag:'wx'});
+verifyTranslations(app);
 console.log(JSON.stringify({ok:true,out,...manifest}));
