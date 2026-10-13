@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileHash} from '../lib/network.mjs';
 import {payloadVersion, payloadURL, validateParts} from '../lib/npm-assets.mjs';
+import {packResult} from './npm-pack-result.mjs';
 
 if(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
   throw Error('Payload publication requires GitHub Actions OIDC');
@@ -31,7 +32,7 @@ for(const [platform,asset] of Object.entries(manifest.platforms)){
       const packageDir=fs.mkdtempSync(path.join(dir,'payload-'));
       fs.writeFileSync(path.join(packageDir,'payload.bin'),bytes,{flag:'wx'});
       fs.writeFileSync(path.join(packageDir,'package.json'),JSON.stringify({name:'@petercjl/codex-own',version,description:'Internal codex-own desktop data. Install @petercjl/codex-own@latest instead.',files:['payload.bin'],repository:{type:'git',url:'git+https://github.com/petercjl/codex-own.git',directory:'own'},publishConfig:{access:'public'}}),{flag:'wx'});
-      const packed=JSON.parse(npm(['pack','--json'],packageDir))[0],tgz=path.join(packageDir,packed.filename);
+      const packed=packResult(npm(['pack','--json'],packageDir),'@petercjl/codex-own'),tgz=path.join(packageDir,packed.filename);
       let existing=await metadata(version);
       if(!existing){
         console.log(`Publishing npm desktop payload ${platform} ${parts.length+1}`);

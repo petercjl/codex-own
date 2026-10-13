@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {packResult} from './npm-pack-result.mjs';
 if(process.platform!=='win32')throw Error('Windows runner required');
 const [archive,manifestFile]=process.argv.slice(2).map(p=>path.resolve(p));
 const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'own-install-'));
@@ -10,7 +11,7 @@ const env={...process.env,LOCALAPPDATA:path.join(fixture,'Local'),APPDATA:path.j
 const original=path.join(env.LOCALAPPDATA,'Programs','Codex','sentinel.txt');
 fs.mkdirSync(path.dirname(original),{recursive:true});fs.writeFileSync(original,'original-installation',{flag:'wx'});
 const npm=(args,options={})=>execFileSync('npm',args,{shell:true,encoding:'utf8',env,...options});
-const packed=JSON.parse(npm(['pack','--json','--pack-destination',fixture],{cwd:path.resolve('own')}))[0];
+const packed=packResult(npm(['pack','--json','--pack-destination',fixture],{cwd:path.resolve('own')}),'@petercjl/codex-own');
 npm(['install','--prefix',path.join(fixture,'manager'),path.join(fixture,packed.filename),'--ignore-scripts','--omit=dev']);
 const cli=path.join(fixture,'manager','node_modules','@petercjl','codex-own','bin','codex-own.mjs');
 const run=(...args)=>JSON.parse(execFileSync(process.execPath,[cli,...args],{env,encoding:'utf8'}));
