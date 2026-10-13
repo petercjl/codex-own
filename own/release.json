@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "repository": "petercjl/codex-own",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "platforms": {
     "darwin-arm64": {
       "entry": "codex-own.app",
@@ -112,22 +112,46 @@
   "provenance": {
     "darwin-arm64": {
       "darwin-arm64": {
-        "sourceRelease": "own-v0.1.0"
+        "darwin-arm64": {
+          "sourceRelease": "own-v0.1.0"
+        },
+        "win32-x64": {
+          "kind": "prepared-independent-build",
+          "desktopVersion": "26.1007.21434",
+          "guiAcceptance": "user-pending"
+        }
       },
       "win32-x64": {
-        "kind": "prepared-independent-build",
-        "desktopVersion": "26.1007.21434",
-        "guiAcceptance": "user-pending"
+        "darwin-arm64": {
+          "sourceRelease": "own-v0.1.0"
+        },
+        "win32-x64": {
+          "kind": "prepared-independent-build",
+          "desktopVersion": "26.1007.21434",
+          "guiAcceptance": "user-pending"
+        }
       }
     },
     "win32-x64": {
       "darwin-arm64": {
-        "sourceRelease": "own-v0.1.0"
+        "darwin-arm64": {
+          "sourceRelease": "own-v0.1.0"
+        },
+        "win32-x64": {
+          "kind": "prepared-independent-build",
+          "desktopVersion": "26.1007.21434",
+          "guiAcceptance": "user-pending"
+        }
       },
       "win32-x64": {
-        "kind": "prepared-independent-build",
-        "desktopVersion": "26.1007.21434",
-        "guiAcceptance": "user-pending"
+        "darwin-arm64": {
+          "sourceRelease": "own-v0.1.0"
+        },
+        "win32-x64": {
+          "kind": "prepared-independent-build",
+          "desktopVersion": "26.1007.21434",
+          "guiAcceptance": "user-pending"
+        }
       }
     }
   }
