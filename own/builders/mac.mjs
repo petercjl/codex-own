@@ -3,9 +3,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
+const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root = path.resolve(import.meta.dirname, '../..');
 const output = path.resolve(process.argv[2] || path.join(root, 'out', 'own-build'));
 const source = process.env.OWN_PREPARED_APP; if (!source) throw Error('Prepared upstream app required');
@@ -18,7 +20,9 @@ execFileSync('ditto',[source,app]);
 const resources=path.join(app,'Contents/Resources');
 fs.writeFileSync(path.join(resources,'codex-own-cli'),'#!/bin/sh\nset -eu\nown_resources="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$own_resources/codex" "$@"\n',{flag:'wx',mode:0o755});
 const work=path.join(output,'asar-source');
-asar.extractAll(path.join(resources,'app.asar'),work);
+const originalArchive=path.join(resources,'app.asar'),header=asar.getRawHeader(originalArchive).header;
+function unpackPacked(dir,prefix=''){for(const [name,e]of Object.entries(dir.files)){const n=prefix+name;if(e.files){unpackPacked(e,n+'/');continue;}if(e.unpacked||e.link)continue;const file=path.join(work,n);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,asar.extractFile(originalArchive,n),{flag:'wx'});}}
+unpackPacked(header);
 const pkgPath=path.join(work,'package.json');
 const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));
 const entry=path.join(work,pkg.main);
@@ -42,7 +46,10 @@ function patchLinks(dir){for(const ent of fs.readdirSync(dir,{withFileTypes:true
 patchLinks(work);
 pkg.name='codex-own';pkg.productName='codex-own';
 fs.writeFileSync(pkgPath,JSON.stringify(pkg,null,2)+'\n');
-await asar.createPackage(work,path.join(resources,'app.asar'));
+header.files['.vite'].files.build.files['own-runtime.cjs']={size:0,offset:'0'};
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');let offset=0;const packed=[];
+function pack(dir,prefix=''){for(const[name,e]of Object.entries(dir.files)){const n=prefix+name;if(e.files){pack(e,n+'/');continue;}if(e.unpacked||e.link)continue;const b=fs.readFileSync(path.join(work,n));e.size=b.length;e.offset=String(offset);offset+=b.length;const blockSize=4194304,blocks=[];for(let i=0;i<b.length;i+=blockSize)blocks.push(sha(b.subarray(i,i+blockSize)));e.integrity={algorithm:'SHA256',hash:sha(b),blockSize,blocks};packed.push(b);}}
+pack(header);const hp=new Pickle();hp.writeString(JSON.stringify(header));const hb=hp.toBuffer(),sp=new Pickle();sp.writeUInt32(hb.length);fs.writeFileSync(originalArchive,Buffer.concat([sp.toBuffer(),hb,...packed]));
 const archive=fs.readFileSync(path.join(resources,'app.asar'));
 const hash=crypto.createHash('sha256').update(archive.subarray(16,16+archive.readUInt32LE(12))).digest('hex');
 const infoFile=path.join(app,'Contents/Info.plist');

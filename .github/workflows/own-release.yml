@@ -28,6 +28,7 @@ jobs:
           echo "version=$(node own/ci/version.mjs "$RELEASE")" >> "$GITHUB_OUTPUT"
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   qa:
+    permissions: {contents: write}
     needs: prepare
     uses: ./.github/workflows/own-build.yml
     with:

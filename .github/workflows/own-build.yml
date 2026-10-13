@@ -7,7 +7,7 @@ on:
       upstream: {type: string, required: false, default: ''}
       existing: {type: boolean, required: false, default: false}
 permissions:
-  contents: read
+  contents: write
 jobs:
   qa:
     strategy:

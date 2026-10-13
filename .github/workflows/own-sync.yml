@@ -32,6 +32,7 @@ jobs:
         if: steps.sync.outputs.changed == 'true'
         run: echo "version=$(node own/ci/version.mjs patch)" >> "$GITHUB_OUTPUT"
   verify:
+    permissions: {contents: write}
     needs: prepare
     if: needs.prepare.outputs.changed == 'true'
     uses: ./.github/workflows/own-build.yml

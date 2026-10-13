@@ -21,7 +21,7 @@ const existingIndex=process.argv.indexOf('--existing-app');
 if(existingIndex>=0){source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};}
 else{
  let syncError;try{run(process.execPath,['scripts/sync-upstream.js','--force',mac?'--skip-win':'--skip-mac']);}catch(e){syncError=e;}
- const cache=path.join(os.tmpdir(),'codex-sync',mac?'mac-arm64-extract':'win-extract');
+ const cache=path.join(os.tmpdir(),'codex-sync',mac?'arm64-extract':'win-extract');
  function findApp(dir,depth=0){if(depth>4)return null;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory()&&e.name.endsWith('.app'))return p;if(e.isDirectory()){const found=findApp(p,depth+1);if(found)return found;}}return null;}
  const original=mac?findApp(cache):path.join(cache,'app');if(!original)throw syncError||Error('Missing source application');
  const sourceResources=path.join(original,mac?'Contents/Resources':'resources'),archive=path.join(sourceResources,'app.asar');
