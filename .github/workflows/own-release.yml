@@ -47,7 +47,7 @@ jobs:
       - run: npm install --global npm@latest
       - run: npm ci --prefix own
       - uses: actions/download-artifact@v7
-        with: {path: verified}
+        with: {path: out/verified}
       - name: Finalize verified desktop manifest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,13 +55,13 @@ jobs:
           EXPECTED_REF: ${{ needs.prepare.outputs.ref }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_REF"
-          node own/ci/combine.mjs verified "$OWN_VERSION"
+          node own/ci/combine.mjs out/verified "$OWN_VERSION"
           if ! gh release view "own-v$OWN_VERSION" >/dev/null 2>&1; then
             gh release create "own-v$OWN_VERSION" --draft --target "$EXPECTED_REF" --title "codex-own $OWN_VERSION" --notes 'Verified desktop artifacts.'
-            gh release upload "own-v$OWN_VERSION" verified/manifest.json
-            find verified -name '*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
+            gh release upload "own-v$OWN_VERSION" out/verified/manifest.json
+            find out/verified -name '*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
           fi
-          cp verified/manifest.json own/release.json
+          cp out/verified/manifest.json own/release.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add own/release.json
