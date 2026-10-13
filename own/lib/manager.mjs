@@ -50,7 +50,7 @@ export function unpack(archive,dest) {
 export function running(p=paths()) {
   if(process.platform==='darwin'){
     const lines=execFileSync('ps',['-axo','pid=,command='],{encoding:'utf8'}).split('\n');
-    return lines.filter(l=>l.includes('codex-own.app/Contents/')&&!l.includes(' ps -')).map(l=>l.trim().split(/\s+/)[0]);
+    return lines.filter(l=>l.includes('codex-own.app/Contents/')&&!l.includes(' ps -')&&!l.includes('/Contents/Resources/cua_node/')).map(l=>l.trim().split(/\s+/)[0]);
   }
   const out=execFileSync('powershell.exe',['-NoProfile','-Command',"@(Get-Process -Name 'codex-own' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id) -join ','"],{encoding:'utf8'}).trim();return out?out.split(','):[];
 }
