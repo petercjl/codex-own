@@ -8,7 +8,15 @@ if(manifest.schema!==2)throw Error('npm asset manifest required');
 for(const platform of ['darwin-arm64','win32-x64']){
   const asset=validateManifest(manifest,platform),dir=fs.mkdtempSync(path.join(os.tmpdir(),'own-registry-'));
   try{
-    await assembleNpmAsset(asset,path.join(dir,'verified.tar.gz'),path.join(dir,'cache'),tarExecutable());
+    const deadline=Date.now()+15*60*1000;
+    for(;;){
+      try{await assembleNpmAsset(asset,path.join(dir,'verified.tar.gz'),path.join(dir,'cache'),tarExecutable());break;}
+      catch(e){
+        if(e.code!=='DOWNLOAD_FAILED'||Date.now()>=deadline)throw e;
+        console.log(`Waiting for npm tarball availability (${platform}): ${e.message}`);
+        await new Promise(r=>setTimeout(r,30000));
+      }
+    }
     console.log(JSON.stringify({ok:true,platform,version:manifest.version,downloadSource:'registry.npmjs.org',sha256:asset.sha256}));
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }

@@ -52,3 +52,15 @@ test('npm payload assembly verifies parts and reuses only hash-verified cache',a
   fs.writeFileSync(path.join(cache,asset.sha256+'.bin'),'corrupt');
   await assembleNpmAsset(asset,path.join(dir,'three'),cache,tar,{download,report:()=>{}});assert.equal(requests,2);
 });
+
+test('temporary npm HTTP failure retries successfully and reports the HTTP status',async t=>{
+  let calls=0;const data=Buffer.from('ready'),messages=[],dest=path.join(temp(t),'part');
+  const url=await server(t,(_,r)=>{if(++calls===1){r.writeHead(404);r.end();}else r.end(data);});
+  await verifiedDownload(url,dest,{size:data.length,sha256:hash(data)},{fetcher:fetch,report:s=>messages.push(s),retryMs:1});
+  assert.equal(calls,2);assert.deepEqual(fs.readFileSync(dest),data);assert.ok(messages.some(s=>s.includes('HTTP 404')));
+});
+test('persistent npm HTTP failure preserves status in the final error',async t=>{
+  const dest=path.join(temp(t),'part'),url=await server(t,(_,r)=>{r.writeHead(503);r.end();});
+  await assert.rejects(verifiedDownload(url,dest,{size:1,sha256:'a'.repeat(64)},{fetcher:fetch,report:()=>{},retryMs:1}),e=>e.code==='DOWNLOAD_FAILED'&&e.message.includes('HTTP 503'));
+  assert.equal(fs.existsSync(dest),false);
+});

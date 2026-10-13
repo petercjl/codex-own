@@ -13,7 +13,7 @@ export async function fileHash(file) {
   return h.digest('hex');
 }
 export async function verifiedDownload(url, dest, expected, {
-  fetcher = networkFetch, report = progress, idleMs = 30000, attempts = 3,
+  fetcher = networkFetch, report = progress, idleMs = 30000, attempts = 3, retryMs = 1000,
 } = {}) {
   const error = (code, message) => Object.assign(new Error(message), {code});
   if (fs.existsSync(dest)) throw error('TARGET_EXISTS', 'Download destination already exists');
@@ -49,8 +49,10 @@ export async function verifiedDownload(url, dest, expected, {
       if (file) { await file.close(); file = null; fs.unlinkSync(dest); }
       if (cancelled) throw error('CANCELLED', 'Download cancelled. Verified earlier parts are retained; rerun the install command to continue.');
       if (e.code === 'CHECKSUM_MISMATCH' || e.code === 'EEXIST') throw e;
-      if (attempt === attempts) throw error('DOWNLOAD_FAILED', `npm download failed after ${attempts} attempts (${e.code || e.cause?.code || 'timeout/network'}). Check network access to registry.npmjs.org and retry; verified parts are retained.`);
-      report('连接中断或 30 秒无数据，重试当前分片；已校验分片保留。');
+      if (attempt === attempts) throw error('DOWNLOAD_FAILED', `npm download failed after ${attempts} attempts (${e.code === 'DOWNLOAD_HTTP' ? e.message : e.code || e.cause?.code || 'timeout/network'}). Check network access to registry.npmjs.org and retry; verified parts are retained.`);
+      report(`下载暂不可用（${e.code === 'DOWNLOAD_HTTP' ? e.message : e.code || e.cause?.code || 'timeout/network'}），稍后重试当前分片；已校验分片保留。`);
+      await new Promise(r=>setTimeout(r,retryMs*attempt));
+      if (cancelled) throw error('CANCELLED', 'Download cancelled. Verified earlier parts are retained; rerun the install command to continue.');
     } finally {
       clearTimeout(timer); clearInterval(interval);
       process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
