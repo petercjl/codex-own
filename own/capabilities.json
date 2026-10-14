@@ -19,7 +19,7 @@
     "win32-x64": "implemented"
   },
   "dataPolicy": "independent external directories; preserve credentials and conversations",
-  "updatePolicy": "explicit update; pinned verified build; refuse running app; backup before switch; restore data snapshot for rollback",
+  "updatePolicy": "desktop checks npm latest at startup and every six hours; explicit download and restart/install; pinned verified build; backup before switch; CLI remains available for recovery",
   "authentication": "npm install does not grant model access; existing independent credentials remain local",
   "distribution": {
     "runtimeHosts": [
@@ -31,5 +31,16 @@
     "idleTimeoutSeconds": 30,
     "downloadAttempts": 3,
     "parallelDownloads": 4
+  },
+  "desktopUpdater": {
+    "source": "https://registry.npmjs.org/@petercjl%2fcodex-own/latest",
+    "channel": "latest",
+    "checkOnStartupSeconds": 15,
+    "checkIntervalHours": 6,
+    "download": "explicit user click; verified chunks cached; current app remains usable",
+    "install": "explicit restart confirmation; copied standalone helper waits for app exit; backup and transactional switch",
+    "runtime": "bundled standalone Node; no global npm upgrade required",
+    "menu": "更新 → 检查 codex-own 更新…",
+    "offline": "current installation remains usable; manual retry; verified prepared update survives restart"
   }
 }

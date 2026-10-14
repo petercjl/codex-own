@@ -95,10 +95,11 @@ export async function configure(keyFile){if(!keyFile)fail('KEY_FILE_REQUIRED','P
  const auth=path.join(p.core,'auth.json');rejectLinks(auth);let backup=null;if(fs.existsSync(auth)){backup=auth+'.backup-'+crypto.randomUUID();fs.copyFileSync(auth,backup,fs.constants.COPYFILE_EXCL);fs.chmodSync(backup,0o600);}const tmp=auth+'.new-'+crypto.randomUUID();exclusive(tmp,{auth_mode:'apikey',OPENAI_API_KEY:key});fs.renameSync(tmp,auth);
  const models=path.join(p.core,'models.json');if(!fs.existsSync(models))fs.copyFileSync(path.join(packageRoot,'defaults','models.json'),models,fs.constants.COPYFILE_EXCL);
  const config=path.join(p.core,'config.toml');if(!fs.existsSync(config))fs.writeFileSync(config,`model = "deepseek-v4.1-flash"\nmodel_provider = "dashscope_deepseek"\nforced_login_method = "api"\ncli_auth_credentials_store = "file"\nmodel_catalog_json = ${JSON.stringify(models.replaceAll('\\','/'))}\nmodel_reasoning_effort = "high"\nweb_search = "disabled"\n[model_providers.dashscope_deepseek]\nname = "DeepSeek-DashScope"\nbase_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"\nwire_api = "responses"\nrequires_openai_auth = true\n`,{flag:'wx',mode:0o600});return {ok:true,configured:true,backup,configPreserved:true};});}
-export async function install({version,adopt=false,archive,manifest}={}) {
+export async function install({version,adopt=false,archive,manifest,expectedCurrent}={}) {
   const p=paths();if(!['darwin-arm64','win32-x64'].includes(p.platform))fail('UNSUPPORTED_PLATFORM',p.platform);
   progress('准备安装：检查版本、平台与独立目录');
   return locked(p,async()=>{const m=manifest||await manifestFor(version||pkg.version);const a=validateManifest(m,p.platform);
+    if(expectedCurrent!==undefined&&state(p)?.version!==expectedCurrent)fail('INSTALLATION_CHANGED','Installation changed after the update was prepared; check again');
     if(state(p)?.version===m.version&&!archive)return {ok:true,unchanged:true,version:m.version};
     if(running(p).length)fail('APP_RUNNING','Quit codex-own before install/update');
     const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive;

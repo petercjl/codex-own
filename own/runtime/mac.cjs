@@ -38,6 +38,7 @@ app.setPath('logs', path.join(root, 'logs'));
 app.setName = () => {};
 app.setAsDefaultProtocolClient = () => false;
 app.removeAsDefaultProtocolClient = () => false;
+require(path.join(resources,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
 app.whenReady().then(() => {
   const icon = nativeImage.createFromPath(path.join(resources, 'codex-own.png'));
   if (app.dock && !icon.isEmpty()) {

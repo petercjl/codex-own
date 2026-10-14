@@ -17,4 +17,5 @@ apply();app.setName('codex-own');app.setPath('userData',paths.desktop);app.setPa
 app.setAppUserModelId('local.codex-own');
 app.setName=()=>{};app.setAppUserModelId=()=>{};
 app.setAsDefaultProtocolClient=()=>false;app.removeAsDefaultProtocolClient=()=>false;
+require(path.join(process.resourcesPath,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
 module.exports={apply,paths};

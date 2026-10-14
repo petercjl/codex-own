@@ -18,6 +18,8 @@ Use the installed `codex-own` CLI. Resolve its current bundled instructions with
 
 For installation-only acceptance, verify doctor, version, target and shortcut without configuring credentials or launching the GUI unless requested. Progress goes to stderr; final results remain JSON on stdout.
 
+Desktop builds with the bundled npm updater check stable latest 15 seconds after startup and every six hours. The user-facing menu is 更新 → 检查 codex-own 更新…. Download runs while the app remains usable; 重启并安装 asks the user to end active tasks, then an independent helper waits for exit, backs up and replaces the app. The helper uses bundled Node and npm payloads, so daily in-app updates do not require updating global npm tooling. Inspect the installed app's own updater version separately from the global CLI version. Retain CLI step 3 for older builds and recovery. Prepared, verified downloads survive restarts; offline checks preserve the current installation. Install logs and unique result records live under the independent manager directory; never delete locks to bypass a failed update.
+
 ## Recovery and boundaries
 
 - APP_RUNNING: request or perform authorized graceful exit, then return to step 3.

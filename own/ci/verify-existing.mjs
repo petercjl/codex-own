@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {validateManifest,digestFile,unpack} from '../lib/manager.mjs';
 import {repairWindowsTranslations,verifyTranslations} from '../builders/i18n.mjs';
 import {tarExecutable} from '../lib/manager.mjs';
+import {upgradeUpdater} from '../builders/upgrade-updater.mjs';
 const version=process.env.OWN_VERSION,key=process.env.OWN_PLATFORM;
 const dir=path.resolve('out',`own-release-${version}-${key}`);fs.mkdirSync(dir,{recursive:true});
 const gh=(args)=>execFileSync('gh',args,{stdio:'inherit'});
@@ -29,6 +30,15 @@ if(key==='win32-x64'&&manifest.provenance?.repairWindowsI18n===true){
   fs.writeFileSync(inputManifest,JSON.stringify(manifest,null,2));
 }
 verifyTranslations(path.join(dest,a.entry));
+if(manifest.provenance?.upgradeNpmUpdater===true||fs.existsSync(path.join(dest,a.entry,key==='darwin-arm64'?'Contents/Resources':'resources','own-updater'))){
+  const upgraded=await upgradeUpdater(path.join(dest,a.entry),{version});console.log(JSON.stringify(upgraded));
+  if(!upgraded.unchanged){
+    fs.copyFileSync(file,file+'.before-npm-updater',fs.constants.COPYFILE_EXCL);
+    const next=file+'.npm-updater-new';execFileSync(tarExecutable(),['-czf',next,'-C',dest,a.entry],{stdio:'inherit'});fs.renameSync(next,file);
+    a.sha256=await digestFile(file);a.size=fs.statSync(file).size;delete a.sourceVersion;
+    const inputManifest=path.join(dir,'manifest.json');fs.copyFileSync(inputManifest,inputManifest+'.before-npm-updater',fs.constants.COPYFILE_EXCL);fs.writeFileSync(inputManifest,JSON.stringify(manifest,null,2));
+  }
+}
 if(key==='win32-x64')execFileSync(process.execPath,['own/ci/test-windows-install.mjs',file,path.join(dir,'manifest.json')],{stdio:'inherit'});
 execFileSync(process.execPath,['own/test-app.mjs',path.join(dest,a.entry)],{stdio:'inherit'});
 if(key==='darwin-arm64')execFileSync('codesign',['--verify','--deep','--strict',path.join(dest,a.entry)],{stdio:'inherit'});

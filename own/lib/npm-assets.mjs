@@ -24,11 +24,14 @@ function safeCache(file) {
   if (fs.existsSync(file) && (!fs.lstatSync(file).isFile() || fs.lstatSync(file).isSymbolicLink()))
     throw Object.assign(new Error('Unexpected npm asset cache entry'), {code:'UNSAFE_PATH'});
 }
-export async function assembleNpmAsset(asset, dest, cache, tar, {download = verifiedDownload, report = progress, concurrency = 4} = {}) {
+export async function assembleNpmAsset(asset, dest, cache, tar, {download = verifiedDownload, report = progress, concurrency = 4,signal} = {}) {
   validateParts(asset);
   fs.mkdirSync(cache, {recursive:true, mode:0o700});
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4) throw new Error('Invalid download concurrency');
   const controller = new AbortController();
+  const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});
+  if(signal?.aborted)controller.abort();
+  try{
   async function fetchPart(part, i) {
     report(`npm 资源分片 ${i+1}/${asset.parts.length}`);
     const file = path.join(cache, `${part.sha256}.bin`);
@@ -61,11 +64,13 @@ export async function assembleNpmAsset(asset, dest, cache, tar, {download = veri
   }
   await Promise.allSettled(Array.from({length:Math.min(concurrency,unique.length)},worker));
   if(failure)throw failure;
+  if(controller.signal.aborted)throw Object.assign(Error('Download cancelled'),{code:'CANCELLED'});
   const files=asset.parts.map(part=>completed.get(part.sha256));
   report('合并并校验完整桌面安装包');
   const output = fs.createWriteStream(dest, {flags:'wx',mode:0o600});
   async function* chunks() { for (const f of files) yield* fs.createReadStream(f); }
-  await pipeline(chunks(), output);
+  await pipeline(chunks(), output,{signal:controller.signal});
   if (fs.statSync(dest).size !== asset.size || await fileHash(dest) !== asset.sha256)
     throw Object.assign(new Error('Assembled desktop checksum mismatch'), {code:'CHECKSUM_MISMATCH'});
+  }finally{signal?.removeEventListener('abort',cancel);}
 }
