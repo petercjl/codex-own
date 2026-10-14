@@ -5,17 +5,18 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
+import {StringDecoder} from 'node:string_decoder';
 function setup(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'own-ui-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  fs.mkdirSync(path.join(root,'own-updater'));fs.writeFileSync(path.join(root,'own-updater','desktop-version.json'),'{"version":"0.2.2"}');
- let handler,menu,window,reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true},quits=0;const spawns=[],timers=[],events={},messages=[];
+ let handler,menu,window,reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true},quits=0,chunks=[];const spawns=[],timers=[],events={},messages=[],states=[];
  class Menu{constructor(){this.items=[];}append(x){this.items.push(x);}getMenuItemById(id){return this.items.find(i=>i.id===id);}}Menu.setApplicationMenu=m=>{menu=m;};Menu.getApplicationMenu=()=>menu;
- class Window extends EventEmitter{constructor(options){super();this.options=options;this.webContents=new EventEmitter();Object.assign(this.webContents,{mainFrame:{},setWindowOpenHandler:()=>{},send:()=>{}});window=this;}isDestroyed(){return false;}loadFile(f){this.file=f;}show(){}focus(){}}
+ class Window extends EventEmitter{constructor(options){super();this.options=options;this.webContents=new EventEmitter();Object.assign(this.webContents,{mainFrame:{},setWindowOpenHandler:()=>{},send:(_channel,state)=>{states.push({...state});}});window=this;}isDestroyed(){return false;}loadFile(f){this.file=f;}show(){}focus(){}}
  const electron={app:{whenReady:()=>Promise.resolve(),on:(n,fn)=>{events[n]=fn;},quit:()=>{quits++;}},BrowserWindow:Window,Menu,MenuItem:class{constructor(opts){Object.assign(this,opts)}},ipcMain:{handle:(_c,h)=>{handler=h;}},dialog:{}};
  const module={exports:{}};
- vm.runInNewContext(fs.readFileSync(new URL('../desktop/controller.cjs',import.meta.url),'utf8'),{module,process:{platform:process.platform,resourcesPath:root,env:{OPENAI_API_KEY:'fixture',NODE_OPTIONS:'--bad',PATH:'path'}},setTimeout:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},setInterval:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},require:n=>({'node:fs':fs,'node:path':path,'node:child_process':{spawn:(exe,args,opts)=>{spawns.push({exe,args,opts});const c=new EventEmitter();c.stdout=new EventEmitter();c.stderr=new EventEmitter();c.unref=()=>{};c.connected=true;c.send=(m,fn)=>{messages.push(m);fn();};queueMicrotask(()=>{c.stdout.emit('data',Buffer.from(JSON.stringify({result:reply})+'\n'));c.emit('exit',0);});return c;}}}[n])});
+ vm.runInNewContext(fs.readFileSync(new URL('../desktop/controller.cjs',import.meta.url),'utf8'),{module,process:{platform:process.platform,resourcesPath:root,env:{OPENAI_API_KEY:'fixture',NODE_OPTIONS:'--bad',PATH:'path'}},setTimeout:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},setInterval:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},require:n=>({'node:fs':fs,'node:path':path,'node:string_decoder':{StringDecoder},'node:child_process':{spawn:(exe,args,opts)=>{spawns.push({exe,args,opts});const c=new EventEmitter();c.stdout=new EventEmitter();c.stderr=new EventEmitter();c.unref=()=>{};c.connected=true;c.send=(m,fn)=>{messages.push(m);fn();};queueMicrotask(()=>{for(const b of chunks)c.stdout.emit('data',b);c.stdout.emit('data',Buffer.from(JSON.stringify({result:reply})+'\n'));c.emit('exit',0);});return c;}}}[n])});
  const controller=module.exports.start(electron,root);
- return {controller,electron,spawns,timers,events,messages,get quits(){return quits;},get menu(){return menu;},get window(){return window;},get handler(){return handler;},set reply(v){reply=v;}};
+ return {controller,electron,spawns,timers,events,messages,states,set chunks(v){chunks=v;},get quits(){return quits;},get menu(){return menu;},get window(){return window;},get handler(){return handler;},set reply(v){reply=v;}};
 }
 test('desktop menu survives upstream rebuilds; startup and interval checks use bundled runtime',async t=>{
  const a=setup(t);await Promise.resolve();assert.ok(a.menu.getMenuItemById('codex-own-updates'));
@@ -29,6 +30,12 @@ test('normal quit cancels a download cooperatively and waits for lock cleanup',a
  const a=setup(t);const pending=a.controller.action('download');let prevented=false;
  a.events['before-quit']({preventDefault:()=>{prevented=true;}});assert.equal(prevented,true);assert.equal(a.messages[0].cancel,true);assert.equal(a.quits,0);
  await pending;assert.equal(a.quits,1);
+});
+test('download progress preserves Chinese characters across pipe byte boundaries',async t=>{
+ const a=setup(t);await a.controller.action('check');
+ const bytes=Buffer.from(JSON.stringify({progress:'正在下载更新'})+'\n'),cut=bytes.indexOf(Buffer.from('正'))+1;
+ a.chunks=[bytes.subarray(0,cut),bytes.subarray(cut)];await a.controller.action('download');
+ assert.ok(a.states.some(s=>s.message==='正在下载更新'));
 });
 test('only the dedicated update window can download; ready state remains available without network',async t=>{
  const a=setup(t);await a.controller.action('check');

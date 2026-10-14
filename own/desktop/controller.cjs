@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const {spawn}=require('node:child_process');
+const {StringDecoder}=require('node:string_decoder');
 const CHANNEL='codex-own:update';
 module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},root){
   const bundle=path.join(process.resourcesPath,'own-updater');
@@ -12,8 +13,8 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   function run(action){return new Promise((resolve,reject)=>{
     const child=spawn(path.join(bundle,process.platform==='win32'?'node.exe':'node'),[path.join(bundle,'desktop','worker.mjs'),action,meta.version],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
     if(action==='download')downloadWorker=child;
-    let output='',error,result,settled=false;
-    child.stdout.on('data',b=>{output+=b.toString();for(;;){const i=output.indexOf('\n');if(i<0)break;const line=output.slice(0,i);output=output.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}
+    let output='',error,result,settled=false;const decoder=new StringDecoder('utf8');
+    child.stdout.on('data',b=>{output+=decoder.write(b);for(;;){const i=output.indexOf('\n');if(i<0)break;const line=output.slice(0,i);output=output.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}
       if(m.progress)emit({message:m.progress});if(m.error)error=m.error;if(m.result)result=m.result;
     }});
     child.stderr.on('data',()=>{});

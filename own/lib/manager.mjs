@@ -51,10 +51,13 @@ export function unpack(archive,dest) {
   function walk(p){for(const x of fs.readdirSync(p,{withFileTypes:true})){const f=path.join(p,x.name);if(x.isSymbolicLink()){const resolved=path.resolve(path.dirname(f),fs.readlinkSync(f));if(!resolved.startsWith(dest+path.sep))fail('UNSAFE_ARCHIVE','Escaping symlink');}else if(x.isDirectory())walk(f);}}
   walk(dest);
 }
+export function macOwnProcessIds(lines) {
+  return lines.filter(l=>l.includes('codex-own.app/Contents/')&&!l.includes(' ps -')&&!l.includes('/Contents/Resources/cua_node/')&&!/\/Contents\/MacOS\/WinAppHelper(?:\s|$)/.test(l)).map(l=>l.trim().split(/\s+/)[0]);
+}
 export function running(p=paths()) {
   if(process.platform==='darwin'){
     const lines=execFileSync('ps',['-axo','pid=,command='],{encoding:'utf8'}).split('\n');
-    return lines.filter(l=>l.includes('codex-own.app/Contents/')&&!l.includes(' ps -')&&!l.includes('/Contents/Resources/cua_node/')).map(l=>l.trim().split(/\s+/)[0]);
+    return macOwnProcessIds(lines);
   }
   const out=execFileSync('powershell.exe',['-NoProfile','-Command',"@(Get-Process -Name 'codex-own' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id) -join ','"],{encoding:'utf8'}).trim();return out?out.split(','):[];
 }

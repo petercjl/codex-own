@@ -82,7 +82,7 @@ $codexOwn = Join-Path (npm.cmd prefix --global) "codex-own.cmd"
 & $codexOwn install --yes
 ```
 
-管理工具和桌面资源全部从 registry.npmjs.org 下载。Windows 桌面下载量约 878 MiB，最多并行下载 4 个分片，安装时显示分片编号、下载百分比和已接收大小，然后显示校验、解压、安装。看到“安装完成”和 ok: true 才表示完成。
+管理工具和桌面资源全部从 registry.npmjs.org 下载。Windows 桌面资源约 1 GB，具体大小随版本变化。最多并行下载 4 个分片，安装时显示分片编号、下载百分比和已接收大小，然后显示校验、解压、安装。看到“安装完成”和 ok: true 才表示完成。
 
 若已有手动安装的 codex-own，先退出应用，将第二步的安装命令替换为以下接管命令；原安装会被备份。
 
