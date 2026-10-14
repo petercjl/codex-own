@@ -5,6 +5,7 @@ import {validateManifest,digestFile,unpack} from '../lib/manager.mjs';
 import {repairWindowsTranslations,verifyTranslations} from '../builders/i18n.mjs';
 import {tarExecutable} from '../lib/manager.mjs';
 import {upgradeUpdater} from '../builders/upgrade-updater.mjs';
+import {canonicalize} from './canonicalize.mjs';
 const version=process.env.OWN_VERSION,key=process.env.OWN_PLATFORM;
 const dir=path.resolve('out',`own-release-${version}-${key}`);fs.mkdirSync(dir,{recursive:true});
 const gh=(args)=>execFileSync('gh',args,{stdio:'inherit'});
@@ -39,7 +40,11 @@ if(manifest.provenance?.upgradeNpmUpdater===true||fs.existsSync(path.join(dest,a
     const inputManifest=path.join(dir,'manifest.json');fs.copyFileSync(inputManifest,inputManifest+'.before-npm-updater',fs.constants.COPYFILE_EXCL);fs.writeFileSync(inputManifest,JSON.stringify(manifest,null,2));
   }
 }
-if(key==='win32-x64')execFileSync(process.execPath,['own/ci/test-windows-install.mjs',file,path.join(dir,'manifest.json')],{stdio:'inherit'});
 execFileSync(process.execPath,['own/test-app.mjs',path.join(dest,a.entry)],{stdio:'inherit'});
 if(key==='darwin-arm64')execFileSync('codesign',['--verify','--deep','--strict',path.join(dest,a.entry)],{stdio:'inherit'});
-fs.writeFileSync(path.join(dir,`manifest-${key}.json`),JSON.stringify({...manifest,platforms:{[key]:a}}),{flag:'wx'});
+const canonical=await canonicalize(path.join(dest,a.entry),a,file);
+manifest.platforms[key]=canonical;
+fs.copyFileSync(path.join(dir,'manifest.json'),path.join(dir,'manifest.json.before-canonical'),fs.constants.COPYFILE_EXCL);
+fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify(manifest,null,2));
+if(key==='win32-x64')execFileSync(process.execPath,['own/ci/test-windows-install.mjs',file,path.join(dir,'manifest.json')],{stdio:'inherit'});
+fs.writeFileSync(path.join(dir,`manifest-${key}.json`),JSON.stringify({...manifest,platforms:{[key]:canonical}}),{flag:'wx'});

@@ -33,3 +33,7 @@ Desktop builds with the bundled npm updater check stable latest 15 seconds after
 The portable contract uses a terminal that can invoke the same CLI on either Agent. Agent-specific scheduling and publication are repository operations, outside ordinary installation. Runtime must not rewrite its own source. A recurring failure belongs in an authorized implementation/test change.
 
 Downloads use at most four parallel npm payload requests, label progress by part, preserve archive order, and cancel active peer downloads on failure.
+
+Incremental releases use `canonical-tar-cdc-v1`: the manager reads only the installed program directory, rebuilds matching content blocks locally, and downloads missing blocks from npm. It works across skipped versions and verifies both each block and the final complete archive. The returned `transfer` reports `reusedBlocks`, `downloadBytes` and `fullDownloadBytes`; quote these measured values rather than promising a fixed update size. Fresh installations download all needed blocks. Large upstream binary changes may still require a large download. Keep cache and staging space available; no credential or conversation files are part of the scan.
+
+When migrating a desktop older than 0.4.0, update the global npm manager to `@petercjl/codex-own@latest` and use CLI step 3 once to obtain local block reuse. Older in-app updaters lack this scanner and may download all resources or reject a larger block index. From 0.4.0 onward, the bundled updater provides the same incremental path without a global npm upgrade.

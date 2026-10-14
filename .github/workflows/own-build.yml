@@ -52,11 +52,17 @@ jobs:
           OWN_VERSION: ${{ inputs.version }}
           OWN_PLATFORM: ${{ matrix.platform }}
         run: node own/ci/verify-existing.mjs
+      - name: Verify canonical archive and local incremental reuse
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+          OWN_PLATFORM: ${{ matrix.platform }}
+        run: node own/ci/test-incremental.mjs
       - uses: actions/upload-artifact@v7
         with:
           name: own-${{ matrix.platform }}
           path: |
             out/own-release-*/codex-own-*.tar.gz
+            out/own-release-*/codex-own-*.tar
             out/own-release-*/manifest-*.json
           if-no-files-found: error
           retention-days: 3

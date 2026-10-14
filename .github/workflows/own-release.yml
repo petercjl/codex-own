@@ -59,7 +59,7 @@ jobs:
           if ! gh release view "own-v$OWN_VERSION" >/dev/null 2>&1; then
             gh release create "own-v$OWN_VERSION" --draft --target "$EXPECTED_REF" --title "codex-own $OWN_VERSION" --notes 'Verified desktop artifacts.'
             gh release upload "own-v$OWN_VERSION" out/verified/manifest.json
-            find out/verified -name '*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
+            find out/verified -name 'codex-own-*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
           fi
           gh release view "own-v$OWN_VERSION" --json assets --jq '.assets[].name' > out/desktop-assets-present.txt
           while IFS= read -r file; do

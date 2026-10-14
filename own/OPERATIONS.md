@@ -1,5 +1,15 @@
 # codex-own operations
 
+## Incremental desktop distribution (0.4.0+)
+
+Builds preserve the complete signed application as the recovery `.tar.gz` artifact. In parallel, `canonicalize.mjs` writes a deterministic uncompressed `.tar` with sorted paths, normalized modes/timestamps and relative symlinks. `canonical-tar-cdc-v1` uses content-defined 16–64 MiB raw blocks (32 MiB rolling-hash mask). npm compresses each payload independently. Do not gzip the whole canonical archive before splitting: that would invalidate unchanged content after a small edit.
+
+The OIDC publisher validates the archive and block index, reuses exact existing content-addressed payload versions and publishes only missing identities; `latest` moves only after all payloads and fresh registry readback pass. The full compressed recovery artifact remains available to future CI overlay builds; end-user downloads stay on npm. The npm manifest exposes only the canonical archive checksum and npm payload parts.
+
+Both CLI installs and desktop preparation scan the managed application read-only, generate identical canonical blocks, retain only blocks needed by the target manifest, then fetch missing verified parts. This requires no specific base release and supports skipped versions. Assembly verifies the final canonical archive before the existing platform extraction/signature checks and transactional switch. Transfer receipts report actual npm tarball byte estimates and reused block counts; raw archive bytes represent disk space, not network traffic.
+
+Migration from 0.3.x uses the new global manager once; older bundled updaters do not perform local reuse. Subsequent desktop updates use the bundled implementation. Validate deterministic native extraction roundtrips, Unicode/modes/links, insertion resynchronization, corrupt-cache and cancellation behavior on both runners. Keep credentials/history outside every archive, index and scan.
+
 Repository: https://github.com/petercjl/codex-own
 Default product branch: own-main. Upstream: Haleclipse/CodexDesktop-Rebuild master.
 Package: @petercjl/codex-own, root own/. Canonical workflows live in the repository root .github/workflows; own/.github/workflows links to the same canonical workflows for package-root tooling.

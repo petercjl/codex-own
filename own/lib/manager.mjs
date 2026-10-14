@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import {execFileSync, spawn} from 'node:child_process';
 import {networkFetch, verifiedDownload, progress} from './network.mjs';
 import {validateParts, assembleNpmAsset} from './npm-assets.mjs';
+import {reuseInstalledBlocks} from './content-blocks.mjs';
 
 export const packageRoot = path.resolve(import.meta.dirname, '..');
 export const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));
@@ -105,9 +106,13 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
     if(expectedCurrent!==undefined&&state(p)?.version!==expectedCurrent)fail('INSTALLATION_CHANGED','Installation changed after the update was prepared; check again');
     if(state(p)?.version===m.version&&!archive)return {ok:true,unchanged:true,version:m.version};
     if(running(p).length)fail('APP_RUNNING','Quit codex-own before install/update');
-    const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive;
+    const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive,transfer;
     if(f){if(fs.statSync(f).size!==a.size||await digestFile(f)!==a.sha256)fail('CHECKSUM_MISMATCH','Local archive checksum mismatch');}
-    else{if(m.schema!==2)fail('NPM_ASSETS_REQUIRED','Update @petercjl/codex-own to the latest npm-only release.');f=path.join(stage,'app.tar.gz');const cache=path.join(p.manager,'npm-assets');rejectLinks(cache);await assembleNpmAsset(a,f,cache,tarExecutable());}
+    else{if(m.schema!==2)fail('NPM_ASSETS_REQUIRED','Update @petercjl/codex-own to the latest npm-only release.');f=path.join(stage,'app.tar');const cache=path.join(p.manager,'npm-assets');rejectLinks(cache);
+      if(state(p)?.identity==='local.codex-own'&&fs.existsSync(p.target)&&appIdentity(p.target)==='local.codex-own'){
+        rejectLinks(p.target);await reuseInstalledBlocks(a,p.target,cache,{report:progress});
+      }
+      transfer=await assembleNpmAsset(a,f,cache,tarExecutable());}
     progress('校验通过，正在解压桌面程序');
     const content=path.join(stage,'unpacked');unpack(f,content);const source=path.join(content,a.entry);
     if(process.platform==='darwin')execFileSync('codesign',['--verify','--deep','--strict',source],{stdio:'pipe'});
@@ -115,7 +120,7 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
     const result=switchApp({p,source,version:m.version,adopt});
     if(process.platform==='darwin')execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-f',p.target],{stdio:'pipe'});
     else shortcut(p);
-    fs.rmSync(stage,{recursive:true,force:true});progress('安装完成');return {...result,downloadSource:archive?'local-archive':'registry.npmjs.org'};
+    fs.rmSync(stage,{recursive:true,force:true});progress('安装完成');return {...result,downloadSource:archive?'local-archive':'registry.npmjs.org',...(transfer?{transfer}:{})};
   });
 }
 export function shortcut(p) {

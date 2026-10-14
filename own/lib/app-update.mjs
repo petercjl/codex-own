@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {latest,manifestFor,validateManifest,paths,state,locked,rejectLinks,exclusive,digestFile,tarExecutable,install,fail,running,launch} from './manager.mjs';
 import {assembleNpmAsset} from './npm-assets.mjs';
+import {reuseInstalledBlocks} from './content-blocks.mjs';
 
 // Desktop release versions use the stable npm channel, independently of upstream's app version.
 export function isNewer(candidate,current) {
@@ -27,12 +28,14 @@ export async function prepareUpdate(current,{p=paths(),resolve=latest,manifest=m
     const dir=fs.mkdtempSync(path.join(base,'update-')),archive=path.join(dir,'desktop.tar.gz');
     const cache=path.join(p.manager,'npm-assets');rejectLinks(cache);
     try{
-      await assemble(asset,archive,cache,tarExecutable(),{report,signal});
+      // The app may stay open: only read program resources, never user data.
+      if(p.target){rejectLinks(p.target);await reuseInstalledBlocks(asset,p.target,cache,{report,signal});}
+      const transfer=await assemble(asset,archive,cache,tarExecutable(),{report,signal});
       // Verify even when a download adapter is supplied.
       if(fs.statSync(archive).size!==asset.size||await digestFile(archive)!==asset.sha256)fail('CHECKSUM_MISMATCH','Prepared update checksum mismatch');
       const receipt=path.join(dir,'receipt.json');
-      exclusive(receipt,{schema:1,current,version:m.version,platform:p.platform,manifest:m});
-      return {...checked,receipt};
+      exclusive(receipt,{schema:1,current,version:m.version,platform:p.platform,manifest:m,...(transfer?{transfer}:{})});
+      return {...checked,receipt,...(transfer?{transfer}:{})};
     }catch(e){fs.rmSync(dir,{recursive:true,force:true});throw e;}
   });
 }

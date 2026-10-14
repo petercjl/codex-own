@@ -25,12 +25,25 @@
     "runtimeHosts": [
       "registry.npmjs.org"
     ],
-    "desktopAssets": "content-addressed npm payload prereleases; install latest manager only",
-    "cache": "verified platform parts retained for retries",
+    "desktopAssets": "canonical-tar-cdc-v1; content-defined raw program blocks compressed and distributed as npm payload prereleases",
+    "cache": "SHA256-verified blocks; seed matching blocks from managed installed program; download missing content only",
     "progress": "stderr; final result JSON on stdout",
     "idleTimeoutSeconds": 30,
     "downloadAttempts": 3,
-    "parallelDownloads": 4
+    "parallelDownloads": 4,
+    "incremental": {
+      "format": "canonical-tar-cdc-v1",
+      "rawBlockMinMiB": 16,
+      "rawBlockMaxMiB": 64,
+      "baseVersionRequired": false,
+      "firstInstall": "all required blocks",
+      "migration": "upgrade npm manager once for desktop builds older than 0.4.0",
+      "statistics": [
+        "reusedBlocks",
+        "downloadBytes",
+        "fullDownloadBytes"
+      ]
+    }
   },
   "desktopUpdater": {
     "source": "https://registry.npmjs.org/@petercjl%2fcodex-own/latest",

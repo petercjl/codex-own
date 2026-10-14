@@ -3,12 +3,14 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {pipeline} from 'node:stream/promises';
 import {fileHash, verifiedDownload, progress} from './network.mjs';
+import {TRANSPORT} from './content-blocks.mjs';
 
 export const payloadVersion = sha => `0.0.0-payload.h${sha}`;
 export const payloadURL = sha => `https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-${payloadVersion(sha)}.tgz`;
 export function validateParts(asset) {
   const fail = () => { throw Object.assign(new Error('Invalid npm asset manifest'), {code:'INVALID_MANIFEST'}); };
-  if (!Array.isArray(asset.parts) || asset.parts.length < 1 || asset.parts.length > 64) fail();
+  if (asset.transport !== undefined && asset.transport !== TRANSPORT) fail();
+  if (!Array.isArray(asset.parts) || asset.parts.length < 1 || asset.parts.length > 1024) fail();
   let size = 0;
   for (const p of asset.parts) {
     if (!/^[a-f0-9]{64}$/.test(p.sha256) || !/^[a-f0-9]{64}$/.test(p.archiveSha256)
@@ -32,11 +34,22 @@ export async function assembleNpmAsset(asset, dest, cache, tar, {download = veri
   const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});
   if(signal?.aborted)controller.abort();
   try{
+  const cached = new Set();
+  for(const part of asset.parts){
+    const file=path.join(cache,part.sha256+'.bin');safeCache(file);
+    if(fs.existsSync(file)&&fs.statSync(file).size===part.size&&await fileHash(file)===part.sha256)cached.add(part.sha256);
+  }
+  const uniqueParts=[...new Map(asset.parts.map(part=>[part.sha256,part])).values()];
+  const stats={transport:asset.transport||'legacy',totalBlocks:asset.parts.length,reusedBlocks:asset.parts.filter(p=>cached.has(p.sha256)).length,
+    downloadBlocks:uniqueParts.filter(p=>!cached.has(p.sha256)).length,
+    downloadBytes:uniqueParts.filter(p=>!cached.has(p.sha256)).reduce((n,p)=>n+p.archiveSize,0),
+    fullDownloadBytes:uniqueParts.reduce((n,p)=>n+p.archiveSize,0)};
+  report(`更新资源：复用 ${stats.reusedBlocks}/${stats.totalBlocks} 块 · 需下载 ${(stats.downloadBytes/1048576).toFixed(1)} MiB / 全量 ${(stats.fullDownloadBytes/1048576).toFixed(1)} MiB`);
   async function fetchPart(part, i) {
     report(`npm 资源分片 ${i+1}/${asset.parts.length}`);
     const file = path.join(cache, `${part.sha256}.bin`);
     safeCache(file);
-    if (fs.existsSync(file) && fs.statSync(file).size === part.size && await fileHash(file) === part.sha256) {
+    if (cached.has(part.sha256)) {
       report(`[${i+1}/${asset.parts.length}] 复用已校验分片`); return file;
     }
     if (fs.existsSync(file)) fs.unlinkSync(file);
@@ -66,11 +79,12 @@ export async function assembleNpmAsset(asset, dest, cache, tar, {download = veri
   if(failure)throw failure;
   if(controller.signal.aborted)throw Object.assign(Error('Download cancelled'),{code:'CANCELLED'});
   const files=asset.parts.map(part=>completed.get(part.sha256));
-  report('合并并校验完整桌面安装包');
+  report('在本地重建并校验完整桌面安装包');
   const output = fs.createWriteStream(dest, {flags:'wx',mode:0o600});
   async function* chunks() { for (const f of files) yield* fs.createReadStream(f); }
   await pipeline(chunks(), output,{signal:controller.signal});
   if (fs.statSync(dest).size !== asset.size || await fileHash(dest) !== asset.sha256)
     throw Object.assign(new Error('Assembled desktop checksum mismatch'), {code:'CHECKSUM_MISMATCH'});
+  return stats;
   }finally{signal?.removeEventListener('abort',cancel);}
 }
