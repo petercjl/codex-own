@@ -6,6 +6,7 @@ import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {verifyTranslations} from './i18n.mjs';
 import {bundleUpdater} from './updater.mjs';
+import {updateMenuChanges} from './update-menu.mjs';
 const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -19,7 +20,7 @@ const resources=path.join(app,'resources'),archive=path.join(resources,'app.asar
 bundleUpdater(resources);
 const header=asar.getRawHeader(archive).header;
 const pkg=JSON.parse(asar.extractFile(archive,'package.json'));
-const changes=new Map();
+const changes=updateMenuChanges(asar,archive);
 pkg.name='codex-own';pkg.productName='codex-own';pkg.description='Independent DeepSeek desktop';
 changes.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
 changes.set(pkg.main,Buffer.from('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString()));

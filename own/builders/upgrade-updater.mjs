@@ -6,6 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {bundleUpdater,verifyUpdater} from './updater.mjs';
+import {updateMenuChanges} from './update-menu.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const root=path.resolve(import.meta.dirname,'..');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -17,12 +18,13 @@ export async function upgradeUpdater(app,{version,node}={}){
  if((mac?info.CFBundleIdentifier:info.identity)!=='local.codex-own')throw Error('Only verified codex-own builds can receive this overlay');
  const bundled=path.join(resources,'own-updater');
  asar.uncache(archive);const header=asar.getRawHeader(archive).header;
+ const menuChanges=mac?new Map():updateMenuChanges(asar,archive);
  const runtimeFile='.vite/build/'+(mac?'own-runtime.cjs':'own-runtime-win.cjs');
  if(!asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).toString().includes('codex-own-independent'))throw Error('Independent bootstrap missing');
  if(fs.existsSync(bundled)){
    const meta=JSON.parse(fs.readFileSync(path.join(bundled,'desktop-version.json')));
    const same=folder=>fs.readdirSync(path.join(root,folder)).every(name=>fs.readFileSync(path.join(root,folder,name)).equals(fs.readFileSync(path.join(bundled,folder,name))));
-   if(meta.version===version&&same('desktop')&&same('lib')&&asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).equals(fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs'))))return {ok:true,unchanged:true,...verifyUpdater(resources)};
+   if(!menuChanges.size&&meta.version===version&&same('desktop')&&same('lib')&&asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).equals(fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs'))))return {ok:true,unchanged:true,...verifyUpdater(resources)};
  }
  // Keep a recovery point even though this is a fresh candidate, not the installed app.
  const backup=fs.mkdtempSync(path.join(path.dirname(app),'before-npm-updater-'));
@@ -34,7 +36,7 @@ export async function upgradeUpdater(app,{version,node}={}){
  let offset=0;const buffers=[];
  function pack(dir,prefix=''){for(const[name,e]of Object.entries(dir.files)){
    const file=prefix+name;if(e.files){pack(e,file+'/');continue;}if(e.unpacked||e.link)continue;
-   const b=file===runtimeFile?fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs')):asar.extractFile(archive,file.replaceAll('/',path.sep));
+   const b=file===runtimeFile?fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs')):menuChanges.get(file)||asar.extractFile(archive,file.replaceAll('/',path.sep));
    e.size=b.length;e.offset=String(offset);offset+=b.length;const blockSize=4194304,blocks=[];for(let i=0;i<b.length;i+=blockSize)blocks.push(sha(b.subarray(i,i+blockSize)));e.integrity={algorithm:'SHA256',hash:sha(b),blockSize,blocks};buffers.push(b);
  }}pack(header);
  const hp=new Pickle();hp.writeString(JSON.stringify(header));const hb=hp.toBuffer(),sp=new Pickle();sp.writeUInt32(hb.length);

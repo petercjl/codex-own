@@ -5,9 +5,12 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {verifyTranslations} from './builders/i18n.mjs';
 import {verifyUpdater} from './builders/updater.mjs';
+import {createRequire} from 'node:module';
+import {updateMenuChanges} from './builders/update-menu.mjs';
 const app=path.resolve(process.argv[2]),mac=process.platform==='darwin';
 console.log(JSON.stringify({i18n:verifyTranslations(app)}));
 console.log(JSON.stringify({updater:verifyUpdater(path.join(app,mac?'Contents/Resources':'resources'))}));
+if(!mac){assert.equal(updateMenuChanges(createRequire(import.meta.url)('@electron/asar'),path.join(app,'resources','app.asar')).size,0,'Windows standalone update menu missing');console.log(JSON.stringify({standaloneUpdateMenu:true}));}
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'own-isolation-'));
 fs.writeFileSync(path.join(home,'config.toml'),'cli_auth_credentials_store = "file"\nforced_login_method = "api"\n',{flag:'wx',mode:0o600});
 const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_)/.test(k))delete env[k];env.CODEX_HOME=home;
