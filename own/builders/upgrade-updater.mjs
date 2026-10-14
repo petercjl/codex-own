@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {bundleUpdater,verifyUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
+import {applyWindowsIcon} from './windows-icon.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const root=path.resolve(import.meta.dirname,'..');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -24,7 +25,8 @@ export async function upgradeUpdater(app,{version,node}={}){
  if(fs.existsSync(bundled)){
    const meta=JSON.parse(fs.readFileSync(path.join(bundled,'desktop-version.json')));
    const same=folder=>fs.readdirSync(path.join(root,folder)).every(name=>fs.readFileSync(path.join(root,folder,name)).equals(fs.readFileSync(path.join(bundled,folder,name))));
-   if(!menuChanges.size&&meta.version===version&&same('desktop')&&same('lib')&&asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).equals(fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs'))))return {ok:true,unchanged:true,...verifyUpdater(resources)};
+   const iconCurrent=mac||fs.readFileSync(path.join(resources,'codex-own.png')).equals(fs.readFileSync(path.join(root,'../resources/own/codex-own-windows.png')));
+   if(iconCurrent&&!menuChanges.size&&meta.version===version&&same('desktop')&&same('lib')&&asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).equals(fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs'))))return {ok:true,unchanged:true,...verifyUpdater(resources)};
  }
  // Keep a recovery point even though this is a fresh candidate, not the installed app.
  const backup=fs.mkdtempSync(path.join(path.dirname(app),'before-npm-updater-'));
@@ -55,7 +57,7 @@ export async function upgradeUpdater(app,{version,node}={}){
    const PE=require('pe-library'),exeFile=path.join(app,'codex-own.exe'),exe=PE.NtExecutable.from(fs.readFileSync(exeFile),{ignoreCert:true}),res=PE.NtExecutableResource.from(exe);
    const integrity=res.entries.find(e=>e.type==='INTEGRITY'&&e.id==='ELECTRONASAR');if(!integrity)throw Error('PE integrity resource missing');
    const values=JSON.parse(Buffer.from(integrity.bin).toString());if(values.length!==1||values[0].file!=='resources\\app.asar')throw Error('Unknown integrity layout');values[0].value=headerHash;integrity.bin=Buffer.from(JSON.stringify(values));res.outputResource(exe);
-   fs.writeFileSync(exeFile,Buffer.from(exe.generate()));Object.assign(info,{asarHeaderHash:headerHash,asarSha256:sha(data),exeSha256:sha(fs.readFileSync(exeFile)),npmUpdater:true});fs.writeFileSync(path.join(app,'codex-own-build.json'),JSON.stringify(info,null,2));
+   fs.writeFileSync(exeFile,Buffer.from(exe.generate()));const icon=applyWindowsIcon(app);Object.assign(info,{asarHeaderHash:headerHash,asarSha256:sha(data),exeSha256:sha(fs.readFileSync(exeFile)),npmUpdater:true,icon});fs.writeFileSync(path.join(app,'codex-own-build.json'),JSON.stringify(info,null,2));
  }
  return {ok:true,backup,...verifyUpdater(resources)};
 }

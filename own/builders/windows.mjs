@@ -61,11 +61,11 @@ fs.writeFileSync(archive,Buffer.concat([sp.toBuffer(),hb,...buffers]));
 const updated=fs.readFileSync(archive);const headerHash=hash(updated.subarray(16,16+updated.readUInt32LE(12)));
 fs.writeFileSync(path.join(resources,'owl-app.ini'),`[Owl]\r\nUserDataDirectoryName=codex-own-independent\\desktop\r\nAppVersion=${pkg.version}\r\n`);
 fs.writeFileSync(path.join(resources,'codex-own-runtime.json'),JSON.stringify({cli:'codex.exe'}),{flag:'wx'});
-const png=fs.readFileSync(path.join(root,'resources/own/codex-own.png'));
+const png=fs.readFileSync(path.join(root,'resources/own/codex-own-windows.png'));
 // Windows icon uses a 256px PNG generated from our existing editable icon.
-const icoPath=path.join(root,'resources/own/codex-own.ico');fs.statSync(icoPath);
+const icoPath=path.join(root,'resources/own/codex-own-windows.ico');fs.statSync(icoPath);
 const icon=RE.Data.IconFile.from(fs.readFileSync(icoPath));
-fs.copyFileSync(path.join(root,'resources/own/codex-own.png'),path.join(resources,'codex-own.png'),fs.constants.COPYFILE_EXCL);
+fs.copyFileSync(path.join(root,'resources/own/codex-own-windows.png'),path.join(resources,'codex-own.png'),fs.constants.COPYFILE_EXCL);
 for(const n of fs.readdirSync(resources).filter(n=>/\.ico$/.test(n)))fs.copyFileSync(icoPath,path.join(resources,n));
 const exe=PE.NtExecutable.from(fs.readFileSync(path.join(app,'ChatGPT.exe')),{ignoreCert:true});
 const res=PE.NtExecutableResource.from(exe);

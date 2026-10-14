@@ -7,7 +7,7 @@ import {tarExecutable} from '../lib/manager.mjs';
 import {upgradeUpdater} from '../builders/upgrade-updater.mjs';
 import {canonicalize} from './canonicalize.mjs';
 const version=process.env.OWN_VERSION,key=process.env.OWN_PLATFORM;
-const dir=path.resolve('out',`own-release-${version}-${key}`);fs.mkdirSync(dir,{recursive:true});
+const dir=path.resolve('out',`own-release-${version}-${key}.noindex`);fs.mkdirSync(dir,{recursive:true});
 const gh=(args)=>execFileSync('gh',args,{stdio:'inherit'});
 gh(['release','download',`own-v${version}`,'--repo','petercjl/codex-own','--pattern','manifest.json','--dir',dir]);
 const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json')));

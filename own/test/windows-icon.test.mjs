@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import {createRequire} from 'node:module';
+import {applyWindowsIcon,verifyWindowsIcon} from '../builders/windows-icon.mjs';
+const require=createRequire(import.meta.url),PE=require('pe-library'),RE=require('resedit');
+test('Windows branding replaces every icon size while preserving executable ASAR integrity',t=>{
+ const app=fs.mkdtempSync(path.join(os.tmpdir(),'own-icon-test-'));t.after(()=>fs.rmSync(app,{recursive:true,force:true}));
+ const resources=path.join(app,'resources');fs.mkdirSync(resources);fs.writeFileSync(path.join(resources,'codex-own.png'),'previous');fs.writeFileSync(path.join(resources,'app.ico'),'previous');
+ const exe=PE.NtExecutable.createEmpty(false),res=PE.NtExecutableResource.from(exe);
+ const integrity=Buffer.from(JSON.stringify([{file:'resources\\app.asar',value:'a'.repeat(64)}]));
+ res.entries.push({type:'INTEGRITY',id:'ELECTRONASAR',lang:1033,codepage:0,bin:integrity});
+ const previous=RE.Data.IconFile.from(fs.readFileSync(new URL('../../resources/own/codex-own.ico',import.meta.url)));
+ RE.Resource.IconGroupEntry.replaceIconsForResource(res.entries,1,1033,previous.icons.map(i=>i.data));res.outputResource(exe);
+ fs.writeFileSync(path.join(app,'codex-own.exe'),Buffer.from(exe.generate()));
+ assert.throws(()=>verifyWindowsIcon(app));applyWindowsIcon(app);assert.deepEqual(verifyWindowsIcon(app),{variant:'windows-blue-w',sizes:6});
+ const after=PE.NtExecutableResource.from(PE.NtExecutable.from(fs.readFileSync(path.join(app,'codex-own.exe')))).entries;
+ assert.deepEqual(Buffer.from(after.find(e=>e.type==='INTEGRITY').bin),integrity);
+ assert.deepEqual(fs.readFileSync(path.join(resources,'app.ico')),fs.readFileSync(new URL('../../resources/own/codex-own-windows.ico',import.meta.url)));
+});

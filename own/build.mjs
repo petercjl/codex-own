@@ -14,7 +14,7 @@ const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${pro
 if(!mac&&key!=='win32-x64')throw Error('Unsupported build platform '+key);
 const platform=mac?'mac-arm64':'win',version=process.env.OWN_VERSION||JSON.parse(fs.readFileSync(path.join(root,'own/package.json'))).version;
 if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version))throw Error('Invalid version');
-const output=path.join(root,'out','own-release-'+version+'-'+key);if(fs.existsSync(output))throw Error('Build output exists');fs.mkdirSync(output,{recursive:true});
+const output=path.join(root,'out','own-release-'+version+'-'+key+'.noindex');if(fs.existsSync(output))throw Error('Build output exists');fs.mkdirSync(output,{recursive:true});
 const run=(cmd,args,options={})=>execFileSync(cmd,args,{cwd:root,stdio:'inherit',...options});
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||run('git',['rev-parse','upstream/master'],{encoding:'utf8',stdio:'pipe'}).trim()};

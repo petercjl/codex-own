@@ -6,7 +6,7 @@ import {unpack,digestFile} from '../lib/manager.mjs';
 import {writeCanonicalArchive,reuseInstalledBlocks,TRANSPORT} from '../lib/content-blocks.mjs';
 
 const platform=process.env.OWN_PLATFORM,version=process.env.OWN_VERSION;
-const dir=path.resolve('out',`own-release-${version}-${platform}`);
+const dir=path.resolve('out',`own-release-${version}-${platform}.noindex`);
 const manifest=JSON.parse(fs.readFileSync(path.join(dir,`manifest-${platform}.json`)));
 const asset=manifest.platforms[platform].incremental;
 assert.equal(asset.transport,TRANSPORT);
