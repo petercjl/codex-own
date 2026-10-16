@@ -3,6 +3,7 @@ import path from 'node:path';
 import {latest,manifestFor,validateManifest,paths,state,locked,rejectLinks,exclusive,digestFile,tarExecutable,install,fail,running,launch} from './manager.mjs';
 import {assembleNpmAsset} from './npm-assets.mjs';
 import {reuseInstalledBlocks} from './content-blocks.mjs';
+import {ensureRuntime} from './tool-runtime.mjs';
 
 // Desktop release versions use the stable npm channel, independently of upstream's app version.
 export function isNewer(candidate,current) {
@@ -31,6 +32,7 @@ export async function prepareUpdate(current,{p=paths(),resolve=latest,manifest=m
       // The app may stay open: only read program resources, never user data.
       if(p.target){rejectLinks(p.target);await reuseInstalledBlocks(asset,p.target,cache,{report,signal});}
       const transfer=await assemble(asset,archive,cache,tarExecutable(),{report,signal});
+      if(m.runtimes)await ensureRuntime(m.runtimes,{p,report,signal});
       // Verify even when a download adapter is supplied.
       if(fs.statSync(archive).size!==asset.size||await digestFile(archive)!==asset.sha256)fail('CHECKSUM_MISMATCH','Prepared update checksum mismatch');
       const receipt=path.join(dir,'receipt.json');

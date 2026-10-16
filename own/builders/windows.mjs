@@ -7,6 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {verifyTranslations} from './i18n.mjs';
 import {bundleUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
+import {isolateRuntimeSource} from './runtime-isolation.mjs';
 const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -35,7 +36,7 @@ for(const name of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replac
    if(n.type==='Property'&&['shouldIncludeSparkle','shouldIncludeWindowsUpdater','shouldIncludeWindowsMsixUpdater','shouldIncludeUpdater'].includes(n.key?.name||n.key?.value)&&n.value?.body?.type==='BlockStatement')edits.push([n.value.body.start,n.value.body.end,'{return false}']);
   });for(const [a,b,v] of edits.sort((a,b)=>b[0]-a[0])){s=s.slice(0,a)+v+s.slice(b);updaterPatches++}
  }
- s=s.replaceAll('codex://','codex-own://');if(s!==before)changes.set(name,Buffer.from(s));
+ s=isolateRuntimeSource(s.replaceAll('codex://','codex-own://'));if(s!==before)changes.set(name,Buffer.from(s));
 }
 if(shellPatches!==1||updaterPatches===0)throw Error('Required Windows isolation patch missing');
 // Rebuild packed data while preserving every original unpacked/link entry.

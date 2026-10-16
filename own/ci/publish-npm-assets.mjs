@@ -25,6 +25,8 @@ async function metadata(version){
 }
 function find(root,name){for(const e of fs.readdirSync(root,{withFileTypes:true})){const p=path.join(root,e.name);if(e.isFile()&&e.name===name)return p;if(e.isDirectory()){const found=find(p,name);if(found)return found;}}}
 const pending=[],jobs=[],seen=new Map(),publication=[],plans=[];
+const runtimeFile=path.join(dir,'runtime-input.json');
+if(fs.existsSync(runtimeFile))manifest.runtimes=JSON.parse(fs.readFileSync(runtimeFile));
 if(!manifest.platforms?.['darwin-arm64']||!manifest.platforms?.['win32-x64'])throw Error('Both verified desktop platforms are required');
 function readBlock(archive,block){
   const bytes=Buffer.alloc(block.size),handle=fs.openSync(archive,'r');let filled=0;
@@ -34,11 +36,13 @@ function readBlock(archive,block){
   return bytes;
 }
 // Validate every platform and index before submitting any irreversible uploads.
-for(const [platform,asset] of Object.entries(manifest.platforms)){
+const entries=Object.entries(manifest.platforms).map(([platform,asset])=>({platform,asset,parent:manifest.platforms,key:platform,archiveName:`codex-own-${platform}.tar`,desktop:true}));
+for(const [platform,assets]of Object.entries(manifest.runtimes?.platforms||{}))for(const [name,asset]of Object.entries(assets))entries.push({platform:`${platform}-${name}`,asset,parent:assets,key:name,archiveName:`runtime-${platform}-${name}.bin`,desktop:false});
+for(const {platform,asset,parent,key,archiveName,desktop} of entries){
   const transport=asset.incremental;
-  const archive=find(dir,`codex-own-${platform}.tar`);
+  const archive=find(dir,archiveName);
   if(!transport||!archive||fs.statSync(archive).size!==transport.size)throw Error('Unverified desktop archive');
-  if(transport.transport!==TRANSPORT||!Array.isArray(transport.blocks)||!transport.blocks.length||transport.blocks.length>1024)throw Error('Content block index required');
+  if((desktop&&transport.transport!==TRANSPORT)||!Array.isArray(transport.blocks)||!transport.blocks.length||transport.blocks.length>1024)throw Error('Content block index required');
   let offset=0;const digest=crypto.createHash('sha256');
   for(const [index,block] of transport.blocks.entries()){
     if(block.offset!==offset||!Number.isSafeInteger(block.size)||block.size<1||block.size>64*1048576||!/^[a-f0-9]{64}$/.test(block.sha256))throw Error('Invalid content block index');
@@ -48,7 +52,7 @@ for(const [platform,asset] of Object.entries(manifest.platforms)){
     }else if(seen.get(block.sha256).block.size!==block.size)throw Error('Conflicting content block size');
   }
   if(offset!==transport.size||digest.digest('hex')!==transport.sha256)throw Error('Incomplete or unverified content block index');
-  plans.push({platform,asset,transport});
+  plans.push({platform,asset,transport,parent,key,desktop});
 }
 const results=await mapLimited(jobs,4,async({platform,archive,block,index})=>{
   const sha256=block.sha256,version=payloadVersion(sha256),packageDir=fs.mkdtempSync(path.join(dir,'payload-'));
@@ -70,11 +74,11 @@ const results=await mapLimited(jobs,4,async({platform,archive,block,index})=>{
   }finally{fs.rmSync(packageDir,{recursive:true,force:true});}
 });
 const byHash=new Map(results.map(r=>[r.part.sha256,r]));
-for(const {platform,asset,transport} of plans){
+for(const {platform,asset,transport,parent,key,desktop} of plans){
   const parts=transport.blocks.map(b=>byHash.get(b.sha256).part);
   const submitted=results.filter(r=>r.platform===platform&&r.published);
-  manifest.platforms[platform]={entry:asset.entry,transport:TRANSPORT,size:transport.size,sha256:transport.sha256,parts};
-  validateParts(manifest.platforms[platform]);
+  parent[key]={entry:asset.entry,...(desktop?{transport:TRANSPORT}:{format:asset.format}),size:transport.size,sha256:transport.sha256,parts};
+  validateParts(parent[key]);
   publication.push({platform,publishedParts:submitted.length,reusedParts:parts.length-submitted.length,publishedBytes:submitted.reduce((n,r)=>n+r.part.archiveSize,0),totalParts:parts.length});
 }
 // npm scans accepted packages before exposing them. Submit first, then wait for

@@ -7,6 +7,7 @@ import {execFileSync, spawn} from 'node:child_process';
 import {networkFetch, verifiedDownload, progress} from './network.mjs';
 import {validateParts, assembleNpmAsset} from './npm-assets.mjs';
 import {reuseInstalledBlocks} from './content-blocks.mjs';
+import {ensureRuntime,validateRuntime} from './tool-runtime.mjs';
 
 export const packageRoot = path.resolve(import.meta.dirname, '..');
 export const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));
@@ -24,6 +25,7 @@ export function rejectLinks(p) {
 }
 export function validateManifest(m, platform) {
   if(![1,2].includes(m.schema)||m.repository!=='petercjl/codex-own'||!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(m.version))fail('INVALID_MANIFEST','Invalid release identity');
+  if(m.runtimes)validateRuntime(m.runtimes,platform);
   const a=m.platforms?.[platform];if(!a)fail('PLATFORM_UNAVAILABLE',`No verified build for ${platform} in ${m.version}`);
   if(!/^[a-f0-9]{64}$/.test(a.sha256)||!Number.isSafeInteger(a.size)||a.size<=0)fail('INVALID_MANIFEST','Invalid archive checksum/size');
   if(m.schema===2){validateParts(a);if(a.entry!==(platform==='darwin-arm64'?'codex-own.app':'app'))fail('INVALID_MANIFEST','Unexpected archive entry');return a;}
@@ -93,7 +95,7 @@ export function switchApp({p,source,version,adopt=false,identity=appIdentity,isR
 }
 export async function locked(p,fn){rejectLinks(p.root);fs.mkdirSync(p.manager,{recursive:true,mode:0o700});const lock=path.join(p.manager,'operation.lock');let fd;try{fd=fs.openSync(lock,'wx',0o600);}catch{fail('BUSY','Another operation or interrupted lock exists; inspect doctor before recovery');}try{fs.writeSync(fd,JSON.stringify({pid:process.pid,time:new Date().toISOString()}));return await fn();}finally{fs.closeSync(fd);fs.unlinkSync(lock);}}
 export async function latest() {const r=await networkFetch('https://registry.npmjs.org/@petercjl%2fcodex-own/latest',{signal:AbortSignal.timeout(30000)});if(!r.ok)fail('REGISTRY_UNAVAILABLE',`Registry HTTP ${r.status}`);const p=await r.json();if(p.name!==pkg.name)fail('INVALID_MANIFEST','Registry package mismatch');return p.version;}
-export async function manifestFor(v){if(v===pkg.version)return read(path.join(packageRoot,'release.json'));if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(v))fail('INVALID_VERSION','Invalid version');const r=await networkFetch(`https://registry.npmjs.org/@petercjl%2fcodex-own/${v}`,{signal:AbortSignal.timeout(30000)});if(!r.ok)fail('MANIFEST_UNAVAILABLE',`npm HTTP ${r.status}`);const p=await r.json(),m=p.ownDesktopManifest;if(p.name!==pkg.name||p.version!==v||m?.version!==v||m?.schema!==2)fail('MANIFEST_UNAVAILABLE','This version has no npm desktop manifest; update the npm manager to latest.');return m;}
+export async function manifestFor(v){if(v===pkg.version){const local=read(path.join(packageRoot,'release.json'));if(local.version===v)return local;}if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(v))fail('INVALID_VERSION','Invalid version');const r=await networkFetch(`https://registry.npmjs.org/@petercjl%2fcodex-own/${v}`,{signal:AbortSignal.timeout(30000)});if(!r.ok)fail('MANIFEST_UNAVAILABLE',`npm HTTP ${r.status}`);const p=await r.json(),m=p.ownDesktopManifest;if(p.name!==pkg.name||p.version!==v||m?.version!==v||m?.schema!==2)fail('MANIFEST_UNAVAILABLE','This version has no npm desktop manifest; update the npm manager to latest.');return m;}
 export async function configure(keyFile){if(!keyFile)fail('KEY_FILE_REQUIRED','Provide --api-key-file');const key=fs.readFileSync(keyFile,'utf8').trim();if(!/^sk-[A-Za-z0-9_-]{10,}$/.test(key))fail('INVALID_KEY_FILE','Expected a single API key');const p=paths();return locked(p,async()=>{if(running(p).length)fail('APP_RUNNING','Quit codex-own first');rejectLinks(p.core);fs.mkdirSync(p.core,{recursive:true,mode:0o700});fs.chmodSync(p.core,0o700);
  if(process.platform==='win32'){const sid=execFileSync('powershell.exe',['-NoProfile','-Command','[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value'],{encoding:'utf8'}).trim();execFileSync('icacls.exe',[p.core,'/inheritance:r','/grant:r',`*${sid}:(OI)(CI)F`],{stdio:'pipe'});}
  const auth=path.join(p.core,'auth.json');rejectLinks(auth);let backup=null;if(fs.existsSync(auth)){backup=auth+'.backup-'+crypto.randomUUID();fs.copyFileSync(auth,backup,fs.constants.COPYFILE_EXCL);fs.chmodSync(backup,0o600);}const tmp=auth+'.new-'+crypto.randomUUID();exclusive(tmp,{auth_mode:'apikey',OPENAI_API_KEY:key});fs.renameSync(tmp,auth);
@@ -104,7 +106,7 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
   progress('准备安装：检查版本、平台与独立目录');
   return locked(p,async()=>{const m=manifest||await manifestFor(version||pkg.version);const a=validateManifest(m,p.platform);
     if(expectedCurrent!==undefined&&state(p)?.version!==expectedCurrent)fail('INSTALLATION_CHANGED','Installation changed after the update was prepared; check again');
-    if(state(p)?.version===m.version&&!archive)return {ok:true,unchanged:true,version:m.version};
+    if(state(p)?.version===m.version&&!archive){if(m.runtimes)await ensureRuntime(m.runtimes,{p,report:progress});return {ok:true,unchanged:true,version:m.version};}
     if(running(p).length)fail('APP_RUNNING','Quit codex-own before install/update');
     const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive,transfer;
     if(f){if(fs.statSync(f).size!==a.size||await digestFile(f)!==a.sha256)fail('CHECKSUM_MISMATCH','Local archive checksum mismatch');}
@@ -116,6 +118,7 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
     progress('校验通过，正在解压桌面程序');
     const content=path.join(stage,'unpacked');unpack(f,content);const source=path.join(content,a.entry);
     if(process.platform==='darwin')execFileSync('codesign',['--verify','--deep','--strict',source],{stdio:'pipe'});
+    if(m.runtimes)await ensureRuntime(m.runtimes,{p,report:progress});
     progress('正在安装到独立目录');
     const result=switchApp({p,source,version:m.version,adopt});
     if(process.platform==='darwin')execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-f',p.target],{stdio:'pipe'});

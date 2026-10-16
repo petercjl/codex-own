@@ -2,6 +2,22 @@
 
 独立桌面应用的 npm 安装与更新工具。支持 Mac ARM64 和 Windows x64。管理工具和桌面资源均从 npm 下载。
 
+## 独立 Node、npm 和 Python
+
+从 0.5.0 起，安装或更新桌面程序会同时安装其固定版本的独立工具。第一版为 Node 24.22.0、npm 11.19.1、Python 3.12.15，保留发行包自带许可证。资源通过 npm 内容包分发，接收端无需连接 GitHub 或 Node/Python 下载站。工具版本独立于桌面版本；后续桌面更新复用相同工具和已校验分片。
+
+Mac 工具位于 `~/Library/Application Support/codex-own-independent/runtimes`，Windows 位于 `%LOCALAPPDATA%\codex-own-independent\runtimes`。版本目录、npm 全局包与缓存、pip 缓存和 Python 字节码均归 codex-own 所有。应用启动后只为自己的进程及工作子进程设置 PATH；用户/系统 PATH、shell 配置和原版 Codex 缓存保持不变。项目的 `node_modules` 和 Python `.venv` 继续保存在项目中。Python 包安装使用项目虚拟环境，pip 默认要求虚拟环境，保证工具版本目录稳定。
+
+可直接发给 Agent：
+
+> 请检查 codex-own 的独立 Node、npm 和 Python 运行时，并验证实际执行路径。
+
+> 请通过 @petercjl/codex-own 更新 codex-own 及其独立运行时，保留配置和对话。
+
+开发者和终端测试入口：`codex-own runtime doctor` 查看工具版本和实际路径；`codex-own runtime run -- node --version`、`codex-own runtime run -- npm --version`、`codex-own runtime run -- python --version` 可在应用外使用同一套工具。`runtime env` 只返回工具环境合同，不输出 API Key 或继承的账户信息。独立更新使用 `runtime update --yes`，回到上个工具版本使用 `runtime rollback --yes`；已运行的应用在重启后采用新版本。安装失败保持原有活动版本，保留可恢复的版本记录。
+
+首次通过 npm 安装管理工具仍需要机器已有 Node.js 22+ 和 npm；这只是引导安装的前提。安装完成后，桌面任务和应用内更新使用 codex-own 自己的工具。此工具集包含 Node、npm、Python、pip、venv；原版完整办公依赖集合、Git、编译器和额外项目库按实际任务另行安装。
+
 ## 应用内更新
 
 带有 npm 更新组件的桌面版本会在启动 15 秒后、以及运行期间每 6 小时检查稳定版。也可以打开菜单“更新 → 检查 codex-own 更新…”。发现新版后点击“下载更新”，下载期间可以继续使用 App。下载完成后结束正在运行的任务，点击“重启并安装”；更新进程会等待 App 退出，备份程序及独立数据，再安装并重新打开。

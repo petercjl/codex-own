@@ -12,7 +12,13 @@
     "skill source",
     "skill status",
     "skill install",
-    "skill update"
+    "skill update",
+    "runtime install",
+    "runtime update",
+    "runtime doctor",
+    "runtime env",
+    "runtime run",
+    "runtime rollback"
   ],
   "platforms": {
     "darwin-arm64": "implemented",
@@ -55,5 +61,24 @@
     "runtime": "bundled standalone Node; no global npm upgrade required",
     "menu": "更新 → 检查 codex-own 更新…",
     "offline": "current installation remains usable; manual retry; verified prepared update survives restart"
+  },
+  "toolRuntime": {
+    "contract": 1,
+    "platforms": [
+      "darwin-arm64",
+      "win32-x64"
+    ],
+    "versions": {
+      "node": "24.22.0",
+      "npm": "11.19.1",
+      "python": "3.12.15"
+    },
+    "source": "release manifest pinned npm content payloads",
+    "state": "independent root/runtimes/active.json",
+    "pathPolicy": "app and child processes only; user and system PATH preserved",
+    "pythonPackages": "project venv; pip requires virtualenv",
+    "npmGlobalPackages": "private runtimes/npm-global prefix",
+    "rollback": "verify predecessor and switch receipt; no conversation data restore",
+    "firstBootstrap": "existing Node >=22 and npm required"
   }
 }

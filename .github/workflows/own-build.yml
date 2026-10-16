@@ -27,6 +27,11 @@ jobs:
         with: {node-version: '24', package-manager-cache: false}
       - run: npm ci --prefix own
       - run: npm run check --prefix own && npm test --prefix own
+      - name: Verify independent Node npm Python on target OS
+        run: |
+          mkdir -p out/runtime-qa
+          node own/ci/prepare-runtimes.mjs out/runtime-qa "${{ matrix.platform }}"
+          node own/ci/test-runtimes.mjs out/runtime-qa
       - name: Build updated upstream candidate
         if: ${{ !inputs.existing }}
         env:

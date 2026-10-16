@@ -20,3 +20,8 @@ for(const platform of ['darwin-arm64','win32-x64']){
     console.log(JSON.stringify({ok:true,platform,version:manifest.version,downloadSource:'registry.npmjs.org',sha256:asset.sha256}));
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }
+for(const [platform,assets]of Object.entries(manifest.runtimes?.platforms||{}))for(const [name,asset]of Object.entries(assets)){
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'own-runtime-registry-'));
+ try{await assembleNpmAsset(asset,path.join(dir,'verified.bin'),path.join(dir,'cache'),tarExecutable());console.log(JSON.stringify({ok:true,platform,tool:name,version:manifest.runtimes.version,sha256:asset.sha256}));}
+ finally{fs.rmSync(dir,{recursive:true,force:true});}
+}

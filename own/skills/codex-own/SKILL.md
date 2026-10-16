@@ -20,6 +20,16 @@ For installation-only acceptance, verify doctor, version, target and shortcut wi
 
 Desktop builds with the bundled npm updater check stable latest 15 seconds after startup and every six hours. The user-facing menu is 更新 → 检查 codex-own 更新…. Download runs while the app remains usable; 重启并安装 asks the user to end active tasks, then an independent helper waits for exit, backs up and replaces the app. The helper uses bundled Node and npm payloads, so daily in-app updates do not require updating global npm tooling. Inspect the installed app's own updater version separately from the global CLI version. Retain CLI step 3 for older builds and recovery. Prepared, verified downloads survive restarts; offline checks preserve the current installation. Install logs and unique result records live under the independent manager directory; never delete locks to bypass a failed update.
 
+## Private tool runtime (contract 1)
+
+Desktop installations from 0.5.0 include a separately versioned Node/npm/Python toolchain. The manager's release manifest pins verified npm payloads for macOS ARM64 and Windows x64. Install/update ensures these tools before switching the app. Runtime bytes retain upstream licenses and contain no user configuration. The initial npm manager bootstrap still requires existing Node.js 22+; ordinary app updates use the bundled updater.
+
+Use `codex-own runtime doctor` to discover the actual version and executable paths. Use `runtime env` for a sanitized JSON environment contract; it returns only tool settings, never inherited credentials. `runtime run -- node|npm|npx|python|python3|pip [args]` executes the selected private tool and propagates its exit status. Do not infer availability from system PATH, Windows App Execution Aliases or Start-menu Python groups. The app reapplies its private environment after importing the login shell.
+
+For authorized installation or update, use `runtime install --yes` or `runtime update --yes`. Immutable versions are stored below the independent data root's `runtimes/versions`, with `active.json` recording the active version and predecessor. Updates keep the old version; already running processes keep their prior paths until restart. `runtime rollback --yes` verifies and reactivates the predecessor without restoring conversation data. BUSY and interrupted staging require inspecting the lock/process and receipts, not deleting state blindly. RUNTIME_VERSION_EXISTS preserves an unexpected existing target for diagnosis. Failed verification leaves the old active receipt unchanged.
+
+Tools own their npm prefix/cache and pip cache; no user/system PATH, shell profile or original Codex runtime is modified. Project npm dependencies belong in project `node_modules`; Python dependencies belong in the project's `.venv`, created with the private Python. pip requires a virtual environment, so use its Python executable with `-m pip` after creating the venv. A project explicitly selecting another interpreter remains an explicit caller choice. Additional Git, compilers and office/media libraries are separate dependencies, not guaranteed by this toolchain. Never copy the original Codex cached runtime or account files to fill a missing dependency.
+
 ## Recovery and boundaries
 
 - APP_RUNNING: request or perform authorized graceful exit, then return to step 3.

@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {bundleUpdater} from './updater.mjs';
+import {isolateRuntimeSource} from './runtime-isolation.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
@@ -43,7 +44,7 @@ fs.writeFileSync(startup,before.replace(needle,needle+'require("./own-runtime.cj
 // All app-owned deep links use the personal scheme; web/service URLs stay intact.
 function patchLinks(dir){for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
  const file=path.join(dir,ent.name);if(ent.isDirectory()){if(ent.name!=='node_modules')patchLinks(file);}
- else if(/\.(js|html)$/.test(ent.name)){const a=fs.readFileSync(file,'utf8'),b=a.replaceAll('codex://','codex-own://');if(a!==b)fs.writeFileSync(file,b);}
+ else if(/\.(js|html)$/.test(ent.name)){const a=fs.readFileSync(file,'utf8'),b=isolateRuntimeSource(a.replaceAll('codex://','codex-own://'));if(a!==b)fs.writeFileSync(file,b);}
 }}
 patchLinks(work);
 pkg.name='codex-own';pkg.productName='codex-own';

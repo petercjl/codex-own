@@ -44,7 +44,7 @@ jobs:
         with: {ref: own-main, fetch-depth: 0}
       - uses: actions/setup-node@v6
         with: {node-version: '24.15.0', registry-url: 'https://registry.npmjs.org', package-manager-cache: false}
-      - run: npm install --global npm@latest
+      - run: npm install --global npm@11.18.0
       - run: npm ci --prefix own
       - uses: actions/download-artifact@v7
         with: {path: out/verified}
@@ -56,6 +56,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_REF"
           node own/ci/combine.mjs out/verified "$OWN_VERSION"
+          node own/ci/prepare-runtimes.mjs out/verified
           if ! gh release view "own-v$OWN_VERSION" >/dev/null 2>&1; then
             gh release create "own-v$OWN_VERSION" --draft --target "$EXPECTED_REF" --title "codex-own $OWN_VERSION" --notes 'Verified desktop artifacts.'
             gh release upload "own-v$OWN_VERSION" out/verified/manifest.json

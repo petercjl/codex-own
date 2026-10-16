@@ -21,7 +21,9 @@ function apply() {
     CODEX_ELECTRON_BUNDLED_PLUGINS_RESOURCES_PATH: resources,
     CODEX_TPP_LOCAL_EXECUTOR_ENABLED: '0',
     TMPDIR: paths.tmp,
+    CODEX_OWN_LEGACY_RUNTIME_ROOT: path.join(root,'runtimes','upstream-disabled'),
   });
+  require(path.join(resources,'own-updater','lib','tool-env.cjs')).apply(path.join(root,'runtimes'));
   return paths;
 }
 for (const value of Object.values(paths)) fs.mkdirSync(value, {recursive: true, mode: 0o700});

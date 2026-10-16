@@ -67,4 +67,17 @@ globalThis.fetch=async input=>{
   const four=fixture('four','0.4.3',true,true);
   assert.throws(()=>execFileSync(process.execPath,[publisher,four],{env,stdio:'pipe'}),e=>String(e.stderr).includes('Content block checksum mismatch'));
   assert.equal(fs.readdirSync(store).length,3,'a bad later platform must be rejected before any earlier upload');
+  const five=fixture('runtime','0.5.0');const runtime={schema:1,version:'node24.22.0-python3.12.15-r1',platforms:{}};
+  for(const platform of ['darwin-arm64','win32-x64']){
+    runtime.platforms[platform]={};for(const name of ['node','python']){
+      const bytes=Buffer.from('private-runtime-'+platform+'-'+name),digest=sha(bytes);fs.writeFileSync(path.join(five,`runtime-${platform}-${name}.bin`),bytes,{flag:'wx'});
+      runtime.platforms[platform][name]={entry:name,format:'tar.gz',incremental:{size:bytes.length,sha256:digest,blocks:[{size:bytes.length,sha256:digest,offset:0}]}};
+    }
+  }
+  fs.writeFileSync(path.join(five,'runtime-input.json'),JSON.stringify(runtime),{flag:'wx'});execFileSync(process.execPath,[publisher,five],{env,stdio:'pipe'});
+  const published=JSON.parse(fs.readFileSync(path.join(five,'npm-manifest.json')));
+  assert.equal(published.runtimes.version,runtime.version);assert.equal(fs.readdirSync(store).length,7);
+  assert.equal(published.runtimes.platforms['win32-x64'].python.format,'tar.gz');
+  assert.ok(published.runtimes.platforms['darwin-arm64'].node.parts[0].url.startsWith('https://registry.npmjs.org/'));
+  assert.equal(JSON.stringify(published.runtimes).includes('incremental'),false);
 });

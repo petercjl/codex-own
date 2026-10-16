@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "node24.22.0-python3.12.15-r1",
+  "platforms": {
+    "darwin-arm64": {
+      "node": {"entry":"node-v24.22.0-darwin-arm64","format":"tar.gz","url":"https://nodejs.org/dist/v24.22.0/node-v24.22.0-darwin-arm64.tar.gz","sha256":"6a9724d9b50a5f22b4816cded441b5a8d9ddae546191a5e5b7efa5a5e2ee26d5"},
+      "python": {"entry":"python","format":"tar.gz","url":"https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.12.15%2B20261013-aarch64-apple-darwin-install_only.tar.gz","sha256":"ba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440"}
+    },
+    "win32-x64": {
+      "node": {"entry":"node-v24.22.0-win-x64","format":"zip","url":"https://nodejs.org/dist/v24.22.0/node-v24.22.0-win-x64.zip","sha256":"f9683a19877e12a9b167305c8db71040d812876359de21f0d2e97c3f321f80c3"},
+      "python": {"entry":"python","format":"tar.gz","url":"https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.12.15%2B20261013-x86_64-pc-windows-msvc-install_only.tar.gz","sha256":"bbc902d4d187ac4914915bf538196a064b49109a33a104965b5164ced5b80a1e"}
+    }
+  }
+}
