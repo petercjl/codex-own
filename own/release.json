@@ -1,13 +1,13 @@
 {
   "schema": 2,
   "repository": "petercjl/codex-own",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "platforms": {
     "darwin-arm64": {
       "entry": "codex-own.app",
       "transport": "canonical-tar-cdc-v1",
-      "size": 2045515264,
-      "sha256": "2c2f12b46354332f3166794dc51b9e899fc39f88b2862be9482507d42520ff13",
+      "size": 2045519872,
+      "sha256": "6ceef71b166b31dfe8295258c336bb2dddd01cbf7cbd6355de5c16178cd2749d",
       "parts": [
         {
           "sha256": "f7950fe492a347a0e74528f4f73472052fc43d5155f32f92481fc96c3cc6ce95",
@@ -339,11 +339,11 @@
           "archiveSha256": "7cdf4ba6de25f51905fac22b7079c52464a4c06b4a9bb39af20121f29e1261a2"
         },
         {
-          "sha256": "ca9271a13483b997b634edb24d09f278bd039675241192fcc1745c6ecc4d7cbb",
+          "sha256": "bf0ecb90c4a398ce1bf67b04c2cd43a1b21e8c995f0ebf6b2790187b9c9a7edd",
           "size": 59472896,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hca9271a13483b997b634edb24d09f278bd039675241192fcc1745c6ecc4d7cbb.tgz",
-          "archiveSize": 26339531,
-          "archiveSha256": "38eeb99a3390e1820b4cea59e9ae1aa9e7bd73350436048ad94f3a17d8311fd3"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hbf0ecb90c4a398ce1bf67b04c2cd43a1b21e8c995f0ebf6b2790187b9c9a7edd.tgz",
+          "archiveSize": 26339649,
+          "archiveSha256": "281d76c73c4e3326535729045ad0198905d92ef38c7e2b2b984c7b7350af6b6e"
         },
         {
           "sha256": "7160a34ddbb6db8a2296686a530bb99f78cb8803027cbb32fb76aa9ed2222355",
@@ -360,11 +360,11 @@
           "archiveSha256": "783256484f3f6dfc99561fe6680100f457b5acf0e845a8824a9b8a94c6518b1e"
         },
         {
-          "sha256": "3da0aa23107a857097ac4331416a382bda0d51e578a02b174056803fe7ad55b1",
-          "size": 35845005,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h3da0aa23107a857097ac4331416a382bda0d51e578a02b174056803fe7ad55b1.tgz",
-          "archiveSize": 29375795,
-          "archiveSha256": "5e85db4cc770d0949258456b740ea7365884722a0712fe381bbc2a8884f198f4"
+          "sha256": "3ab3b4e037c73a5c8372185f95e53cfa3d896b0e0ad83f22e0ba03930a6c6a12",
+          "size": 35849613,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h3ab3b4e037c73a5c8372185f95e53cfa3d896b0e0ad83f22e0ba03930a6c6a12.tgz",
+          "archiveSize": 29376983,
+          "archiveSha256": "238a4fa5b80e3a066b6e4ad279e7345e6e5f2b6b8fa9f9b479b01285a3405bad"
         },
         {
           "sha256": "20604d70f3b62c4f011cc6fcf2215c5b21005cf31ff27e7e8c0a31af21c46c37",
@@ -388,19 +388,19 @@
           "archiveSha256": "988c7e1746e5237643195824ef5f1193e03998135de90a5ae0c33e105b450f5f"
         },
         {
-          "sha256": "d75c1cbc6920e5228fb7ad54f9ba8c20cedaa85068cbe6d185aacd5064ac173f",
+          "sha256": "2cb194bbeda7df041b482386d4c61d512994b84dc4baa76df73985942cff7366",
           "size": 1766400,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hd75c1cbc6920e5228fb7ad54f9ba8c20cedaa85068cbe6d185aacd5064ac173f.tgz",
-          "archiveSize": 355790,
-          "archiveSha256": "17c3b956264ff40efd594803a539944e98db340444e476b837e8116a5605d538"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h2cb194bbeda7df041b482386d4c61d512994b84dc4baa76df73985942cff7366.tgz",
+          "archiveSize": 355805,
+          "archiveSha256": "9b5d0900872c202813608df4e3558a82b14eafa28bde964fdf488cea8d7539b7"
         }
       ]
     },
     "win32-x64": {
       "entry": "app",
       "transport": "canonical-tar-cdc-v1",
-      "size": 2424548352,
-      "sha256": "edb3bc0563135145cf9418205175d629e8c4f432aca3882cfa1d5ded3b4d9663",
+      "size": 2424552960,
+      "sha256": "eaef194c566bdf33238cc85fcca3ac88924efac107d85acbed92cb7c28625f65",
       "parts": [
         {
           "sha256": "75e7eeb9ec280f24305ca34c3a22539c26616b4fb74cb89ac5436ed62390d31d",
@@ -816,11 +816,11 @@
           "archiveSha256": "eb3f18bd55a152598f8d6b8325f21c3e2e6f82f937c5e8f29d2b7d5c758f075a"
         },
         {
-          "sha256": "8f19e89a0994e9885a3d35adc7444341ca2fe2f2ffd10c8439a7c989d2f4865d",
+          "sha256": "b2593d5d8c1e3fdb53ef446121af11f261cdc4cf8605868a9ae348e34df4bcef",
           "size": 5942272,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h8f19e89a0994e9885a3d35adc7444341ca2fe2f2ffd10c8439a7c989d2f4865d.tgz",
-          "archiveSize": 2001204,
-          "archiveSha256": "fe95043fb3a0751ade7b06b8428472fff36018350b3f4c67c692e83dcaf88e96"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hb2593d5d8c1e3fdb53ef446121af11f261cdc4cf8605868a9ae348e34df4bcef.tgz",
+          "archiveSize": 2001323,
+          "archiveSha256": "b11a13e8cb1bba05f78908f9026247a83c623c422672a4153ab91decbcd6d0b6"
         },
         {
           "sha256": "6d72766b19ebd5e4aae33b6d57b22f07b10cb83bc080f7596bfdd834675dfbc6",
@@ -844,11 +844,11 @@
           "archiveSha256": "39f25e55411d144f5cea0f7b1842f48eabc3de2983ce26bd8d2e19175abbd312"
         },
         {
-          "sha256": "5044f716d709e616100e3d3a218be117c2edd4f2d7940b3c04b7bd21efa78ac0",
-          "size": 34144141,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h5044f716d709e616100e3d3a218be117c2edd4f2d7940b3c04b7bd21efa78ac0.tgz",
-          "archiveSize": 27842633,
-          "archiveSha256": "06c0a106a5f9a139ad17f5283375cccc119a147d30bf5540172c88345c3d1319"
+          "sha256": "40de87acec8f30d6a282b5d7d90f7c9afa8314fe936e456340eb21372d700510",
+          "size": 34148749,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h40de87acec8f30d6a282b5d7d90f7c9afa8314fe936e456340eb21372d700510.tgz",
+          "archiveSize": 27842671,
+          "archiveSha256": "c89125ab38d07a4857e544bbdaf051cae32eab0126c1185b47d5c8aabdae5e37"
         },
         {
           "sha256": "e80bff562bb79507e555d21bac0d844f17994b47b5bad12409a0046df9de72cd",
@@ -891,15 +891,15 @@
   "provenance": {
     "darwin-arm64": {
       "kind": "verified-own-overlay-upgrade",
-      "sourceVersion": "0.4.1",
+      "sourceVersion": "0.5.0",
       "upgradeNpmUpdater": true,
-      "privateToolRuntime": "node24.22.0-python3.12.15-r1"
+      "firstToolBootstrap": "automatic-relaunch"
     },
     "win32-x64": {
       "kind": "verified-own-overlay-upgrade",
-      "sourceVersion": "0.4.1",
+      "sourceVersion": "0.5.0",
       "upgradeNpmUpdater": true,
-      "privateToolRuntime": "node24.22.0-python3.12.15-r1"
+      "firstToolBootstrap": "automatic-relaunch"
     }
   },
   "runtimes": {
