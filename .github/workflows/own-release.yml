@@ -165,14 +165,63 @@ jobs:
           ARTIFACT_SOURCE_WORKFLOW: ${{ needs.recover-qa.outputs.source_workflow }}
           ARTIFACT_TRIGGER_REF: ${{ needs.recover-qa.outputs.trigger_ref }}
           VERIFIED_RUN: ${{ inputs.verified_run || github.run_id }}
+          npm_config_logs_dir: ${{ runner.temp }}/own-npm-publish
+          npm_config_logs_max: '1000'
+          npm_config_fetch_timeout: '60000'
+          npm_config_fetch_retries: '2'
+          npm_config_fetch_retry_mintimeout: '10000'
+          npm_config_fetch_retry_maxtimeout: '30000'
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_REF"
           mkdir -p out/verified
+          test ! -e out/own-npm-diagnostics.cjs
+          test ! -e out/npm-upload-failed.json
+          cat > out/own-npm-diagnostics.cjs <<'NODE'
+          const fs = require('node:fs'), path = require('node:path');
+          const root = process.env.npm_config_logs_dir, seen = new Map();
+          fs.mkdirSync(root, {recursive:true});
+          function inspect() {
+            for (const name of fs.readdirSync(root).filter(n => n.endsWith('.log'))) {
+              const file = path.join(root, name);
+              let lines; try { lines = fs.readFileSync(file, 'utf8').split('\n'); } catch { continue; }
+              const prior = seen.get(name) || 0;
+              for (const line of lines.slice(prior).filter(l => /\berror\b/i.test(l))) {
+                const safe = line.replace(/https?:\/\/\S+/g, '[URL]')
+                  .replace(/\b(?:npm_|ghp_|gho_|github_pat_)[A-Za-z0-9_]+/g, '[REDACTED]')
+                  .replace(/\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2}/g, '[REDACTED]')
+                  .replace(/Bearer\s+\S+/ig, 'Bearer [REDACTED]')
+                  .replace(/\b(?:token|password|_authToken)\s*[:=]\s*\S+/ig, '[REDACTED]')
+                  .replace(/sk-[A-Za-z0-9_-]+/g, '[REDACTED]').slice(0, 1200);
+                console.log(JSON.stringify({npmPublishDiagnostic:{file:name,line:safe}}));
+                const code = line.match(/\berror code\s+(E[A-Z0-9_]+)/)?.[1];
+                if (code && code !== 'EPUBLISHCONFLICT' && !fs.existsSync('out/npm-upload-failed.json')) {
+                  fs.writeFileSync('out/npm-upload-failed.json', JSON.stringify({code,file:name,diagnostic:safe}), {flag:'wx',mode:0o600});
+                }
+              }
+              seen.set(name, Math.max(0, lines.length - 1));
+            }
+          }
+          inspect(); setInterval(inspect, 5000);
+          NODE
+          node out/own-npm-diagnostics.cjs &
+          own_log_pid=$!
+          trap 'kill "$own_log_pid" 2>/dev/null || true' EXIT
           if [ "$BUILD_NATIVE" = true ] || [ "$BUILD_RUNTIME" = true ]; then node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN" release-plan.json; fi
           if [ "$BUILD_NATIVE" = true ]; then node own/ci/combine.mjs out/verified "$OWN_VERSION"; else cp own/artifacts/current.json out/catalog-input.json; node -e "const fs=require('fs');fs.writeFileSync('out/verified/manifest.json',JSON.stringify(JSON.parse(fs.readFileSync('out/catalog-input.json')).manifest))"; fi
           if [ "$BUILD_RUNTIME" = true ]; then node own/ci/combine-tools.mjs out/verified; else node -e "const fs=require('fs');const p='out/verified/manifest.json',m=JSON.parse(fs.readFileSync(p));m.runtimes=JSON.parse(fs.readFileSync('own/artifacts/current.json')).manifest.runtimes;fs.writeFileSync(p,JSON.stringify(m))"; fi
           if [ "$BUILD_NATIVE" = true ] || [ "$BUILD_RUNTIME" = true ]; then
-            node own/ci/publish-npm-assets.mjs out/verified
+            node own/ci/publish-npm-assets.mjs out/verified &
+            own_publish_pid=$!
+            while kill -0 "$own_publish_pid" 2>/dev/null; do
+              if test -f out/npm-upload-failed.json; then
+                kill "$own_publish_pid" 2>/dev/null || true
+                wait "$own_publish_pid" 2>/dev/null || true
+                cat out/npm-upload-failed.json
+                exit 1
+              fi
+              sleep 5
+            done
+            wait "$own_publish_pid"
             node own/ci/verify-npm-assets.mjs out/verified/npm-manifest.json release-plan.json
           else cp out/verified/manifest.json out/verified/npm-manifest.json; fi
           node own/ci/artifact-record.mjs out/verified/npm-manifest.json release-plan.json own/artifacts/current.json out/bound-manifest.json
