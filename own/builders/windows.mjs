@@ -9,6 +9,7 @@ import {bundleUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
+import {isolateShellImport} from './shell-environment.mjs';
 const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -31,7 +32,7 @@ let shellPatches=0,updaterPatches=0;
 function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const x of v)walk(x,fn);else if(v&&typeof v==='object')walk(v,fn)}}
 for(const name of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js'))){
  let s=changes.has(name)?changes.get(name).toString():asar.extractFile(archive,name.replaceAll('/',path.sep)).toString(),before=s;
- if(name.includes('startup-requirements-')){const needle='Object.assign(process.env,l.userEnv),';if(s.split(needle).length!==2)throw Error('Shell import contract changed');s=s.replace(needle,needle+'require("./own-runtime-win.cjs").apply(),');shellPatches++}
+ if(name.includes('startup-requirements-')){const result=isolateShellImport(s,'own-runtime-win.cjs');s=result.source;shellPatches+=result.patches;}
  if(s.includes('shouldIncludeUpdater')){
   const edits=[];walk(acorn.parse(s,{ecmaVersion:'latest',sourceType:'module'}),n=>{
    if(n.type==='Property'&&['shouldIncludeSparkle','shouldIncludeWindowsUpdater','shouldIncludeWindowsMsixUpdater','shouldIncludeUpdater'].includes(n.key?.name||n.key?.value)&&n.value?.body?.type==='BlockStatement')edits.push([n.value.body.start,n.value.body.end,'{return false}']);

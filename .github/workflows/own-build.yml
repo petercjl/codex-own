@@ -33,7 +33,7 @@ jobs:
         if: inputs.runtime_qa
         run: |
           mkdir -p out/runtime-qa
-          node own/ci/prepare-runtimes.mjs out/runtime-qa "${{ matrix.platform }}"
+          node own/ci/prepare-runtimes.mjs out/runtime-qa "${{ matrix.platform }}" own/artifacts/current.json
           node own/ci/test-runtimes.mjs out/runtime-qa
       - name: Build updated upstream candidate
         if: ${{ !inputs.existing }}
@@ -86,6 +86,6 @@ jobs:
         if: inputs.runtime_qa
         with:
           name: tools-${{ matrix.platform }}
-          path: out/runtime-qa/runtime-*
+          path: out/runtime-qa/publish/*
           retention-days: 3
           if-no-files-found: error

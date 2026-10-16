@@ -7,6 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {bundleUpdater} from './updater.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
+import {isolateShellImport} from './shell-environment.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
@@ -39,9 +40,7 @@ const startupFiles=fs.readdirSync(path.dirname(entry)).filter(n=>/^startup-requi
 if(startupFiles.length!==1)throw Error('Ambiguous startup module');
 const startup=path.join(path.dirname(entry),startupFiles[0]);
 const before=fs.readFileSync(startup,'utf8');
-const needle='Object.assign(process.env,l.userEnv),';
-if(before.split(needle).length!==2)throw Error('Shell environment boundary changed');
-fs.writeFileSync(startup,before.replace(needle,needle+'require("./own-runtime.cjs").apply(),'));
+fs.writeFileSync(startup,isolateShellImport(before,'own-runtime.cjs').source);
 // All app-owned deep links use the personal scheme; web/service URLs stay intact.
 function patchLinks(dir){for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
  const file=path.join(dir,ent.name);if(ent.isDirectory()){if(ent.name!=='node_modules')patchLinks(file);}

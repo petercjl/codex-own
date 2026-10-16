@@ -9,6 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {digestFile,tarExecutable} from './lib/manager.mjs';
 import {canonicalize} from './ci/canonicalize.mjs';
 import {sourceTree} from './ci/source-tree.mjs';
+import {exposeVendorResolver} from './builders/upstream-resolver.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${process.arch}`,mac=key==='darwin-arm64';
@@ -48,7 +49,7 @@ else{
  for(const [n,e]of files){if(e.link||e.unpacked)continue;const b=fs.readFileSync(path.join(extract,n));e.offset=String(offset);e.size=b.length;offset+=b.length;const size=4194304,blocks=[];for(let i=0;i<b.length;i+=size)blocks.push(sha(b.subarray(i,i+size)));e.integrity={algorithm:'SHA256',hash:sha(b),blockSize:size,blocks};buffers.push(b);}
  const hp=new Pickle();hp.writeString(JSON.stringify(header));const hb=hp.toBuffer(),sp=new Pickle();sp.writeUInt32(hb.length);fs.writeFileSync(dest,Buffer.concat([sp.toBuffer(),hb,...buffers]));
  // Run the upstream's exact CLI resolution function, never select a different provider here.
- const resolverPath=path.join(root,'scripts/build-from-upstream.js');let code=fs.readFileSync(resolverPath,'utf8');if(!code.endsWith('main();\n'))throw Error('Upstream resolver contract changed');code=code.slice(0,-8)+'module.exports={resolveCodexVendor};\n';
+ const resolverPath=path.join(root,'scripts/build-from-upstream.js'),code=exposeVendorResolver(fs.readFileSync(resolverPath,'utf8'));
  const mod=new Module(resolverPath);mod.filename=resolverPath;mod.paths=Module._nodeModulePaths(path.dirname(resolverPath));mod._compile(code,resolverPath);
  const vendor=mod.exports.resolveCodexVendor(platform),cli=path.join(resources,mac?'codex':'codex.exe');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);

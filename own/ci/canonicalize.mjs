@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {writeCanonicalArchive} from '../lib/content-blocks.mjs';
-import {indexProbe} from './native-probe.mjs';
+import {indexProbe,verifyLocalProbe} from './native-probe.mjs';
 
 // Candidate has already passed the platform's app verification. Preserve input.
 export async function canonicalize(source,asset,file){
@@ -11,5 +11,8 @@ export async function canonicalize(source,asset,file){
   const {blocks,...transport}=result;
   // Keep the full compressed build artifact for CI recovery and old releases.
   // Runtime npm metadata contains only the canonical incremental transport.
-  return {...asset,probe:indexProbe(target,asset.entry==='codex-own.app'?'darwin-arm64':'win32-x64'),incremental:{entry:asset.entry,...transport,blocks}};
+  const mac=asset.entry==='codex-own.app',cli=fs.realpathSync(path.join(source,mac?'Contents/Resources/codex':'resources/codex.exe'));
+  if(!cli.startsWith(fs.realpathSync(source)+path.sep))throw Error('Native invocation entry escapes program');
+  const probeDir=fs.mkdtempSync(path.join(path.dirname(file),'native-probe-'));let probe;try{probe=verifyLocalProbe(target,indexProbe(target,mac?'darwin-arm64':'win32-x64',{entry:asset.entry+'/'+path.relative(source,cli).replaceAll('\\','/')}),probeDir);}finally{fs.rmSync(probeDir,{recursive:true,force:true});}
+  return {...asset,probe,incremental:{entry:asset.entry,...transport,blocks}};
 }

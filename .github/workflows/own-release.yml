@@ -93,7 +93,7 @@ jobs:
       - name: Verify independent Node npm Python on target OS
         run: |
           mkdir -p out/tools
-          node own/ci/prepare-runtimes.mjs out/tools "${{ matrix.platform }}"
+          node own/ci/prepare-runtimes.mjs out/tools "${{ matrix.platform }}" own/artifacts/current.json
           node own/ci/test-runtimes.mjs out/tools
       - name: Record source-pinned runtime QA proof
         run: node own/ci/qa-proof.mjs "${{ matrix.platform }}" "qa-proof-${{ matrix.platform }}.json"
@@ -105,7 +105,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: tools-${{ matrix.platform }}
-          path: out/tools/runtime-*
+          path: out/tools/publish/*
           retention-days: 3
           if-no-files-found: error
   recover-qa:
