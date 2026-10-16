@@ -16,12 +16,13 @@ function semantic(file,bytes){const p=JSON.parse(bytes);
 }
 export function snapshot(root,{ref,files}={}){
  const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',maxBuffer:16*1048576});
- files||=(ref?git(['ls-tree','-r','--name-only',ref]):git(['ls-files'])).trim().split('\n').filter(Boolean);
+ let modes={};if(!files){const rows=git(ref?['ls-tree','-r','-z',ref]:['ls-files','--stage','-z']).split('\0').filter(Boolean);for(const row of rows){const i=row.indexOf('\t');if(i<0)throw Error('Invalid tracked source entry');modes[row.slice(i+1)]=row.slice(0,6);}files=Object.keys(modes);}
  const entries={};for(const file of files.sort()){
   const kind=classify(file);if(kind==='generated')continue;
-  const bytes=ref?execFileSync('git',['show',ref+':'+file],{cwd:root,maxBuffer:64*1048576}):fs.readFileSync(path.join(root,file));
+  const location=path.join(root,file),link=!ref&&fs.lstatSync(location).isSymbolicLink();
+  const bytes=ref?execFileSync('git',['show',ref+':'+file],{cwd:root,maxBuffer:64*1048576}):link?Buffer.from(fs.readlinkSync(location)):fs.readFileSync(location);
   // Semantic npm metadata excludes release numbers and generated bindings only.
-  entries[file]={kind,sha256:identity(kind==='semantic'?semantic(file,bytes):bytes.toString('base64'))};
+  entries[file]={kind,sha256:identity({mode:modes[file]||(link?'120000':'100644'),content:kind==='semantic'?semantic(file,bytes):bytes.toString('base64')})};
  }
  const group=k=>identity({policy,files:Object.fromEntries(Object.entries(entries).filter(([,e])=>e.kind===k||e.kind==='semantic'||e.kind==='unknown'))});
  const upstream=identity(Object.fromEntries(Object.entries(entries).filter(([f,e])=>(e.kind==='native'&&!f.startsWith('own/'))||e.kind==='semantic')));
