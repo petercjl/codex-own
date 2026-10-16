@@ -5,6 +5,7 @@ on:
       release: {description: 'patch, minor, major or exact semver', type: string, default: patch, required: true}
       tag: {description: 'npm dist-tag', type: choice, options: [latest, next], default: latest, required: true}
       existing: {description: 'Verify previously prepared versioned desktop artifacts', type: boolean, default: true}
+      verified_run: {description: 'Publication-only recovery: reuse unchanged desktop code from passed platform QA jobs', type: string, default: ''}
 permissions:
   contents: read
 concurrency:
@@ -28,6 +29,7 @@ jobs:
           echo "version=$(node own/ci/version.mjs "$RELEASE")" >> "$GITHUB_OUTPUT"
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   qa:
+    if: inputs.verified_run == ''
     permissions: {contents: write}
     needs: prepare
     uses: ./.github/workflows/own-build.yml
@@ -35,19 +37,36 @@ jobs:
       ref: ${{ needs.prepare.outputs.ref }}
       version: ${{ needs.prepare.outputs.version }}
       existing: ${{ inputs.existing }}
-  publish:
-    needs: [prepare, qa]
+  reuse-qa:
+    if: inputs.verified_run != ''
+    needs: prepare
     runs-on: ubuntu-latest
-    permissions: {contents: write, id-token: write}
+    permissions: {contents: read, actions: read}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: '${{ needs.prepare.outputs.ref }}', fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24', package-manager-cache: false}
+      - name: Verify unchanged source and both platform QA results
+        env: {GH_TOKEN: '${{ github.token }}', VERIFIED_RUN: '${{ inputs.verified_run }}'}
+        run: node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN"
+  publish:
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.qa.result == 'success' || needs.reuse-qa.result == 'success') }}
+    needs: [prepare, qa, reuse-qa]
+    runs-on: ubuntu-latest
+    permissions: {contents: write, id-token: write, actions: read}
     steps:
       - uses: actions/checkout@v6
         with: {ref: own-main, fetch-depth: 0}
       - uses: actions/setup-node@v6
         with: {node-version: '24.15.0', registry-url: 'https://registry.npmjs.org', package-manager-cache: false}
-      - run: npm install --global npm@11.18.0
+      - run: npm install --global npm@12.2.0
       - run: npm ci --prefix own
       - uses: actions/download-artifact@v7
-        with: {path: out/verified}
+        with:
+          path: out/verified
+          run-id: ${{ inputs.verified_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Finalize verified desktop manifest
         env:
           GH_TOKEN: ${{ github.token }}
