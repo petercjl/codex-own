@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {latest,manifestFor,validateManifest,paths,state,locked,rejectLinks,exclusive,digestFile,tarExecutable,install,fail,running,launch} from './manager.mjs';
+import {latest,manifestFor,validateManifest,paths,state,installedBinding,locked,rejectLinks,exclusive,digestFile,tarExecutable,install,fail,running,launch} from './manager.mjs';
 import {assembleNpmAsset} from './npm-assets.mjs';
 import {reuseInstalledBlocks} from './content-blocks.mjs';
 import {ensureRuntime,toolEnv} from './tool-runtime.mjs';
@@ -54,13 +54,16 @@ export function readPrepared(receipt,p=paths()) {
   const base=path.join(p.manager,'prepared');rejectLinks(receipt);
   if(path.basename(receipt)!=='receipt.json'||path.dirname(path.dirname(path.resolve(receipt)))!==path.resolve(base))fail('UNSAFE_PATH','Unexpected update receipt');
   const r=JSON.parse(fs.readFileSync(receipt,'utf8'));
+  if(fs.existsSync(receipt+'.applied.json'))fail('UPDATE_ALREADY_APPLIED','This prepared release was already applied');
   if(![1,2].includes(r.schema)||r.platform!==p.platform||r.version!==r.manifest?.version||r.manifest?.schema!==2||(r.schema===1&&!isNewer(r.version,r.current))||(r.schema===2&&(!r.manifest.binding||r.runtimeVersion!==r.manifest.runtimes?.version)))fail('INVALID_MANIFEST','Invalid prepared update');
   validateManifest(r.manifest,p.platform);
   return {...r,archive:r.schema===2&&r.desktopUpdate===false?undefined:path.join(path.dirname(receipt),'desktop.tar.gz')};
 }
 export async function applyPrepared(receipt,{p=paths(),apply=install}={}) {
   const r=readPrepared(receipt,p);
-  return apply({version:r.manifest.binding?.managerVersion||r.version,manifest:r.manifest,archive:r.archive,expectedCurrent:r.current});
+  const result=await apply({version:r.manifest.binding?.managerVersion||r.version,manifest:r.manifest,archive:r.archive,expectedCurrent:r.current});
+  if(result.ok===true&&!fs.existsSync(receipt+'.applied.json'))exclusive(receipt+'.applied.json',{ok:true,version:r.version,managerVersion:r.manifest.binding?.managerVersion||r.version});
+  return result;
 }
 export async function restorePrepared(current,p=paths()) {
   const base=path.join(p.manager,'prepared');rejectLinks(base);
@@ -68,9 +71,9 @@ export async function restorePrepared(current,p=paths()) {
   const candidates=[];
   for(const name of fs.readdirSync(base).filter(n=>/^update-[a-zA-Z0-9]+$/.test(n))){
     const receipt=path.join(base,name,'receipt.json');
-    try{const r=readPrepared(receipt,p);if(r.current===current&&(!r.archive||(fs.statSync(r.archive).size===validateManifest(r.manifest,p.platform).size&&await digestFile(r.archive)===validateManifest(r.manifest,p.platform).sha256)))candidates.push({ok:true,current,available:r.version,managerAvailable:r.manifest.binding?.managerVersion,runtimeVersion:r.runtimeVersion,updateAvailable:true,receipt});}catch{}
+    try{const r=readPrepared(receipt,p),selected=installedBinding(p)?.binding?.managerVersion,target=r.manifest.binding?.managerVersion;if(target&&selected&&(selected===target||isNewer(selected,target)))continue;if(r.current===current&&(!r.archive||(fs.statSync(r.archive).size===validateManifest(r.manifest,p.platform).size&&await digestFile(r.archive)===validateManifest(r.manifest,p.platform).sha256)))candidates.push({ok:true,current,available:r.version,managerAvailable:target,runtimeVersion:r.runtimeVersion,updateAvailable:true,receipt});}catch{}
   }
-  return candidates.sort((a,b)=>isNewer(a.available,b.available)?-1:isNewer(b.available,a.available)?1:0)[0]||null;
+  return candidates.sort((a,b)=>isNewer(a.managerAvailable||a.available,b.managerAvailable||b.available)?-1:isNewer(b.managerAvailable||b.available,a.managerAvailable||a.available)?1:0)[0]||null;
 }
 export async function waitForExit({isRunning=running,timeoutMs=120000,intervalMs=500,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
   const end=Date.now()+timeoutMs;

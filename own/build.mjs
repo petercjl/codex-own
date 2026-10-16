@@ -10,6 +10,7 @@ import {digestFile,tarExecutable} from './lib/manager.mjs';
 import {canonicalize} from './ci/canonicalize.mjs';
 import {sourceTree} from './ci/source-tree.mjs';
 import {exposeVendorResolver} from './builders/upstream-resolver.mjs';
+import {nativeVersion} from './builders/native-version.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${process.arch}`,mac=key==='darwin-arm64';
@@ -53,7 +54,7 @@ else{
  const mod=new Module(resolverPath);mod.filename=resolverPath;mod.paths=Module._nodeModulePaths(path.dirname(resolverPath));mod._compile(code,resolverPath);
  const vendor=mod.exports.resolveCodexVendor(platform),cli=path.join(resources,mac?'codex':'codex.exe');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
- if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.cliVersion=run(cli,['--version'],{stdio:'pipe',encoding:'utf8'}).trim();provenance.optionalMissingBindings=missing;
+ if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.cliVersion=await nativeVersion(cli);provenance.optionalMissingBindings=missing;
  const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?'codex-own.app':'app');
 }
 const resources=path.join(source,mac?'Contents/Resources':'resources');
