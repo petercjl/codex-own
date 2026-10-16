@@ -194,7 +194,7 @@ jobs:
                   .replace(/sk-[A-Za-z0-9_-]+/g, '[REDACTED]').slice(0, 1200);
                 console.log(JSON.stringify({npmPublishDiagnostic:{file:name,line:safe}}));
                 const code = line.match(/\berror code\s+(E[A-Z0-9_]+)/)?.[1];
-                const awaitingRegistry = code === 'E409' && lines.some(l => /409 Conflict.*Cannot publish over previously staged version/.test(l));
+                const awaitingRegistry = code === 'E409' && lines.some(l => /409 Conflict.*(?:Cannot publish over previously staged version|Too many pending publishes for .*\(limit: \d+\).*Wait for existing publishes to finish)/.test(l));
                 if (code && code !== 'EPUBLISHCONFLICT' && !awaitingRegistry && !fs.existsSync('out/npm-upload-failed.json')) {
                   fs.writeFileSync('out/npm-upload-failed.json', JSON.stringify({code,file:name,diagnostic:safe}), {flag:'wx',mode:0o600});
                 }

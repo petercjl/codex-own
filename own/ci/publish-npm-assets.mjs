@@ -9,7 +9,7 @@ import {fileHash} from '../lib/network.mjs';
 import {payloadVersion, payloadURL, validateParts} from '../lib/npm-assets.mjs';
 import {packResult} from './npm-pack-result.mjs';
 import {TRANSPORT} from '../lib/content-blocks.mjs';
-import {mapLimited,npmAuthFailure} from './publication-pool.mjs';
+import {mapPublicationWindows,submitPayload} from './publication-pool.mjs';
 
 if(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
   throw Error('Payload publication requires GitHub Actions OIDC');
@@ -55,7 +55,23 @@ for(const {platform,asset,parent,key,archiveName,desktop} of entries){
   if(offset!==transport.size||digest.digest('hex')!==transport.sha256)throw Error('Incomplete or unverified content block index');
   plans.push({platform,asset,transport,parent,key,desktop});
 }
-const results=await mapLimited(jobs,4,async({platform,archive,block,index})=>{
+async function settlePending(){
+  const deadline=Date.now()+30*60*1000;
+  while(pending.length){
+    for(let i=pending.length-1;i>=0;i--){
+      const item=pending[i],published=await metadata(item.version);
+      if(!published)continue;
+      if(published.dist?.integrity!==item.integrity||published.dist?.tarball!==item.url)
+        throw Error(`Published payload identity mismatch: ${item.version}`);
+      pending.splice(i,1);
+    }
+    if(!pending.length)return;
+    if(Date.now()>=deadline)throw Error(`NPM_PROCESSING_PENDING: ${pending.length} payloads remain unavailable; inspect this run and exact versions before retrying.`);
+    console.log(`Waiting for npm processing: ${pending.length} payloads pending; next upload window is paused`);
+    await new Promise(r=>setTimeout(r,30000));
+  }
+}
+const results=await mapPublicationWindows(jobs,async({platform,archive,block,index})=>{
   const sha256=block.sha256,version=payloadVersion(sha256),packageDir=fs.mkdtempSync(path.join(dir,'payload-'));
   try{
       fs.writeFileSync(path.join(packageDir,'payload.bin'),readBlock(archive,block),{flag:'wx'});
@@ -64,16 +80,14 @@ const results=await mapLimited(jobs,4,async({platform,archive,block,index})=>{
       const existing=await metadata(version);
       if(!existing){
         console.log(`Publishing npm desktop payload ${platform} ${index+1}`);
-        let failure;
-        try{await npm(['publish',tgz,'--provenance','--access','public','--tag','desktop-assets'],packageDir);}
-        catch(e){const code=npmAuthFailure(e);if(code)throw Object.assign(Error(`${code}: restore npm Trusted Publishing; no OTP/token fallback`),{code:'NPM_PUBLISH_AUTH_FAILED'});failure=e;}
-        pending.push({version,integrity:packed.integrity,url:payloadURL(sha256),failure});
+        await submitPayload(()=>npm(['publish',tgz,'--provenance','--access','public','--tag','desktop-assets'],packageDir),{report:message=>console.log(message)});
+        pending.push({version,integrity:packed.integrity,url:payloadURL(sha256)});
       }
       if(existing && (existing.dist?.integrity!==packed.integrity||existing.dist?.tarball!==payloadURL(sha256)))throw Error('Existing payload identity mismatch');
       const part={sha256,size:block.size,url:payloadURL(sha256),archiveSize:fs.statSync(tgz).size,archiveSha256:await fileHash(tgz)};
       return {platform,published:!existing,part};
   }finally{fs.rmSync(packageDir,{recursive:true,force:true});}
-});
+},settlePending);
 const byHash=new Map(results.map(r=>[r.part.sha256,r]));
 for(const {platform,asset,transport,parent,key,desktop} of plans){
   const parts=transport.blocks.map(b=>byHash.get(b.sha256).part);
@@ -84,20 +98,7 @@ for(const {platform,asset,transport,parent,key,desktop} of plans){
 }
 // npm scans accepted packages before exposing them. Submit first, then wait for
 // every exact identity; an upload response alone never authorizes a main release.
-const deadline=Date.now()+30*60*1000;
-while(pending.length){
-  for(let i=pending.length-1;i>=0;i--){
-    const item=pending[i],published=await metadata(item.version);
-    if(!published)continue;
-    if(published.dist?.integrity!==item.integrity||published.dist?.tarball!==item.url)
-      throw Error(`Published payload identity mismatch: ${item.version}`);
-    pending.splice(i,1);
-  }
-  if(!pending.length)break;
-  if(Date.now()>=deadline)throw pending.find(p=>p.failure)?.failure||Error(`NPM_PROCESSING_PENDING: ${pending.length} payloads remain unavailable; inspect this run and exact versions before retrying.`);
-  console.log(`Waiting for npm scanning: ${pending.length} payloads pending`);
-  await new Promise(r=>setTimeout(r,30000));
-}
+await settlePending();
 manifest.schema=2;
 fs.writeFileSync(output,JSON.stringify(manifest,null,2)+'\n',{flag:'wx'});
 fs.writeFileSync(path.join(dir,'publication-stats.json'),JSON.stringify({version:manifest.version,platforms:publication},null,2)+'\n',{flag:'wx'});
