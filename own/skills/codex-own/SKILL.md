@@ -36,6 +36,8 @@ Tools own their npm prefix/cache and pip cache; no user/system PATH, shell profi
 
 ## Recovery and boundaries
 
+For Windows Agent shell diagnosis, inspect `doctor.agentShell`: verified system Git Bash is preferred for general task commands, PowerShell remains available for Windows-specific operations, and missing/unusable Bash reports a fallback reason. `desktopAdapterBundled` distinguishes a capable desktop from an upgraded manager with an older desktop. The desktop adds this execution policy to new, resumed and forked Agent sessions while preserving existing developer instructions and the private Node/npm/Python environment. Integrated-terminal settings are independent; verify the actual tool call's explicit `shell` and command result. The Windows host context may still say PowerShell. An explicit user shell choice takes precedence. Never replay a failed command in a different shell without checking its side effects.
+
 Component binding contract 2 requires a bridge desktop with embedded updater contract 2 and tool environment contract 1. Manager releases pin exact immutable artifacts, so their version numbers may differ. A manager-only release is not a desktop update; a tool-only update retains the desktop and uses new paths after restart. Legacy pre-bridge clients may need one CLI upgrade. INCOMPATIBLE_BINDING preserves the installed components; inspect the published binding and compatibility instead of forcing a version match.
 
 - APP_RUNNING: request or perform authorized graceful exit, then return to step 3.

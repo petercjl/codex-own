@@ -27,6 +27,15 @@
   "dataPolicy": "independent external directories; preserve credentials and conversations",
   "updatePolicy": "desktop checks npm latest at startup and every six hours; explicit download and restart/install; pinned verified build; backup before switch; CLI remains available for recovery",
   "authentication": "npm install does not grant model access; existing independent credentials remain local",
+  "windowsAgentShell": {
+    "contract": 1,
+    "preferred": "verified system Git Bash; explicit exec_command shell selection",
+    "windowsOperations": "explicit PowerShell for Registry, COM, services and PowerShell cmdlets",
+    "fallback": "PowerShell when Git Bash is absent or unusable; report reason",
+    "scope": "owned bundled CLI stdio app-server thread start, resume and fork; integrated terminal is independent",
+    "preservation": "preserve caller developer instructions and private tool environment; no configuration writes or command replay",
+    "diagnostics": "doctor.agentShell: discovered executables, fallback reason and desktopAdapterBundled"
+  },
   "distribution": {
     "runtimeHosts": [
       "registry.npmjs.org"

@@ -13,6 +13,7 @@ function apply(){
  Object.assign(process.env,{CODEX_HOME:paths.core,CODEX_CLI_PATH:cli,CODEX_ELECTRON_USER_DATA_PATH:paths.desktop,CODEX_APP_SERVER_FORCE_CLI:'1',CODEX_APP_SERVER_USE_LOCAL_DAEMON:'0',CODEX_ELECTRON_RESOURCES_PATH:process.resourcesPath,CODEX_ELECTRON_BUNDLED_PLUGINS_RESOURCES_PATH:process.resourcesPath,CODEX_TPP_LOCAL_EXECUTOR_ENABLED:'0',TEMP:paths.tmp,TMP:paths.tmp});
  process.env.CODEX_OWN_LEGACY_RUNTIME_ROOT=path.join(root,'runtimes','upstream-disabled');
  require(path.join(process.resourcesPath,'own-updater','lib','tool-env.cjs')).apply(path.join(root,'runtimes'));
+ require(path.join(process.resourcesPath,'own-updater','lib','windows-agent-shell.cjs')).install({cli,core:paths.core});
  return paths;
 }
 apply();app.setName('codex-own');app.setPath('userData',paths.desktop);app.setPath('logs',paths.logs);

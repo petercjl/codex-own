@@ -10,6 +10,7 @@ import {reuseInstalledBlocks} from './content-blocks.mjs';
 import {ensureRuntime,validateRuntime,restoreRuntimeSelection} from './tool-runtime.mjs';
 import {validateBinding,packageManifest,sameDesktop,identity as bindingHash} from './binding.mjs';
 import {deepseekConfiguration} from './model-configuration.mjs';
+import windowsAgentShell from './windows-agent-shell.cjs';
 
 export const packageRoot = path.resolve(import.meta.dirname, '..');
 export const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));
@@ -164,4 +165,4 @@ export async function rollback({restoreData=false}={}){const p=paths();return lo
   if(prev.state?.releaseManifest){const m=prev.state.releaseManifest;if(!prev.runtimeSelection&&m.runtimes)await ensureRuntime(m.runtimes,{p,report:progress});if(m.binding)recordBinding(p,m);}
   else{const f=path.join(p.manager,'binding.json');if(fs.existsSync(f))fs.renameSync(f,f+'.before-legacy-rollback-'+crypto.randomUUID());}
   writeState(p,{...(prev.state||{schema:1,identity:'local.codex-own',version:'adopted-legacy',target:p.target}),previous:null});return {ok:true,preserved,dataBackup:backup};});}
-export function doctor(){const p=paths(),s=state(p);let tar=true;try{execFileSync(tarExecutable(),['--version'],{stdio:'pipe'});}catch{tar=false;}const pending=fs.existsSync(p.manager)?fs.readdirSync(p.manager).filter(n=>/^transaction-.*\.json$/.test(n)&&!n.endsWith('.complete.json')&&!fs.existsSync(path.join(p.manager,n.replace('.json','.complete.json')))):[];return {ok:tar&&!pending.length,managerVersion:pkg.version,platform:p.platform,supported:['darwin-arm64','win32-x64'].includes(p.platform),installed:s?.version||null,paths:p,tar,pendingTransactions:pending,lock:fs.existsSync(path.join(p.manager,'operation.lock')),configured:fs.existsSync(path.join(p.core,'auth.json')),windowsGuiTested:false};}
+export function doctor(){const p=paths(),s=state(p);let tar=true;try{execFileSync(tarExecutable(),['--version'],{stdio:'pipe'});}catch{tar=false;}const pending=fs.existsSync(p.manager)?fs.readdirSync(p.manager).filter(n=>/^transaction-.*\.json$/.test(n)&&!n.endsWith('.complete.json')&&!fs.existsSync(path.join(p.manager,n.replace('.json','.complete.json')))):[];return {ok:tar&&!pending.length,managerVersion:pkg.version,platform:p.platform,supported:['darwin-arm64','win32-x64'].includes(p.platform),installed:s?.version||null,paths:p,tar,pendingTransactions:pending,lock:fs.existsSync(path.join(p.manager,'operation.lock')),configured:fs.existsSync(path.join(p.core,'auth.json')),agentShell:{...windowsAgentShell.discover(),desktopAdapterBundled:process.platform==='win32'&&fs.existsSync(path.join(p.target,'resources','own-updater','lib','windows-agent-shell.cjs')),policyContract:1},windowsGuiTested:false};}

@@ -22,6 +22,14 @@ Mac 任务使用运行时目录内的私有 zsh 启动文件和 Bash `BASH_ENV`�
 
 从 0.4.x 的应用内更新按钮升级时，新应用首次打开会显示“正在准备 codex-own 工作环境”，自动从 npm 补齐工具并验证后再进入桌面。下载失败或取消后可重新打开重试，已验证分片会保留。
 
+## Windows Agent 的命令环境
+
+Windows 桌面在启动 Agent 会话时自动检测并验证系统安装的 Git Bash。通用命令优先显式使用 Bash；注册表、COM、Windows 服务及 PowerShell cmdlet 等操作显式使用 PowerShell。没有可用的 Git Bash 时保留 PowerShell 后备，并报告缺失或无法运行的原因。Git Bash 由系统的 Git for Windows 提供，独立 Node/npm/Python 继续来自 codex-own 私有运行时。
+
+该行为随桌面程序交付，新建、恢复和派生会话均适用，保留用户已有指令与配置。集成终端下拉选项仍单独控制手动终端。底层 Windows 主机环境可以显示 PowerShell；实际执行的 shell 以工具调用中的 `shell` 和执行结果为准。失败命令不会被自动换 shell 重跑。
+
+`codex-own doctor` 的 `agentShell` 显示发现的 Bash、PowerShell 路径和后备原因；`desktopAdapterBundled` 表示当前桌面是否包含此能力。只更新 npm 管理工具时，旧桌面需要继续完成桌面更新。复杂 JSON 或脚本优先通过 UTF-8 文件传递。
+
 ## 独立组件版本
 
 组件绑定合同 2 分别记录 npm 管理器版本、桌面成品版本和 Node/npm/Python 工具版本。管理器升级可以继续使用已验证的旧桌面和工具；版本号不同是正常的。更新检查按绑定的实际组件判断，相同桌面无需退出、重新下载或切换程序。工具更新保留桌面，重启后采用新工具路径。
