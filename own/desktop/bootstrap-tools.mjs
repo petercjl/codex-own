@@ -7,7 +7,8 @@ const cancellation=new AbortController();
 process.on('message',message=>{if(message?.cancel)cancellation.abort();});
 process.on('disconnect',()=>cancellation.abort());
 try{
- const manifest=await manifestFor(meta.version);
+ const embedded=JSON.parse(fs.readFileSync(new URL('../release.json',import.meta.url)));
+ const manifest=embedded.runtimes?.version===meta.toolRuntimeVersion?embedded:await manifestFor(meta.version);
  if(manifest.runtimes?.version!==meta.toolRuntimeVersion)throw Error('Desktop runtime pin does not match npm release');
  const result=await installRuntime(manifest.runtimes,{signal:cancellation.signal,report:message=>process.stderr.write(message+'\n')});
  if(!result.ok)throw Error('Private tool verification failed');

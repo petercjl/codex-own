@@ -12,7 +12,7 @@ const version='node24.22.0-python3.12.15-r1';
 function fixture(t,installed=false){
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-bootstrap-'))),bundle=path.join(root,'bundle');fs.mkdirSync(path.join(bundle,'desktop'),{recursive:true});fs.writeFileSync(path.join(bundle,'desktop-version.json'),JSON.stringify({version:'0.5.0',toolRuntimeVersion:version}),{flag:'wx'});
  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100}));
- const state={installed,applied:0,spawned:0,errors:0,windows:[]},app=new EventEmitter();app.whenReady=async()=>{};
+ const state={installed,applied:0,spawned:0,errors:0,windows:[],relaunches:0},app=new EventEmitter();app.whenReady=async()=>{};app.relaunch=()=>state.relaunches++;app.exit=code=>state.exitCode=code;
  class Window extends EventEmitter{constructor(){super();this.destroyed=false;state.windows.push(this);this.webContents={executeJavaScript:async text=>{state.lastProgress=text;}};}async loadURL(url){assert.match(url,/data:text\/html/);}setMenuBarVisibility(){}isDestroyed(){return this.destroyed;}destroy(){this.destroyed=true;this.emit('closed');}}
  const electron={app,BrowserWindow:Window,dialog:{showErrorBox:()=>state.errors++}},child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.connected=true;child.send=message=>{state.cancel=message;queueMicrotask(()=>child.emit('close',1));};
  const module={exports:{}};vm.runInNewContext(fs.readFileSync(new URL('../desktop/tool-bootstrap.cjs',import.meta.url),'utf8'),{module,__dirname:path.join(bundle,'desktop'),process:{platform:process.platform,env:{NODE_OPTIONS:'unsafe',ELECTRON_RUN_AS_NODE:'1'}},require:n=>({'node:fs':fs,'node:path':path,'node:crypto':crypto,'node:child_process':{},'node:string_decoder':{StringDecoder},'../lib/tool-env.cjs':{active:()=>state.installed?{version}:null}}[n])});
@@ -24,11 +24,12 @@ test('old updater migration gates async desktop startup and fails on changed ups
  const gated=gateToolStartup(source,'own-runtime-win.cjs');assert.ok(gated.includes('async function d(){await require("./own-runtime-win.cjs").ensureTools();'));assert.equal(gateToolStartup(gated,'own-runtime-win.cjs'),gated);assert.throws(()=>gateToolStartup('startImmediately();','own-runtime.cjs'),/bootstrap contract/);
 });
 test('valid installed tools allow offline startup without launching a helper or window',async t=>{
- const {state,start}=fixture(t,true);assert.equal((await start()).unchanged,true);assert.equal(state.applied,1);assert.equal(state.spawned,0);assert.equal(state.windows.length,0);
+ const {state,start}=fixture(t,true);assert.equal((await start()).unchanged,true);assert.equal(state.applied,1);assert.equal(state.spawned,0);assert.equal(state.windows.length,0);assert.equal(state.relaunches,0);
 });
 test('migration waits for verified receipt, decodes split Chinese progress and reapplies environment',async t=>{
  const {state,start}=fixture(t);const result=await start((child,state)=>{const bytes=Buffer.from('下载独立工具\n');child.stderr.emit('data',bytes.subarray(0,5));child.stderr.emit('data',bytes.subarray(5));state.installed=true;child.stdout.emit('data',Buffer.from('{"ok":true}\n'));child.emit('close',0);});
  assert.equal(result.ok,true);assert.equal(state.applied,1);assert.equal(state.errors,0);assert.ok(state.lastProgress.includes('下载独立工具'));assert.equal(state.windows[0].destroyed,true);
+ assert.equal(state.relaunches,1);assert.equal(state.exitCode,0);
 });
 test('migration cancellation cooperates over IPC and never activates an unverified runtime',async t=>{
  const {state,start}=fixture(t);await assert.rejects(start((_child,state)=>state.windows[0].emit('closed')),{code:'CANCELLED'});assert.equal(state.cancel.cancel,true);assert.equal(state.applied,0);assert.equal(state.errors,0);

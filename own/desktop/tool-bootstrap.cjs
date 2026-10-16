@@ -32,7 +32,11 @@ function ensureTools(electron,root,apply,{launch=spawn}={}){
      output+=stdoutDecoder.end();
      if(cancelled){reject(Object.assign(Error('Runtime preparation cancelled'),{code:'CANCELLED'}));return;}
      if(code!==0){reject(Error('Runtime preparation failed; see '+logPath));return;}
-     try{const r=JSON.parse(output);if(!r.ok||tools.active(base)?.version!==meta.toolRuntimeVersion)throw Error('Unexpected runtime install receipt');apply();resolve(r);}catch(e){reject(e);}
+     try{const r=JSON.parse(output);if(!r.ok||tools.active(base)?.version!==meta.toolRuntimeVersion)throw Error('Unexpected runtime install receipt');apply();
+      // Showing preparation has already made Electron ready. Restart before
+      // upstream startup registers pre-ready protocols and window lifecycle.
+      finished=true;app.relaunch();app.exit(0);resolve(r);
+     }catch(e){reject(e);}
     });
    });
   }catch(e){if(e.code!=='CANCELLED')dialog.showErrorBox('codex-own 运行时准备失败','请检查 npm 网络连接后重新打开应用。诊断日志：\n'+logPath);throw e;}
