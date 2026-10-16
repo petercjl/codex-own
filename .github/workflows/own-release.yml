@@ -51,7 +51,7 @@ jobs:
         env: {GH_TOKEN: '${{ github.token }}', VERIFIED_RUN: '${{ inputs.verified_run }}'}
         run: node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN"
   publish:
-    if: ${{ always() && needs.prepare.result == 'success' && (needs.qa.result == 'success' || needs.reuse-qa.result == 'success') }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.qa.result == 'success' || needs.reuse-qa.result == 'success') }}
     needs: [prepare, qa, reuse-qa]
     runs-on: ubuntu-latest
     permissions: {contents: write, id-token: write, actions: read}
