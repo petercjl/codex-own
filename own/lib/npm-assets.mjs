@@ -58,7 +58,7 @@ export async function assembleNpmAsset(asset, dest, cache, tar, {download = veri
       const archive = path.join(scratch, 'package.tgz');
       await download(part.url, archive, {size:part.archiveSize, sha256:part.archiveSha256}, {signal:controller.signal, report:message=>report(`[${i+1}/${asset.parts.length}] ${message}`)});
       // Extract only the fixed payload entry, never arbitrary paths from a package tarball.
-      execFileSync(tar, ['-xf', archive, '-C', scratch, 'package/payload.bin'], {stdio:'pipe'});
+      execFileSync(tar, ['-xf', path.basename(archive), '-C', '.', 'package/payload.bin'], {cwd:scratch,stdio:'pipe'});
       const payload = path.join(scratch, 'package', 'payload.bin');
       safeCache(payload);
       if (fs.statSync(payload).size !== part.size || await fileHash(payload) !== part.sha256)

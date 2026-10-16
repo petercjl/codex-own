@@ -49,4 +49,4 @@ app.whenReady().then(() => {
     app.dock.setIcon = () => setIcon(icon);
   }
 });
-module.exports = {apply, paths};
+module.exports = {apply, paths,ensureTools:()=>require(path.join(resources,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply)};

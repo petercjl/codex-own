@@ -6,6 +6,7 @@ import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {bundleUpdater} from './updater.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
+import {gateToolStartup} from './tool-gate.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
@@ -33,7 +34,7 @@ if (!fs.readFileSync(entry,'utf8').startsWith('require(')) throw Error('Unknown 
 const runtime=path.join(path.dirname(entry),'own-runtime.cjs');
 if(fs.existsSync(runtime))throw Error('Runtime already present');
 fs.copyFileSync(path.join(root,'own/runtime/mac.cjs'),runtime);
-fs.writeFileSync(entry,'require("./own-runtime.cjs");\n'+fs.readFileSync(entry,'utf8'));
+fs.writeFileSync(entry,gateToolStartup('require("./own-runtime.cjs");\n'+fs.readFileSync(entry,'utf8'),'own-runtime.cjs'));
 const startupFiles=fs.readdirSync(path.dirname(entry)).filter(n=>/^startup-requirements-.*\.js$/.test(n));
 if(startupFiles.length!==1)throw Error('Ambiguous startup module');
 const startup=path.join(path.dirname(entry),startupFiles[0]);

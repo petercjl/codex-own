@@ -9,6 +9,7 @@ import {bundleUpdater,verifyUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
 import {applyWindowsIcon} from './windows-icon.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
+import {gateToolStartup} from './tool-gate.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const root=path.resolve(import.meta.dirname,'..');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -21,6 +22,8 @@ export async function upgradeUpdater(app,{version,node}={}){
  const bundled=path.join(resources,'own-updater');
  asar.uncache(archive);const header=asar.getRawHeader(archive).header;
  const menuChanges=mac?new Map():updateMenuChanges(asar,archive);
+ const entry=JSON.parse(asar.extractFile(archive,'package.json')).main,entrySource=asar.extractFile(archive,entry.replaceAll('/',path.sep)).toString();
+ const gated=gateToolStartup(entrySource,mac?'own-runtime.cjs':'own-runtime-win.cjs');if(gated!==entrySource)menuChanges.set(entry,Buffer.from(gated));
  for(const file of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js'))){
    const before=menuChanges.get(file)?.toString()||asar.extractFile(archive,file.replaceAll('/',path.sep)).toString();
    if(before.includes('codex-runtimes')){const after=isolateRuntimeSource(before);if(after!==before)menuChanges.set(file,Buffer.from(after));}

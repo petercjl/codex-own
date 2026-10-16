@@ -48,8 +48,11 @@ export function tarExecutable(platform=process.platform,env=process.env,exists=f
   return executable;
 }
 export function unpack(archive,dest) {
-  const names=execFileSync(tarExecutable(),['-tf',archive],{encoding:'utf8',maxBuffer:30*1024*1024}).split('\n').filter(Boolean);checkEntries(names);
-  fs.mkdirSync(dest);execFileSync(tarExecutable(),['-xf',archive,'-C',dest],{stdio:'pipe'});
+  // Older Windows tar builds convert absolute argv paths through the ANSI code
+  // page. CreateProcessW's cwd supports Unicode; sibling relative args avoid it.
+  const cwd=path.dirname(path.resolve(archive)),source=path.basename(archive),target=path.relative(cwd,path.resolve(dest));
+  const names=execFileSync(tarExecutable(),['-tf',source],{cwd,encoding:'utf8',maxBuffer:30*1024*1024}).split('\n').filter(Boolean);checkEntries(names);
+  fs.mkdirSync(dest);execFileSync(tarExecutable(),['-xf',source,'-C',target],{cwd,stdio:'pipe'});
   // Bundled framework links may be relative but must stay within the extracted tree.
   function walk(p){for(const x of fs.readdirSync(p,{withFileTypes:true})){const f=path.join(p,x.name);if(x.isSymbolicLink()){const resolved=path.resolve(path.dirname(f),fs.readlinkSync(f));if(!resolved.startsWith(dest+path.sep))fail('UNSAFE_ARCHIVE','Escaping symlink');}else if(x.isDirectory())walk(f);}}
   walk(dest);

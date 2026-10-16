@@ -8,6 +8,7 @@ import {verifyTranslations} from './i18n.mjs';
 import {bundleUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
+import {gateToolStartup} from './tool-gate.mjs';
 const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -24,7 +25,7 @@ const pkg=JSON.parse(asar.extractFile(archive,'package.json'));
 const changes=updateMenuChanges(asar,archive);
 pkg.name='codex-own';pkg.productName='codex-own';pkg.description='Independent DeepSeek desktop';
 changes.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
-changes.set(pkg.main,Buffer.from('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString()));
+changes.set(pkg.main,Buffer.from(gateToolStartup('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString(),'own-runtime-win.cjs')));
 changes.set('.vite/build/own-runtime-win.cjs',fs.readFileSync(path.join(root,'own/runtime/windows.cjs')));
 let shellPatches=0,updaterPatches=0;
 function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const x of v)walk(x,fn);else if(v&&typeof v==='object')walk(v,fn)}}
