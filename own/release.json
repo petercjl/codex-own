@@ -1,13 +1,13 @@
 {
   "schema": 2,
   "repository": "petercjl/codex-own",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "platforms": {
     "darwin-arm64": {
       "entry": "codex-own.app",
       "transport": "canonical-tar-cdc-v1",
-      "size": 2045490688,
-      "sha256": "6c299eccf14ed95f106bd13d42033760254610fbe16ced9018dcc17e77d2911b",
+      "size": 2045515264,
+      "sha256": "2c2f12b46354332f3166794dc51b9e899fc39f88b2862be9482507d42520ff13",
       "parts": [
         {
           "sha256": "f7950fe492a347a0e74528f4f73472052fc43d5155f32f92481fc96c3cc6ce95",
@@ -45,11 +45,11 @@
           "archiveSha256": "1697a11a56260838efd2bb2f0d95767540c7154ad85c274f86b23a1baddf8d7c"
         },
         {
-          "sha256": "e081208d5cdc77baaae34525949efb2c375e9899462cf7a3ee8297d43831d8ba",
+          "sha256": "61f22cc033b97a745f8afd40e750591cf00df08a9454c54ca924e89061eef41f",
           "size": 46558388,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.he081208d5cdc77baaae34525949efb2c375e9899462cf7a3ee8297d43831d8ba.tgz",
-          "archiveSize": 13975146,
-          "archiveSha256": "11827b2a0ee79e518481167fd0863f079cc7789f562137c3a7d6fa4aa7aab4e4"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h61f22cc033b97a745f8afd40e750591cf00df08a9454c54ca924e89061eef41f.tgz",
+          "archiveSize": 13975144,
+          "archiveSha256": "acf70e99c7cea6c10007035aa7d8509457b7cc73d9378f5f5dc7ae42152726d0"
         },
         {
           "sha256": "e09427abf6b00a3719b916121a734361209e637eefe8dff4ee5736dde2ac8751",
@@ -73,18 +73,18 @@
           "archiveSha256": "25db0027db503c12230d346ec500d01ba53880069164eeb0020da829dcff6c8f"
         },
         {
-          "sha256": "15d483fbc670a0d6225766dafaba4788d08d9acb6394525d58d9a114674f3f72",
+          "sha256": "d30e0f5e5bdd6a27a5f8d12a3272a94aaa47dccae8b58036dc3b162dac4b7e61",
           "size": 26327040,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h15d483fbc670a0d6225766dafaba4788d08d9acb6394525d58d9a114674f3f72.tgz",
-          "archiveSize": 8466879,
-          "archiveSha256": "a749c1777b6a11ea75cddcb0bc40b8cb9afd8d16e861dd0f9ccee021aa6f08a4"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hd30e0f5e5bdd6a27a5f8d12a3272a94aaa47dccae8b58036dc3b162dac4b7e61.tgz",
+          "archiveSize": 8466868,
+          "archiveSha256": "5e19777e583abc273553db5c8c9808b098085cc2ec319ae5cd8def73bd923f24"
         },
         {
-          "sha256": "09aa46003472eb0128ee1a4bfdc915e00a300cd18d772998e0bf36ea9adefa62",
-          "size": 20032650,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h09aa46003472eb0128ee1a4bfdc915e00a300cd18d772998e0bf36ea9adefa62.tgz",
-          "archiveSize": 5138658,
-          "archiveSha256": "6f41a2d0a912ede983633efb23f47cb943d1a1fe27bd67b39300d402a87c6260"
+          "sha256": "9b44de3ecc70850eccbb992540cfd1b9b14ab2bfa042bbee072bcbebbe7a1338",
+          "size": 20033661,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h9b44de3ecc70850eccbb992540cfd1b9b14ab2bfa042bbee072bcbebbe7a1338.tgz",
+          "archiveSize": 5138668,
+          "archiveSha256": "9149d9c8394d1cb9770861460b52815481409a9cd39c935cbf3497171b858128"
         },
         {
           "sha256": "432172d98e9f5fb2d7a7e41036c0d36f3c405203e2e612c0706ec2440bd50044",
@@ -164,11 +164,11 @@
           "archiveSha256": "4193df135e7180f6fc32a0fd9fa1cef6b1ee90e3bfd437cf9d7a7c2c82a23310"
         },
         {
-          "sha256": "90a418d1a8baa1f2bf8fee848e05ff10162144689a46a6860680db0a6801a764",
-          "size": 5769306,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h90a418d1a8baa1f2bf8fee848e05ff10162144689a46a6860680db0a6801a764.tgz",
-          "archiveSize": 4533432,
-          "archiveSha256": "1ee70e0376d1db00ea958c3194136940d54075e27cf56742c4778beb365892fa"
+          "sha256": "ff1233b968d63b1329b76402e82b689f0d0a46f1f6127107a1a05b181163118e",
+          "size": 5769319,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hff1233b968d63b1329b76402e82b689f0d0a46f1f6127107a1a05b181163118e.tgz",
+          "archiveSize": 4533434,
+          "archiveSha256": "6be6ad10c5bc084261686bb6f498abbd0fa637180d933b9a5a8c3af5a66a2b8d"
         },
         {
           "sha256": "2c7b16b63b93ce10c381c512543fadd21e65ec8b5b499e68cf7e6b9905e4ef09",
@@ -339,11 +339,11 @@
           "archiveSha256": "7cdf4ba6de25f51905fac22b7079c52464a4c06b4a9bb39af20121f29e1261a2"
         },
         {
-          "sha256": "2b2a46d3f39371c916e81154f668291a6dd9c37ab2ce000b1c636ae6ffa57945",
-          "size": 59450880,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h2b2a46d3f39371c916e81154f668291a6dd9c37ab2ce000b1c636ae6ffa57945.tgz",
-          "archiveSize": 26333973,
-          "archiveSha256": "c882c2e80d039808850674b3d1643d0212a75ee8d769cb30de75e3e8869669d6"
+          "sha256": "ca9271a13483b997b634edb24d09f278bd039675241192fcc1745c6ecc4d7cbb",
+          "size": 59472896,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hca9271a13483b997b634edb24d09f278bd039675241192fcc1745c6ecc4d7cbb.tgz",
+          "archiveSize": 26339531,
+          "archiveSha256": "38eeb99a3390e1820b4cea59e9ae1aa9e7bd73350436048ad94f3a17d8311fd3"
         },
         {
           "sha256": "7160a34ddbb6db8a2296686a530bb99f78cb8803027cbb32fb76aa9ed2222355",
@@ -360,11 +360,11 @@
           "archiveSha256": "783256484f3f6dfc99561fe6680100f457b5acf0e845a8824a9b8a94c6518b1e"
         },
         {
-          "sha256": "273c28c983e5709b06ef410a0695846b6ca407cf93abf90aacd81eeb79d96734",
+          "sha256": "3da0aa23107a857097ac4331416a382bda0d51e578a02b174056803fe7ad55b1",
           "size": 35845005,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h273c28c983e5709b06ef410a0695846b6ca407cf93abf90aacd81eeb79d96734.tgz",
-          "archiveSize": 29375784,
-          "archiveSha256": "2eacfba0fcdb4044088fadba88d57aada93ca250d536e699960f57e6e9a78677"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h3da0aa23107a857097ac4331416a382bda0d51e578a02b174056803fe7ad55b1.tgz",
+          "archiveSize": 29375795,
+          "archiveSha256": "5e85db4cc770d0949258456b740ea7365884722a0712fe381bbc2a8884f198f4"
         },
         {
           "sha256": "20604d70f3b62c4f011cc6fcf2215c5b21005cf31ff27e7e8c0a31af21c46c37",
@@ -388,19 +388,19 @@
           "archiveSha256": "988c7e1746e5237643195824ef5f1193e03998135de90a5ae0c33e105b450f5f"
         },
         {
-          "sha256": "7b5bbcf781bd880525c52f1ec8166189292ecf694903d54904b74ce1b2a90b45",
-          "size": 1764864,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h7b5bbcf781bd880525c52f1ec8166189292ecf694903d54904b74ce1b2a90b45.tgz",
-          "archiveSize": 355467,
-          "archiveSha256": "a10577274aa7ce96df453bd8e5acc865b74b70a1948c8adb080062a7051e6b22"
+          "sha256": "d75c1cbc6920e5228fb7ad54f9ba8c20cedaa85068cbe6d185aacd5064ac173f",
+          "size": 1766400,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hd75c1cbc6920e5228fb7ad54f9ba8c20cedaa85068cbe6d185aacd5064ac173f.tgz",
+          "archiveSize": 355790,
+          "archiveSha256": "17c3b956264ff40efd594803a539944e98db340444e476b837e8116a5605d538"
         }
       ]
     },
     "win32-x64": {
       "entry": "app",
       "transport": "canonical-tar-cdc-v1",
-      "size": 2424525312,
-      "sha256": "a0e46980fce8922c7ac407651f5d7660f71619669e70a72ede26ddbefe1bcd6b",
+      "size": 2424548352,
+      "sha256": "edb3bc0563135145cf9418205175d629e8c4f432aca3882cfa1d5ded3b4d9663",
       "parts": [
         {
           "sha256": "75e7eeb9ec280f24305ca34c3a22539c26616b4fb74cb89ac5436ed62390d31d",
@@ -473,11 +473,11 @@
           "archiveSha256": "00624b63deb580eaa1f50528d963c34871c5d650bc704fed498dbedb44a832a4"
         },
         {
-          "sha256": "5a8008e622b5ac2a574a8ee1f0ea18a1d4ba02375cf4bbe56f58b1f43a408c9f",
+          "sha256": "94c67bc06de1d41fc2ef15a8f13084070637c48afa45b88f65d5338e3a4733ed",
           "size": 23890432,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h5a8008e622b5ac2a574a8ee1f0ea18a1d4ba02375cf4bbe56f58b1f43a408c9f.tgz",
-          "archiveSize": 11339427,
-          "archiveSha256": "951fd051ba248b2eb7ec8fe4e57fa09797ea4c8d622806ca7844ad3ab4603676"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h94c67bc06de1d41fc2ef15a8f13084070637c48afa45b88f65d5338e3a4733ed.tgz",
+          "archiveSize": 11339437,
+          "archiveSha256": "5306b9fa30dde73a6a6c376da4d62b42c4586798d18d3a51103b981c0098b77d"
         },
         {
           "sha256": "723a5e60c1066bd5ba6e387fae972124a6f8f1726d7ba1bdb273aa620b62726f",
@@ -508,11 +508,11 @@
           "archiveSha256": "893d020e3aa46399d3f91f0212b66a47c42e7a03bc1072b76dbe22224d00b9f7"
         },
         {
-          "sha256": "66d07a8b7caf21d15e0741ea08c6378ff241cf9be0809ac437e1da6e3f5bcc84",
-          "size": 24783138,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h66d07a8b7caf21d15e0741ea08c6378ff241cf9be0809ac437e1da6e3f5bcc84.tgz",
-          "archiveSize": 6289325,
-          "archiveSha256": "c0be6a6a77d803e7d51c5d18fa78c2becfcc5035ee5761323984d129d3895e8b"
+          "sha256": "007c6c48ecb83a528c06de0e5686f9e406fb78c714c6e513cbc19184df6bf825",
+          "size": 24784186,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h007c6c48ecb83a528c06de0e5686f9e406fb78c714c6e513cbc19184df6bf825.tgz",
+          "archiveSize": 6289351,
+          "archiveSha256": "10d50695aad87cff4305ab9e0455b726e2467a662d3f50b3f362c7d372f95c1f"
         },
         {
           "sha256": "8209fa7ff4208fabdc6143ddce15132d60abdfe5123505704b70c2bcb9be6394",
@@ -592,11 +592,11 @@
           "archiveSha256": "08144618dc5dafba20b37e708ff2b11950486eb02666b31bbf7c28398855edf6"
         },
         {
-          "sha256": "f637d96b0a0dfca34c1e5278317e99b4710731a4a7950fdedd47609cf8440f14",
-          "size": 5769032,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hf637d96b0a0dfca34c1e5278317e99b4710731a4a7950fdedd47609cf8440f14.tgz",
-          "archiveSize": 4533426,
-          "archiveSha256": "d3dca4b7e4c20e83cd86264ff7d7c1f07edae25561c34f60747db4b0d5e87f91"
+          "sha256": "d47efa1bc6aed426cb5cca7d0c5395843d9ebe99597d9382135f8afbfe5e554a",
+          "size": 5769008,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hd47efa1bc6aed426cb5cca7d0c5395843d9ebe99597d9382135f8afbfe5e554a.tgz",
+          "archiveSize": 4533424,
+          "archiveSha256": "62b5013f5b29776fe699f6e0cf6465cadbae965ec03a702b8481bc719a983f90"
         },
         {
           "sha256": "641ba77a852ed34cc497714672d9d26250796f736f4df1a6b5ca196c6d7c9bfa",
@@ -816,11 +816,11 @@
           "archiveSha256": "eb3f18bd55a152598f8d6b8325f21c3e2e6f82f937c5e8f29d2b7d5c758f075a"
         },
         {
-          "sha256": "2b7dbeeee52216216a3a12fed0086451c5f7941bbb982ab46724855035742535",
-          "size": 5920256,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h2b7dbeeee52216216a3a12fed0086451c5f7941bbb982ab46724855035742535.tgz",
-          "archiveSize": 1995643,
-          "archiveSha256": "32b46cbd4ab442c603cfb38a777b15ff2b7708dd6263ced3109fa4180f719014"
+          "sha256": "8f19e89a0994e9885a3d35adc7444341ca2fe2f2ffd10c8439a7c989d2f4865d",
+          "size": 5942272,
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h8f19e89a0994e9885a3d35adc7444341ca2fe2f2ffd10c8439a7c989d2f4865d.tgz",
+          "archiveSize": 2001204,
+          "archiveSha256": "fe95043fb3a0751ade7b06b8428472fff36018350b3f4c67c692e83dcaf88e96"
         },
         {
           "sha256": "6d72766b19ebd5e4aae33b6d57b22f07b10cb83bc080f7596bfdd834675dfbc6",
@@ -844,11 +844,11 @@
           "archiveSha256": "39f25e55411d144f5cea0f7b1842f48eabc3de2983ce26bd8d2e19175abbd312"
         },
         {
-          "sha256": "04c55d07fe77a520fa1e38854ef22e7de16b82b5ebe0b4a1bc3d0c9c8401642a",
+          "sha256": "5044f716d709e616100e3d3a218be117c2edd4f2d7940b3c04b7bd21efa78ac0",
           "size": 34144141,
-          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h04c55d07fe77a520fa1e38854ef22e7de16b82b5ebe0b4a1bc3d0c9c8401642a.tgz",
-          "archiveSize": 27842573,
-          "archiveSha256": "6ef33668abfbc4c92e21bbe313b58d17b63db5d7c2e861f5bfff639948437afe"
+          "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h5044f716d709e616100e3d3a218be117c2edd4f2d7940b3c04b7bd21efa78ac0.tgz",
+          "archiveSize": 27842633,
+          "archiveSha256": "06c0a106a5f9a139ad17f5283375cccc119a147d30bf5540172c88345c3d1319"
         },
         {
           "sha256": "e80bff562bb79507e555d21bac0d844f17994b47b5bad12409a0046df9de72cd",
@@ -891,17 +891,106 @@
   "provenance": {
     "darwin-arm64": {
       "kind": "verified-own-overlay-upgrade",
-      "sourceVersion": "0.3.1",
+      "sourceVersion": "0.4.1",
       "upgradeNpmUpdater": true,
-      "incrementalTransport": "canonical-tar-cdc-v1",
-      "windowsIcon": "windows-blue-w"
+      "privateToolRuntime": "node24.22.0-python3.12.15-r1"
     },
     "win32-x64": {
       "kind": "verified-own-overlay-upgrade",
-      "sourceVersion": "0.3.1",
+      "sourceVersion": "0.4.1",
       "upgradeNpmUpdater": true,
-      "incrementalTransport": "canonical-tar-cdc-v1",
-      "windowsIcon": "windows-blue-w"
+      "privateToolRuntime": "node24.22.0-python3.12.15-r1"
+    }
+  },
+  "runtimes": {
+    "schema": 1,
+    "version": "node24.22.0-python3.12.15-r1",
+    "platforms": {
+      "darwin-arm64": {
+        "node": {
+          "entry": "node-v24.22.0-darwin-arm64",
+          "format": "tar.gz",
+          "size": 53049576,
+          "sha256": "6a9724d9b50a5f22b4816cded441b5a8d9ddae546191a5e5b7efa5a5e2ee26d5",
+          "parts": [
+            {
+              "sha256": "949aea7a152b116e84670a7b771614bcea487f587a581e0d1a120928e9ab0221",
+              "size": 33554432,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h949aea7a152b116e84670a7b771614bcea487f587a581e0d1a120928e9ab0221.tgz",
+              "archiveSize": 33512749,
+              "archiveSha256": "5f3bbf063aa3d82e32ba0499e46123822d7148542101aee2d019929190c196c2"
+            },
+            {
+              "sha256": "4cac86c2c3bad12d3402c7cd52ce002dcf222ebb3db964d1cbc5042b433aab59",
+              "size": 19495144,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h4cac86c2c3bad12d3402c7cd52ce002dcf222ebb3db964d1cbc5042b433aab59.tgz",
+              "archiveSize": 19133414,
+              "archiveSha256": "643fb96788aef65d2a7adb81e1df6e55d963364b34837e152167282843818172"
+            }
+          ]
+        },
+        "python": {
+          "entry": "python",
+          "format": "tar.gz",
+          "size": 25180390,
+          "sha256": "ba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440",
+          "parts": [
+            {
+              "sha256": "ba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440",
+              "size": 25180390,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440.tgz",
+              "archiveSize": 25107923,
+              "archiveSha256": "503f5667f2d6fa6950438764f0ac29e413e3080bfcfe83b295b6c74c2c15163e"
+            }
+          ]
+        }
+      },
+      "win32-x64": {
+        "node": {
+          "entry": "node-v24.22.0-win-x64",
+          "format": "zip",
+          "size": 37733703,
+          "sha256": "f9683a19877e12a9b167305c8db71040d812876359de21f0d2e97c3f321f80c3",
+          "parts": [
+            {
+              "sha256": "94c14ce1eeda03b3b96bd4ea01346bf43b21e70efbc5b25adaba94fda2b85906",
+              "size": 33554432,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h94c14ce1eeda03b3b96bd4ea01346bf43b21e70efbc5b25adaba94fda2b85906.tgz",
+              "archiveSize": 33182230,
+              "archiveSha256": "72c783c0db418be6745f13f1c824b00314eec2d534c9b1913cc58b6c0524a9ce"
+            },
+            {
+              "sha256": "84cf2122a4133990d5f24187fecab4e1c8137bc71b37e6289cbf3aa68118839d",
+              "size": 4179271,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h84cf2122a4133990d5f24187fecab4e1c8137bc71b37e6289cbf3aa68118839d.tgz",
+              "archiveSize": 3550650,
+              "archiveSha256": "93768d0020e6ab5be47b5c841bcba0e4d3feebbcc5b07e2378309239d1a3e186"
+            }
+          ]
+        },
+        "python": {
+          "entry": "python",
+          "format": "tar.gz",
+          "size": 46390009,
+          "sha256": "bbc902d4d187ac4914915bf538196a064b49109a33a104965b5164ced5b80a1e",
+          "parts": [
+            {
+              "sha256": "69b8bc6e8da423ec63f0b80af3c43a1c10efad679fa3a6c875bf33f0373ab201",
+              "size": 33554432,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h69b8bc6e8da423ec63f0b80af3c43a1c10efad679fa3a6c875bf33f0373ab201.tgz",
+              "archiveSize": 33403996,
+              "archiveSha256": "2b124ed954113cd681b37e442539c6cc8daee7e2a96724c76e94b86418da7e4d"
+            },
+            {
+              "sha256": "94972a77f8080d4b9e5094d5ac42a1e3d7cfce1c7b2dcd804b43e02f4133d885",
+              "size": 12835577,
+              "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h94972a77f8080d4b9e5094d5ac42a1e3d7cfce1c7b2dcd804b43e02f4133d885.tgz",
+              "archiveSize": 12811675,
+              "archiveSha256": "38cffc9d4a50f51d0dc333aca4e7065f12721a200bfc20f5e01ac24e44ae9e2d"
+            }
+          ]
+        }
+      }
     }
   }
 }
