@@ -3,20 +3,20 @@
   "manifest": {
     "schema": 2,
     "repository": "petercjl/codex-own",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "platforms": {
       "darwin-arm64": {
         "entry": "codex-own.app",
         "probe": {
           "path": "codex-own.app/Contents/Resources/codex",
           "offset": 984280576,
-          "size": 176332872,
-          "sha256": "bec7098c8cf2584e80c7415baee786d9597b4ff5e2a1dbda5a2f00c4dbe49ab4",
-          "version": "codex-cli 0.155.1-cometix"
+          "size": 185834568,
+          "sha256": "bdf26c4f03ab64e57162a2f715d0f5b236f4534e60ca92abb989069280066987",
+          "version": "codex-cli 0.156.1-cometix"
         },
         "transport": "canonical-tar-cdc-v1",
-        "size": 2059602944,
-        "sha256": "0fa4a37aa223df0375da924a4c54ed4b88b3ab8d0f0b69740a55df1993111e21",
+        "size": 2069270528,
+        "sha256": "b3ee85d92ce77585660ffa6b498cea700bf2fd105910559195ccf757d38e0c01",
         "parts": [
           {
             "sha256": "0b42f2d545aca8e8255bd5fee043156b6851be1bf123d3c74b9ebb578f3f7d32",
@@ -194,25 +194,32 @@
             "archiveSha256": "cae2cb285e018ff1230ed1032a2543d3ccf80f11850cc5b9dcdfc28cb39e77a7"
           },
           {
-            "sha256": "f51a3483084d230232c4cdab22d6efb1a02ab988efa701114cd1be442c99122c",
-            "size": 67108864,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hf51a3483084d230232c4cdab22d6efb1a02ab988efa701114cd1be442c99122c.tgz",
-            "archiveSize": 27079528,
-            "archiveSha256": "9ce41cf52d39d73841ac5e7cc9d59b0f4ac4fa661be57de4400e02fc31f5e8fe"
+            "sha256": "9f1541afecef78ed6dcb2555cb30631477c58f440f45378a412aeafa234fda4b",
+            "size": 18144476,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h9f1541afecef78ed6dcb2555cb30631477c58f440f45378a412aeafa234fda4b.tgz",
+            "archiveSize": 8088208,
+            "archiveSha256": "dabf319c1ef141487c13505ff6aa58cf6e5b9df0018f973d364f905562052b45"
           },
           {
-            "sha256": "3c2a7064f467726e7a1ef5f2a4212a2d9db6395a367f3c009639ce4d6e64958d",
-            "size": 67108864,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h3c2a7064f467726e7a1ef5f2a4212a2d9db6395a367f3c009639ce4d6e64958d.tgz",
-            "archiveSize": 26384530,
-            "archiveSha256": "95f68fd520e055817746d4eb287e048a39fdc06ff2255942a9fa315997d8d8fd"
+            "sha256": "e1b55ea645cf932b012e0321f698834f49d73a6e51cae25f906738e43d60b3ab",
+            "size": 61081744,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.he1b55ea645cf932b012e0321f698834f49d73a6e51cae25f906738e43d60b3ab.tgz",
+            "archiveSize": 24120768,
+            "archiveSha256": "aac77f373c281247619e26cba053d411cbbf1bb26603a89cf240e8daa6d80556"
           },
           {
-            "sha256": "93aac2e9f596e42a1627489d61ecf3717f06fa5fb19b29a682747e3817b76387",
-            "size": 42116096,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h93aac2e9f596e42a1627489d61ecf3717f06fa5fb19b29a682747e3817b76387.tgz",
-            "archiveSize": 11211914,
-            "archiveSha256": "50933e9ca1812a7dac33fce4e2a812023a24766daed716249d692ce71ea41d5f"
+            "sha256": "fbddd5e3806129942e6770532f92a997d494a491c8944e94759516687fb473e3",
+            "size": 67108864,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hfbddd5e3806129942e6770532f92a997d494a491c8944e94759516687fb473e3.tgz",
+            "archiveSize": 25348547,
+            "archiveSha256": "c5795bf1dde51594e51a31b7e21dbd93b3fc0636597649fbf6f69b44640e3ad8"
+          },
+          {
+            "sha256": "91a6be058aeafb1ece595c590c4fa6383725f30948cee4dda3784d1d2b7850f4",
+            "size": 39500436,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h91a6be058aeafb1ece595c590c4fa6383725f30948cee4dda3784d1d2b7850f4.tgz",
+            "archiveSize": 10784559,
+            "archiveSha256": "d30e7f84bf4bd7007a583c33f046ad3323f1e89a333a52c51a498eb8f3714aaf"
           },
           {
             "sha256": "f82f9cb2f7577996ad84d0413d7976cd7a82ea4c870fde2e2b66beb0f513cbc8",
@@ -355,11 +362,11 @@
             "archiveSha256": "c99a078d64811b89c5a6dee82392825acb8fdb4881abf88f8bbc9fda1da67f9e"
           },
           {
-            "sha256": "db61908a467103ea8fb834178da3f64e09ce22537024ae6365eb844593d098a8",
-            "size": 59759616,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hdb61908a467103ea8fb834178da3f64e09ce22537024ae6365eb844593d098a8.tgz",
-            "archiveSize": 26446753,
-            "archiveSha256": "e816377b3609236eb56d0903ad12cf38277c67b64566c986d11a77884e16822a"
+            "sha256": "ea91d3a81d35275eb48d845b55078b61c6569075a6048bb82298179d60e10a43",
+            "size": 59762688,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hea91d3a81d35275eb48d845b55078b61c6569075a6048bb82298179d60e10a43.tgz",
+            "archiveSize": 26447505,
+            "archiveSha256": "cd97dae12c9fb7eb85b381efa49a3460f264400bec81b5e2b3a2a99a52e50011"
           },
           {
             "sha256": "7cfeb48649874d23596c06c132aea050773133adc936e5d905966a48916f629b",
@@ -376,11 +383,11 @@
             "archiveSha256": "caa6952e6c00fed43f98c1e5b5eb653ed311f09b35be3aa2afc6d696ff38677b"
           },
           {
-            "sha256": "44107ec7ad287d674234cbaedfcae92aa3056a8229d251011224858e55b96fa7",
-            "size": 17132062,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h44107ec7ad287d674234cbaedfcae92aa3056a8229d251011224858e55b96fa7.tgz",
-            "archiveSize": 15661125,
-            "archiveSha256": "1b75543fc36f403a8f0ae7ad3f946d7b3ca479d8f32f642321d4769adb030d31"
+            "sha256": "fc98e60dbd9a45b36bcbc6d334dfa5c9c56f3a5a2937e5bd81de48892f6a057a",
+            "size": 17287710,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hfc98e60dbd9a45b36bcbc6d334dfa5c9c56f3a5a2937e5bd81de48892f6a057a.tgz",
+            "archiveSize": 15691279,
+            "archiveSha256": "0fea08981d1bbfe1df66f33b4ad14ac7b5bb1326a09ebea064c4c89f2efa81f6"
           },
           {
             "sha256": "486eecb966966e046dfade862bdce1b6f29a5d17c1a663832a23b38fece27089",
@@ -411,11 +418,11 @@
             "archiveSha256": "fa3816195cbaaf7fd2f0cb1b61134b6d41363893bf71f91df2421d2976438cd1"
           },
           {
-            "sha256": "65927d887b78f9143609f224ef9d3c0084eb51c67455033da04e9bb28440f37f",
-            "size": 1771008,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h65927d887b78f9143609f224ef9d3c0084eb51c67455033da04e9bb28440f37f.tgz",
-            "archiveSize": 356550,
-            "archiveSha256": "6356a58a0058a3660e386e81e741180dadc8992b549c1c801160a58262344e88"
+            "sha256": "d26a21ecf3dd76ff54bc837b38b4d6cb722699afcc38d60fedda06283baf86cd",
+            "size": 1778176,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hd26a21ecf3dd76ff54bc837b38b4d6cb722699afcc38d60fedda06283baf86cd.tgz",
+            "archiveSize": 358237,
+            "archiveSha256": "52a9648c8a7421e93d180c1f071f06372586954b9cb481de61a7c2d867154352"
           }
         ]
       },
@@ -424,13 +431,13 @@
         "probe": {
           "path": "app/resources/codex.exe",
           "offset": 1578081280,
-          "size": 173487104,
-          "sha256": "83afc8dfe9a9bb6dba5f5592389cf01737d817e51886654e0f6b45fdf4988569",
-          "version": "codex-cli 0.155.1-cometix"
+          "size": 184842240,
+          "sha256": "8d12293fc75d495ebc1df360b25a05352dbe6ce0521c3456b5c33a3bb92ab014",
+          "version": "codex-cli 0.156.1-cometix"
         },
         "transport": "canonical-tar-cdc-v1",
-        "size": 2276933632,
-        "sha256": "cd7beefc8eb48a3a6e83cf242f16fb83f8918878beb632cf0c538107cb4f3b62",
+        "size": 2288447488,
+        "sha256": "a4cb2deacfc45eac514196b8ba1b8280b92feb3cdd2e3e44637680a57f2cf10c",
         "parts": [
           {
             "sha256": "308461c5561025640d0ed339cca7c440649e8cb13505d6b6e974f2ac93f5069e",
@@ -727,32 +734,32 @@
             "archiveSha256": "8731d432ceb6a3209a78de043525b8c6c4f2c949f0a2ed5ba4f7b87e2d6bb234"
           },
           {
-            "sha256": "77d0ffe9d2b5168c5da2db7acd96ded8e19c31bb6021920c90b74534feb3b465",
+            "sha256": "8041cd1798a3992a3aa22fe09b7dd4af57b9c73f10fe15b07f8ce715732206b5",
             "size": 67108864,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h77d0ffe9d2b5168c5da2db7acd96ded8e19c31bb6021920c90b74534feb3b465.tgz",
-            "archiveSize": 22395106,
-            "archiveSha256": "bdc3df29cfac3972ee0ca9bbe71a6360449738843af018ae7e46bad8e86143cb"
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h8041cd1798a3992a3aa22fe09b7dd4af57b9c73f10fe15b07f8ce715732206b5.tgz",
+            "archiveSize": 22283663,
+            "archiveSha256": "a4b1268d9a90c61ecad944b94d1abca47152a1e0f46e30680be2b22e0ce74b3c"
           },
           {
-            "sha256": "1fb047d4679f948b20b1e615f08e5ea150d4d5edd5cadaf68c6debee31a003e3",
+            "sha256": "2e48eaa6bade86bd9450e56a3c01bf5e96d795dd99e3ca7c9f28b6beef16e240",
             "size": 67108864,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h1fb047d4679f948b20b1e615f08e5ea150d4d5edd5cadaf68c6debee31a003e3.tgz",
-            "archiveSize": 25067015,
-            "archiveSha256": "9e7fd78aebd2c719c3afebc0bc1ed3f4036b54d8fc47f79d55615bccd23c255d"
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h2e48eaa6bade86bd9450e56a3c01bf5e96d795dd99e3ca7c9f28b6beef16e240.tgz",
+            "archiveSize": 25442661,
+            "archiveSha256": "190738a751abe456a13bf09e8266f847ba4dfdcd76d3ea6256fdfef07f8cc575"
           },
           {
-            "sha256": "d5a8f8c79cb96ffebd065cfe8e70da6cef1d7a77f7a184298692fef60934a559",
-            "size": 37278369,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hd5a8f8c79cb96ffebd065cfe8e70da6cef1d7a77f7a184298692fef60934a559.tgz",
-            "archiveSize": 12377681,
-            "archiveSha256": "ec058e81dd983106c7d5d13dd0f1b00bbb178750ffde18cf468443322baac03a"
+            "sha256": "dab44da85d0cb8b60706ef5cd2eecebf1c66d7a49f80e183018b79295e22e2f4",
+            "size": 18699313,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hdab44da85d0cb8b60706ef5cd2eecebf1c66d7a49f80e183018b79295e22e2f4.tgz",
+            "archiveSize": 6323660,
+            "archiveSha256": "33c7064f58e30b868e5f62c051ac23a8eeaaa0e7f6b610bd84bd3b3e216fc59c"
           },
           {
-            "sha256": "43da8ecef12622c3bca8abec3a93059d93b97c80bb1e54fb9c7efed29e1dd839",
-            "size": 1991519,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h43da8ecef12622c3bca8abec3a93059d93b97c80bb1e54fb9c7efed29e1dd839.tgz",
-            "archiveSize": 1025799,
-            "archiveSha256": "74ca3cec9df0a7c0192e6a3a3a71bbe12bbd4a9a814560869bea4952f29b0c73"
+            "sha256": "bfa9b58f0869daceee103782683f4bfa4a5abd5b91d19fc2389605b76b887a25",
+            "size": 31925711,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hbfa9b58f0869daceee103782683f4bfa4a5abd5b91d19fc2389605b76b887a25.tgz",
+            "archiveSize": 10897642,
+            "archiveSha256": "5e2a991168c6cb88f4334f9ba8d0172863a6e59f9806763fcdd64ba89a290c32"
           },
           {
             "sha256": "3c0ecd62fb79af40b78f911ea961a10c2155cd116d4a3176a1851a388489c840",
@@ -832,11 +839,11 @@
             "archiveSha256": "46ce103d3c585317f55a3ddf2d51777c35efd172bdd20542ab530d5f2bc0e821"
           },
           {
-            "sha256": "54f12c08c7aeb21b24ac38670b62e21026912b29e98ec60518d4fcd544adf8e7",
-            "size": 5970944,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h54f12c08c7aeb21b24ac38670b62e21026912b29e98ec60518d4fcd544adf8e7.tgz",
-            "archiveSize": 2009929,
-            "archiveSha256": "e70e2c58cbd310258c97f5c8e6363cc107d4d634ed96b2e3a7e67d44fb10c422"
+            "sha256": "4bec4769adbdc7aeb19ae22b8ef27116f433195799d0ada179304275aac84c2c",
+            "size": 5974016,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h4bec4769adbdc7aeb19ae22b8ef27116f433195799d0ada179304275aac84c2c.tgz",
+            "archiveSize": 2010691,
+            "archiveSha256": "ee43496fe0478251d1bed4ad852386700b8ce77cc0982449e8c8db8d7a25d1fc"
           },
           {
             "sha256": "15378e38de6292c183145444811610b2bfde8b72bd694127d1a009e020d09859",
@@ -853,11 +860,11 @@
             "archiveSha256": "541098580cb90b6f0ec96267bd3bb987122dfd1e086f02cf1eeb3a7fee531c5a"
           },
           {
-            "sha256": "5314a0d741cde0cec2c50572fc817f231a45a529f9b21f831c5e5fca58d2b4d6",
-            "size": 34121101,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h5314a0d741cde0cec2c50572fc817f231a45a529f9b21f831c5e5fca58d2b4d6.tgz",
-            "archiveSize": 27857537,
-            "archiveSha256": "6ec327f4bfa342f3e104820752d20920ad0f8ac630c67267a4f521cc9fd5e1a4"
+            "sha256": "8e17bc786208a81288879ccc2fb11615098ebff8c9c143e0eca3c10b2774736a",
+            "size": 34276749,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h8e17bc786208a81288879ccc2fb11615098ebff8c9c143e0eca3c10b2774736a.tgz",
+            "archiveSize": 27888290,
+            "archiveSha256": "7af49e01024b32e5adbc3f08a40c605cb7835ec5ead1aff79a51be88dcdba2b9"
           },
           {
             "sha256": "1ed2bf8a8edfa5772517404274b44baf011ec3bbfc89936bc3851d54daee4686",
@@ -900,7 +907,7 @@
     "provenance": {
       "darwin-arm64": {
         "upstreamCommit": null,
-        "ownSourceRef": "e23c489a92e035c6692493e5d6f740a188f371b4",
+        "ownSourceRef": "ca534ba6b814769dd6e00b3152d45095ba2643bd",
         "updaterNodeSha256": "3200fbd9f7fd4410426dd541e10d1ab829d3472f270d743c7fabd1696c03fe32",
         "toolchain": {
           "node": "v24.15.0",
@@ -913,13 +920,13 @@
         },
         "originalAsarSha256": "bf9c41fa9770fbfacfba93042ff71c24cb65c82935819377275faac08103383f",
         "cliSource": "upstream-resolved-vendor",
-        "cliSha256": "bec7098c8cf2584e80c7415baee786d9597b4ff5e2a1dbda5a2f00c4dbe49ab4",
-        "cliVersion": "codex-cli 0.155.1-cometix",
+        "cliSha256": "bdf26c4f03ab64e57162a2f715d0f5b236f4534e60ca92abb989069280066987",
+        "cliVersion": "codex-cli 0.156.1-cometix",
         "optionalMissingBindings": []
       },
       "win32-x64": {
         "upstreamCommit": null,
-        "ownSourceRef": "e23c489a92e035c6692493e5d6f740a188f371b4",
+        "ownSourceRef": "ca534ba6b814769dd6e00b3152d45095ba2643bd",
         "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
         "toolchain": {
           "node": "v24.15.0",
@@ -932,8 +939,8 @@
         },
         "originalAsarSha256": "163a18c84db57ad5c50222b313dc4d11d45febc03ec065b516ba9f0380f2eb3f",
         "cliSource": "upstream-resolved-vendor",
-        "cliSha256": "83afc8dfe9a9bb6dba5f5592389cf01737d817e51886654e0f6b45fdf4988569",
-        "cliVersion": "codex-cli 0.155.1-cometix",
+        "cliSha256": "8d12293fc75d495ebc1df360b25a05352dbe6ce0521c3456b5c33a3bb92ab014",
+        "cliVersion": "codex-cli 0.156.1-cometix",
         "optionalMissingBindings": []
       }
     },
@@ -1030,26 +1037,26 @@
     },
     "binding": {
       "schema": 1,
-      "managerVersion": "0.6.0",
+      "managerVersion": "0.6.1",
       "managerSource": {
         "repository": "petercjl/codex-own",
-        "ref": "e23c489a92e035c6692493e5d6f740a188f371b4",
-        "run": "38866410593",
+        "ref": "ca534ba6b814769dd6e00b3152d45095ba2643bd",
+        "run": "38888575040",
         "workflow": ".github/workflows/own-release.yml"
       },
       "managerContract": 2,
-      "releasePolicyFingerprint": "629e280eda943598c83830ea7983ce126c1d5e693ae6792c7690912b6602be44",
+      "releasePolicyFingerprint": "2bb3d3729d316905b494d5fb97682a8d3e7d1cae84bc2814d1af9d6721f6588b",
       "desktop": {
-        "artifactVersion": "0.6.0",
-        "publishedIn": "0.6.0",
-        "identity": "13a823bd577b1aeadccbe7d061f6ce0674c4b7f0c7a978f35a05ddee4331f4f4",
-        "inputFingerprint": "55ba7486cb4fca4aee98de228454fd97078c49e720177372a9b3efdd159eccae",
-        "declaredFingerprint": "f74874c550fa84448c8bd03d23665cc2e292583cbc6f30e6e2210753b38e67a0",
-        "upstreamFingerprint": "da5d83c970cff497708e671117c801ed7352dd5374e11e8ebefaf1393eb478f8",
+        "artifactVersion": "0.6.1",
+        "publishedIn": "0.6.1",
+        "identity": "b9421a263a028f7c975ad9d94b82582b599329304d29da3db1df8273c002621f",
+        "inputFingerprint": "182b6501762680e9631f8451286468661c37253955e1449bf72e23b28f275a62",
+        "declaredFingerprint": "dc8c30570e950292e1803c5dfb0062225ebc16ee96a5df7cbb9020e6b0ec2284",
+        "upstreamFingerprint": "534b9cc3c7f2682d02176e3077af87f763058b193d47988b311b9e1b3277cd61",
         "source": {
           "repository": "petercjl/codex-own",
-          "ref": "e23c489a92e035c6692493e5d6f740a188f371b4",
-          "run": "38866410593",
+          "ref": "ca534ba6b814769dd6e00b3152d45095ba2643bd",
+          "run": "38888575040",
           "workflow": ".github/workflows/own-release.yml"
         },
         "updaterContract": 2,
@@ -1161,13 +1168,13 @@
         },
         "legacyImported": true,
         "validation": {
-          "publishedIn": "0.6.0",
-          "inputFingerprint": "b06b40ab0375b065b8d97171a23e3f7df51fcc8272da661fd417fa8fd7059c17",
-          "declaredFingerprint": "2dc7b105957d9929e353b0c209f9ad3bf072fa25eb15882656afd24a7bbc3a7d",
+          "publishedIn": "0.6.1",
+          "inputFingerprint": "b401bb55058d5c3f0a79d0b64e527cf605b604b63c1cb68a128428804135e1bd",
+          "declaredFingerprint": "94fdf9ccfff0ce9baa63252a6434a890b04e3fec3427036cb9974f065c96e257",
           "source": {
             "repository": "petercjl/codex-own",
-            "ref": "e23c489a92e035c6692493e5d6f740a188f371b4",
-            "run": "38866410593",
+            "ref": "ca534ba6b814769dd6e00b3152d45095ba2643bd",
+            "run": "38888575040",
             "workflow": ".github/workflows/own-release.yml"
           }
         }
@@ -1279,7 +1286,7 @@
       },
       "own/builders/updater.mjs": {
         "kind": "native",
-        "sha256": "abbf4b8f3d179fa293feef2c007d7907479c98501a516333152c896dfefab0c5"
+        "sha256": "04e3b8585cfe38737d3fe8eb41af78eceeb341d8bc065805af318b59366428b6"
       },
       "own/builders/upgrade-updater.mjs": {
         "kind": "native",
@@ -1335,7 +1342,7 @@
       },
       "own/ci/manager-qa.mjs": {
         "kind": "release",
-        "sha256": "d9ca6156951926253886708645bf0b8d915683a54e5fdbccdf3534e03acb5ef2"
+        "sha256": "b92b21728ec54ff95fee7f049660fd4a7c580e076bdd61fcb7aff7437848dd15"
       },
       "own/ci/native-probe.mjs": {
         "kind": "release",
@@ -1467,7 +1474,11 @@
       },
       "own/lib/manager.mjs": {
         "kind": "native",
-        "sha256": "916d8aa7ad604ccc598794fdca938a429d26a96fc6538a9f6c56bc37e973cf23"
+        "sha256": "b315c9b411ceddbba01abf96f71781f348b9cad8806635b1a0ba045ec8994921"
+      },
+      "own/lib/model-configuration.mjs": {
+        "kind": "native",
+        "sha256": "6cbafeb10d51dc2769edf30b78b85ead1c714590f181f2f3adb46d1782bde428"
       },
       "own/lib/network.mjs": {
         "kind": "native",
@@ -1487,11 +1498,11 @@
       },
       "own/package-lock.json": {
         "kind": "semantic",
-        "sha256": "cf697b2536b630ae758d78cf5c7217ae6e30d63ea1fe5db7d82f0da76ff232c8"
+        "sha256": "f543a81a5e110f89aa80b1073aa9c77984d53f9eb8278ef07834a88a0cc09f8e"
       },
       "own/package.json": {
         "kind": "semantic",
-        "sha256": "6ce30968efe6a15645d625275e7f69ef4f643f15944be39e629bf8678944b8c8"
+        "sha256": "e4b3ecb74f5c02fff025ef690c558968c9e7d0323402c925a5929755f3f798c3"
       },
       "own/runtime/mac.cjs": {
         "kind": "native",
@@ -1552,6 +1563,10 @@
       "own/test/lifecycle.test.mjs": {
         "kind": "manager",
         "sha256": "d8d3cbf5f4fe175517b09a90818774ace134784d4734fbd45d3273c02ebafb86"
+      },
+      "own/test/model-configuration.test.mjs": {
+        "kind": "manager",
+        "sha256": "8dfda48a87c1196ecd1b9c3f6bbcb38eda2b2e211cbe9fe4c71e66559dbc578f"
       },
       "own/test/native-probe.test.mjs": {
         "kind": "manager",
@@ -1766,15 +1781,15 @@
         "sha256": "16c7ccf0d6adcff026aa02a09be5ac379e6f6afcf8f484d16f6e1f162a7aa77a"
       }
     },
-    "native": "f74874c550fa84448c8bd03d23665cc2e292583cbc6f30e6e2210753b38e67a0",
-    "runtime": "2dc7b105957d9929e353b0c209f9ad3bf072fa25eb15882656afd24a7bbc3a7d",
-    "release": "629e280eda943598c83830ea7983ce126c1d5e693ae6792c7690912b6602be44",
-    "upstream": "da5d83c970cff497708e671117c801ed7352dd5374e11e8ebefaf1393eb478f8",
+    "native": "dc8c30570e950292e1803c5dfb0062225ebc16ee96a5df7cbb9020e6b0ec2284",
+    "runtime": "94fdf9ccfff0ce9baa63252a6434a890b04e3fec3427036cb9974f065c96e257",
+    "release": "2bb3d3729d316905b494d5fb97682a8d3e7d1cae84bc2814d1af9d6721f6588b",
+    "upstream": "534b9cc3c7f2682d02176e3077af87f763058b193d47988b311b9e1b3277cd61",
     "unknown": []
   },
   "registry": {
-    "version": "0.6.0",
-    "integrity": "sha512-9TSzqSHD3xrmObS1kJ4tauNQn05Z3rASCUhXKOKwva/beZ98u6Yyi69BhVi+QeeoWO99O3Gb5slkzOUXZl2cww==",
-    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.0.tgz"
+    "version": "0.6.1",
+    "integrity": "sha512-CWmQO/9xhqTl20FGfNws+4Q0oZyiAgmj+3cYtLFxN87T9JXy39NfCU3nEu5WjXxOdwLthMf8o4jScE/Gwk1TAg==",
+    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.1.tgz"
   }
 }
