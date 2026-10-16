@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {digestFile,tarExecutable} from './lib/manager.mjs';
 import {canonicalize} from './ci/canonicalize.mjs';
 import {sourceTree} from './ci/source-tree.mjs';
-import {exposeVendorResolver} from './builders/upstream-resolver.mjs';
+import {exposeVendorResolver,withSystemTar} from './builders/upstream-resolver.mjs';
 import {nativeVersion} from './builders/native-version.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -52,7 +52,7 @@ else{
  // Run the upstream's exact CLI resolution function, never select a different provider here.
  const resolverPath=path.join(root,'scripts/build-from-upstream.js'),code=exposeVendorResolver(fs.readFileSync(resolverPath,'utf8'));
  const mod=new Module(resolverPath);mod.filename=resolverPath;mod.paths=Module._nodeModulePaths(path.dirname(resolverPath));mod._compile(code,resolverPath);
- const vendor=mod.exports.resolveCodexVendor(platform),cli=path.join(resources,mac?'codex':'codex.exe');
+ const vendor=withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()),cli=path.join(resources,mac?'codex':'codex.exe');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
  if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.cliVersion=await nativeVersion(cli);provenance.optionalMissingBindings=missing;
  const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?'codex-own.app':'app');
