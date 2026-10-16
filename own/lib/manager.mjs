@@ -9,6 +9,7 @@ import {validateParts, assembleNpmAsset} from './npm-assets.mjs';
 import {reuseInstalledBlocks} from './content-blocks.mjs';
 import {ensureRuntime,validateRuntime,restoreRuntimeSelection} from './tool-runtime.mjs';
 import {validateBinding,packageManifest,sameDesktop,identity as bindingHash} from './binding.mjs';
+import {deepseekConfiguration} from './model-configuration.mjs';
 
 export const packageRoot = path.resolve(import.meta.dirname, '..');
 export const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));
@@ -108,11 +109,15 @@ export function recordBinding(p,m){
  if(fs.existsSync(f))fs.copyFileSync(f,f+'.backup-'+crypto.randomUUID(),fs.constants.COPYFILE_EXCL);
  const next=f+'.new-'+crypto.randomUUID();exclusive(next,{schema:1,manifest:m});fs.renameSync(next,f);
 }
-export async function configure(keyFile){if(!keyFile)fail('KEY_FILE_REQUIRED','Provide --api-key-file');const key=fs.readFileSync(keyFile,'utf8').trim();if(!/^sk-[A-Za-z0-9_-]{10,}$/.test(key))fail('INVALID_KEY_FILE','Expected a single API key');const p=paths();return locked(p,async()=>{if(running(p).length)fail('APP_RUNNING','Quit codex-own first');rejectLinks(p.core);fs.mkdirSync(p.core,{recursive:true,mode:0o700});fs.chmodSync(p.core,0o700);
+export async function configure(keyFile,{p=paths(),isRunning=running}={}){if(!keyFile)fail('KEY_FILE_REQUIRED','Provide --api-key-file');const key=fs.readFileSync(keyFile,'utf8').trim();if(!/^sk-[A-Za-z0-9_-]{10,}$/.test(key))fail('INVALID_KEY_FILE','Expected a single API key');return locked(p,async()=>{if(isRunning(p).length)fail('APP_RUNNING','Quit codex-own first');rejectLinks(p.core);fs.mkdirSync(p.core,{recursive:true,mode:0o700});fs.chmodSync(p.core,0o700);
+ const models=path.join(p.core,'models.json'),config=path.join(p.core,'config.toml');rejectLinks(config);rejectLinks(models);
+ const previous=fs.existsSync(config)?fs.readFileSync(config,'utf8'):null,updated=deepseekConfiguration(previous,models);let configBackup=null;
+ if(previous!==null&&previous!==updated){const metadata=fs.statSync(config);if(!metadata.isFile())fail('CONFIG_INVALID','Configuration must be a regular file');configBackup=config+'.backup-'+crypto.randomUUID();fs.copyFileSync(config,configBackup,fs.constants.COPYFILE_EXCL);fs.chmodSync(configBackup,0o600);if(fs.statSync(configBackup).size!==metadata.size||fs.readFileSync(configBackup,'utf8')!==previous)fail('BACKUP_FAILED','Configuration backup could not be verified');}
  if(process.platform==='win32'){const sid=execFileSync('powershell.exe',['-NoProfile','-Command','[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value'],{encoding:'utf8'}).trim();execFileSync('icacls.exe',[p.core,'/inheritance:r','/grant:r',`*${sid}:(OI)(CI)F`],{stdio:'pipe'});}
  const auth=path.join(p.core,'auth.json');rejectLinks(auth);let backup=null;if(fs.existsSync(auth)){backup=auth+'.backup-'+crypto.randomUUID();fs.copyFileSync(auth,backup,fs.constants.COPYFILE_EXCL);fs.chmodSync(backup,0o600);}const tmp=auth+'.new-'+crypto.randomUUID();exclusive(tmp,{auth_mode:'apikey',OPENAI_API_KEY:key});fs.renameSync(tmp,auth);
- const models=path.join(p.core,'models.json');if(!fs.existsSync(models))fs.copyFileSync(path.join(packageRoot,'defaults','models.json'),models,fs.constants.COPYFILE_EXCL);
- const config=path.join(p.core,'config.toml');if(!fs.existsSync(config))fs.writeFileSync(config,`model = "deepseek-v4.1-flash"\nmodel_provider = "dashscope_deepseek"\nforced_login_method = "api"\ncli_auth_credentials_store = "file"\nmodel_catalog_json = ${JSON.stringify(models.replaceAll('\\','/'))}\nmodel_reasoning_effort = "high"\nweb_search = "disabled"\n[model_providers.dashscope_deepseek]\nname = "DeepSeek-DashScope"\nbase_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"\nwire_api = "responses"\nrequires_openai_auth = true\n`,{flag:'wx',mode:0o600});return {ok:true,configured:true,backup,configPreserved:true};});}
+ if(!fs.existsSync(models))fs.copyFileSync(path.join(packageRoot,'defaults','models.json'),models,fs.constants.COPYFILE_EXCL);
+ if(previous!==updated){const next=config+'.new-'+crypto.randomUUID();fs.writeFileSync(next,updated,{flag:'wx',mode:0o600});fs.renameSync(next,config);if(fs.readFileSync(config,'utf8')!==updated)fail('VERIFY_FAILED','Model configuration did not match the requested provider');}
+ return {ok:true,configured:true,backup,configBackup,configPreserved:previous===updated,settingsPreserved:true,modelProvider:'dashscope_deepseek'};});}
 export async function install({version,adopt=false,archive,manifest,expectedCurrent,p=paths(),runtimeInstaller=ensureRuntime,identify=appIdentity}={}) {
   if(!['darwin-arm64','win32-x64'].includes(p.platform))fail('UNSUPPORTED_PLATFORM',p.platform);
   progress('准备安装：检查版本、平台与独立目录');

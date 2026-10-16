@@ -15,8 +15,13 @@ export function bundleUpdater(resources,{version=process.env.OWN_VERSION||JSON.p
   }
   fs.mkdirSync(dest,{recursive:true});
   for(const folder of ['desktop','lib'])fs.cpSync(path.join(root,folder),path.join(dest,folder),{recursive:true,force:false,errorOnExist:true});
-  const dependency=path.dirname(require.resolve('undici/package.json'));
-  fs.cpSync(dependency,path.join(dest,'node_modules','undici'),{recursive:true,force:false,errorOnExist:true});
+  for(const name of ['undici','smol-toml']){
+    let dependency=path.dirname(require.resolve(name));
+    while(!fs.existsSync(path.join(dependency,'package.json'))||JSON.parse(fs.readFileSync(path.join(dependency,'package.json'))).name!==name){
+      const parent=path.dirname(dependency);if(parent===dependency)throw Error('Updater dependency package missing: '+name);dependency=parent;
+    }
+    fs.cpSync(dependency,path.join(dest,'node_modules',name),{recursive:true,force:false,errorOnExist:true});
+  }
   fs.copyFileSync(node,path.join(dest,process.platform==='win32'?'node.exe':'node'),fs.constants.COPYFILE_EXCL);
   if(process.platform==='darwin')fs.chmodSync(path.join(dest,'node'),0o755);
   fs.writeFileSync(path.join(dest,'package.json'),JSON.stringify({name:'@petercjl/codex-own',version,type:'module'}),{flag:'wx'});
@@ -29,7 +34,7 @@ export function bundleUpdater(resources,{version=process.env.OWN_VERSION||JSON.p
 export function verifyUpdater(resources){
   const dest=path.join(resources,'own-updater'),meta=JSON.parse(fs.readFileSync(path.join(dest,'desktop-version.json')));
   if(meta.schema!==1||meta.updaterContract!==2||meta.runtimeContract!==1||!/^\d+\.\d+\.\d+$/.test(meta.version)||meta.source!=='https://registry.npmjs.org/@petercjl%2fcodex-own/latest')throw Error('Invalid own update source or component contract');
-  for(const f of ['desktop/controller.cjs','desktop/preload.cjs','desktop/update.html','desktop/update-ui.js','desktop/worker.mjs','desktop/bootstrap-tools.mjs','desktop/tool-bootstrap.cjs','lib/app-update.mjs','lib/manager.mjs','lib/tool-runtime.mjs','lib/tool-env.cjs','node_modules/undici/package.json',process.platform==='win32'?'node.exe':'node'])fs.statSync(path.join(dest,f));
+  for(const f of ['desktop/controller.cjs','desktop/preload.cjs','desktop/update.html','desktop/update-ui.js','desktop/worker.mjs','desktop/bootstrap-tools.mjs','desktop/tool-bootstrap.cjs','lib/app-update.mjs','lib/manager.mjs','lib/model-configuration.mjs','lib/tool-runtime.mjs','lib/tool-env.cjs','node_modules/undici/package.json','node_modules/smol-toml/package.json',process.platform==='win32'?'node.exe':'node'])fs.statSync(path.join(dest,f));
   const node=path.join(dest,process.platform==='win32'?'node.exe':'node');
   execFileSync(node,['--input-type=module','-e',"await import('./lib/app-update.mjs')"],{cwd:dest,stdio:'pipe'});
   return {version:meta.version,source:'npm',bundledNode:true};

@@ -39,6 +39,7 @@
     "resedit": "3.0.2"
   },
   "dependencies": {
+    "smol-toml": "1.9.1",
     "undici": "7.30.0"
   },
   "ownDesktopManifest": {
