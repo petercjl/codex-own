@@ -16,7 +16,7 @@ async function main(){
  if(command==='doctor')return {...doctor(),runtime:runtimeDoctor()};
  if(command==='runtime'){
   if(sub==='doctor')return runtimeDoctor();
-  if(sub==='env'){const env=toolEnv.environment();if(!env)fail('RUNTIME_NOT_INSTALLED','Install private tools first');return {ok:true,contract:1,root:toolEnv.runtimeRoot(),environment:Object.fromEntries(Object.entries(env).filter(([k])=>['PATH','CODEX_OWN_NODE','CODEX_OWN_PYTHON','CODEX_OWN_RUNTIME_VERSION','AGENT_WORKBENCH_NPM_CLI'].includes(k)||/^(NPM_CONFIG_|PYTHON|PIP_)/.test(k)))};}
+  if(sub==='env'){const env=toolEnv.environment();if(!env)fail('RUNTIME_NOT_INSTALLED','Install private tools first');return {ok:true,contract:1,root:toolEnv.runtimeRoot(),environment:Object.fromEntries(Object.entries(env).filter(([k])=>['PATH','ZDOTDIR','BASH_ENV','CODEX_OWN_NODE','CODEX_OWN_PYTHON','CODEX_OWN_RUNTIME_VERSION','AGENT_WORKBENCH_NPM_CLI'].includes(k)||/^(NPM_CONFIG_|PYTHON|PIP_)/.test(k)))};}
   if(sub==='run'){const i=args.indexOf('--');process.exitCode=runRuntime(i<0?args.slice(2):args.slice(i+1));return;}
   if(sub==='install'||sub==='update'){yes();const m=await manifestFor(value('version')||await latest());return installRuntime(m.runtimes);}
   if(sub==='rollback'){yes();return rollbackRuntime();}

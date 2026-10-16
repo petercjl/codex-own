@@ -8,6 +8,8 @@
 
 Mac 工具位于 `~/Library/Application Support/codex-own-independent/runtimes`，Windows 位于 `%LOCALAPPDATA%\codex-own-independent\runtimes`。版本目录、npm 全局包与缓存、pip 缓存和 Python 字节码均归 codex-own 所有。应用启动后只为自己的进程及工作子进程设置 PATH；用户/系统 PATH、shell 配置和原版 Codex 缓存保持不变。项目的 `node_modules` 和 Python `.venv` 继续保存在项目中。Python 包安装使用项目虚拟环境，pip 默认要求虚拟环境，保证工具版本目录稳定。
 
+Mac 任务使用运行时目录内的私有 zsh 启动文件和 Bash `BASH_ENV`，保证登录 shell 仍优先选择独立工具。这些配置只在 codex-own 进程中生效，用户原有 shell 文件保持不变。
+
 可直接发给 Agent：
 
 > 请检查 codex-own 的独立 Node、npm 和 Python 运行时，并验证实际执行路径。

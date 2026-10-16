@@ -56,6 +56,7 @@ export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,repor
   // executed tool directory: copy to a fresh immutable final path, probe there,
   // and only then atomically switch the small active receipt.
   fs.mkdirSync(target);created=true;fs.cpSync(candidate,target,{recursive:true,force:false,errorOnExist:true,verbatimSymlinks:true});
+  if(process.platform==='darwin'){const shell=path.join(target,'shell');fs.mkdirSync(shell);for(const [name,body]of Object.entries(toolEnv.shellFiles(base,m.version)))fs.writeFileSync(path.join(shell,name),body,{flag:'wx',mode:0o600});}
   const tested=runtimeDoctor(base,{version:m.version});if(!tested.ok)fail('RUNTIME_PROBE_FAILED',tested.message||'Tool verification failed');
   const expected=m.version.match(/^node([0-9.]+)-python([0-9.]+)-/);
   if(tested.node.version!=='v'+expected[1]||tested.python.version!=='Python '+expected[2])fail('RUNTIME_VERSION_MISMATCH','Runtime executable versions do not match manifest');

@@ -19,6 +19,10 @@ assert.equal(run(r.node,['-p','process.execPath']),r.node);
 assert.match(run(r.node,[r.npm,'--version']),/^\d+\.\d+\.\d+$/);
 assert.equal(run(r.python,['-c','import sys; print(sys.executable)']),r.python);
 assert.ok(run(r.node,[r.npm,'config','get','prefix']).startsWith(base));
+if(process.platform==='darwin')for(const shell of ['/bin/zsh','/bin/bash']){
+ const output=run(shell,['-lc','command -v node; command -v npm; command -v python3']);
+ assert.ok(output.split('\n').every(p=>p.startsWith(r.directory)),`Login shell escaped private toolchain: ${output}`);
+}
 const venv=path.join(root,'测试项目','.venv');run(r.python,['-m','venv',venv]);
 const py=path.join(venv,process.platform==='win32'?'Scripts/python.exe':'bin/python');
 assert.equal(run(py,['-c','import sys; print(sys.prefix)']),venv);
