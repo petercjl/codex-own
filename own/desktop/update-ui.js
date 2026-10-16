@@ -1,8 +1,8 @@
 const api=window.codexOwnUpdates,$=id=>document.getElementById(id);
 const labels={idle:'准备检查更新',checking:'正在检查更新…',available:'发现新版本',current:'当前已是最新版本',downloading:'正在下载更新…',ready:'更新已下载，可以重启安装',installing:'正在退出并安装更新…',error:'更新未完成，可以重试'};
 function render(s){
- $('versions').textContent=`当前版本：${s.current}${s.available?'　最新版本：'+s.available:''}`;
- $('status').textContent=labels[s.phase]||labels.idle;
+ $('versions').textContent=`桌面：${s.current}${s.available&&s.available!==s.current?' → '+s.available:''}${s.managerAvailable?'　发布包：'+s.managerAvailable:''}${s.runtimeVersion?'\n工具：'+s.runtimeVersion:''}`;
+ $('status').textContent=s.phase==='available'&&s.desktopUpdate===false&&s.runtimeUpdate?'发现独立工具更新':labels[s.phase]||labels.idle;
  $('progress').textContent=s.message||'';
  const busy=['checking','downloading','installing'].includes(s.phase);
  $('check').disabled=busy;$('check').hidden=s.phase==='ready';

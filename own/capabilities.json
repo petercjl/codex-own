@@ -80,5 +80,19 @@
     "npmGlobalPackages": "private runtimes/npm-global prefix",
     "rollback": "verify predecessor and switch receipt; no conversation data restore",
     "firstBootstrap": "existing Node >=22 and npm required"
+  },
+  "releaseBinding": {
+    "contract": 2,
+    "managerVersion": "npm package version",
+    "desktopVersion": "release.json.version",
+    "runtimeVersion": "release.json.runtimes.version",
+    "identity": "SHA256 of canonical component metadata and raw program/tool assets",
+    "compatibility": {
+      "manager": 2,
+      "embeddedUpdater": 2,
+      "toolEnvironment": 1
+    },
+    "sameDesktop": "zero desktop download and activation; app may remain open",
+    "legacy": "one bridge desktop upgrade required before ordinary manager-only reuse"
   }
 }

@@ -8,6 +8,7 @@ import {createRequire, Module} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {digestFile,tarExecutable} from './lib/manager.mjs';
 import {canonicalize} from './ci/canonicalize.mjs';
+import {sourceTree} from './ci/source-tree.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${process.arch}`,mac=key==='darwin-arm64';
@@ -17,7 +18,7 @@ if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version))throw Error('Invalid version');
 const output=path.join(root,'out','own-release-'+version+'-'+key+'.noindex');if(fs.existsSync(output))throw Error('Build output exists');fs.mkdirSync(output,{recursive:true});
 const run=(cmd,args,options={})=>execFileSync(cmd,args,{cwd:root,stdio:'inherit',...options});
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||run('git',['rev-parse','upstream/master'],{encoding:'utf8',stdio:'pipe'}).trim()};
+let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||null,ownSourceRef:run('git',['rev-parse','HEAD'],{encoding:'utf8',stdio:'pipe'}).trim(),updaterNodeSha256:await digestFile(process.execPath),toolchain:{node:process.version,platform:key,image:process.env.ImageVersion||null}};
 const existingIndex=process.argv.indexOf('--existing-app');
 if(existingIndex>=0){source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};}
 else{
@@ -25,6 +26,7 @@ else{
  const cache=path.join(os.tmpdir(),'codex-sync',mac?'arm64-extract':'win-extract');
  function findApp(dir,depth=0){if(depth>4)return null;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory()&&e.name.endsWith('.app'))return p;if(e.isDirectory()){const found=findApp(p,depth+1);if(found)return found;}}return null;}
  const original=mac?findApp(cache):path.join(cache,'app');if(!original)throw syncError||Error('Missing source application');
+ provenance.originalProgramTree=await sourceTree(original);
  const sourceResources=path.join(original,mac?'Contents/Resources':'resources'),archive=path.join(sourceResources,'app.asar');
  provenance.originalAsarSha256=await digestFile(archive);
  const header=asar.getRawHeader(archive).header;

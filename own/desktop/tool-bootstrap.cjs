@@ -7,7 +7,14 @@ let pending;
 function ensureTools(electron,root,apply,{launch=spawn}={}){
  const bundle=path.resolve(__dirname,'..'),base=path.join(root,'runtimes');
  const meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json')));
- try{if(tools.active(base)?.version===meta.toolRuntimeVersion){apply();return Promise.resolve({ok:true,unchanged:true});}}catch{}
+ const bindingFile=path.join(root,'manager','binding.json');let required=meta.toolRuntimeVersion;
+ if(fs.existsSync(bindingFile)){
+  const m=JSON.parse(fs.readFileSync(bindingFile)).manifest;
+  if(m?.binding?.managerContract!==2||m.binding.runtimes.contract!==1)throw Error('Unsupported installed component binding');
+  if(m.binding.desktop.artifactVersion===meta.version)required=m.runtimes.version;
+ }
+ try{const selection=tools.active(base);if(['user-update','user-rollback'].includes(selection?.selection)&&selection.selectedForDesktop===meta.version)required=selection.version;}catch{}
+ try{if(tools.active(base)?.version===required){apply();return Promise.resolve({ok:true,unchanged:true});}}catch{}
  if(pending)return pending;
  pending=(async()=>{
   const {app,BrowserWindow,dialog}=electron;await app.whenReady();
@@ -32,7 +39,7 @@ function ensureTools(electron,root,apply,{launch=spawn}={}){
      output+=stdoutDecoder.end();
      if(cancelled){reject(Object.assign(Error('Runtime preparation cancelled'),{code:'CANCELLED'}));return;}
      if(code!==0){reject(Error('Runtime preparation failed; see '+logPath));return;}
-     try{const r=JSON.parse(output);if(!r.ok||tools.active(base)?.version!==meta.toolRuntimeVersion)throw Error('Unexpected runtime install receipt');apply();
+     try{const r=JSON.parse(output);if(!r.ok||tools.active(base)?.version!==required)throw Error('Unexpected runtime install receipt');apply();
       // Showing preparation has already made Electron ready. Restart before
       // upstream startup registers pre-ready protocols and window lifecycle.
       finished=true;app.relaunch();app.exit(0);resolve(r);

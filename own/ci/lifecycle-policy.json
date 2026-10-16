@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "targets": ["darwin-arm64", "win32-x64"],
+  "toolchain": {"node": "24.15.0", "npm": "12.2.0", "macos": "macos-15", "windows": "windows-latest", "recipeContract": 1},
+  "manager": ["own/bin/", "own/skills/", "own/defaults/", "own/README.md", "own/ARTIFACT-LIFECYCLE.md", "own/OPERATIONS.md", "own/LICENSE", "own/capabilities.json", "own/test/"],
+  "native": ["own/lib/", "own/desktop/", "own/runtime/mac.cjs", "own/runtime/windows.cjs", "own/builders/", "own/build.mjs", "own/test-app.mjs", "resources/", "src/", "patches/", "scripts/", "forge.config.js", "package.json", "package-lock.json"],
+  "runtime": ["own/runtime/sources.json", "own/ci/prepare-runtimes.mjs"],
+  "release": [".github/", "own/.github/", "own/ci/", ".gitignore", ".npmignore", "README.md", "LICENSE"],
+  "generated": ["own/release.json", "own/artifacts/current.json"],
+  "semantic": ["own/package.json", "own/package-lock.json"]
+}

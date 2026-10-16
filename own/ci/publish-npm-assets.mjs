@@ -15,6 +15,7 @@ if(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_UR
   throw Error('Payload publication requires GitHub Actions OIDC');
 const dir=path.resolve(process.argv[2]), file=path.join(dir,'manifest.json');
 const manifest=JSON.parse(fs.readFileSync(file));
+delete manifest.binding; // The verified release binding is made after publication.
 const output=path.join(dir,'npm-manifest.json');
 if(fs.existsSync(output))throw Error('Output already exists');
 const execute=promisify(execFile);
@@ -37,9 +38,9 @@ function readBlock(archive,block){
 }
 // Validate every platform and index before submitting any irreversible uploads.
 const entries=Object.entries(manifest.platforms).map(([platform,asset])=>({platform,asset,parent:manifest.platforms,key:platform,archiveName:`codex-own-${platform}.tar`,desktop:true}));
-for(const [platform,assets]of Object.entries(manifest.runtimes?.platforms||{}))for(const [name,asset]of Object.entries(assets))entries.push({platform:`${platform}-${name}`,asset,parent:assets,key:name,archiveName:`runtime-${platform}-${name}.bin`,desktop:false});
+for(const [platform,assets]of Object.entries(manifest.runtimes?.platforms||{}))for(const [name,asset]of Object.entries(assets))if(asset.incremental)entries.push({platform:`${platform}-${name}`,asset,parent:assets,key:name,archiveName:`runtime-${platform}-${name}.bin`,desktop:false});
 for(const {platform,asset,parent,key,archiveName,desktop} of entries){
-  const transport=asset.incremental;
+  const transport=asset.incremental;if(!transport){validateParts(asset);continue;}
   const archive=find(dir,archiveName);
   if(!transport||!archive||fs.statSync(archive).size!==transport.size)throw Error('Unverified desktop archive');
   if((desktop&&transport.transport!==TRANSPORT)||!Array.isArray(transport.blocks)||!transport.blocks.length||transport.blocks.length>1024)throw Error('Content block index required');
@@ -77,7 +78,7 @@ const byHash=new Map(results.map(r=>[r.part.sha256,r]));
 for(const {platform,asset,transport,parent,key,desktop} of plans){
   const parts=transport.blocks.map(b=>byHash.get(b.sha256).part);
   const submitted=results.filter(r=>r.platform===platform&&r.published);
-  parent[key]={entry:asset.entry,...(desktop?{transport:TRANSPORT}:{format:asset.format}),size:transport.size,sha256:transport.sha256,parts};
+  parent[key]={entry:asset.entry,...(asset.probe?{probe:asset.probe}:{}),...(desktop?{transport:TRANSPORT}:{format:asset.format}),size:transport.size,sha256:transport.sha256,parts};
   validateParts(parent[key]);
   publication.push({platform,publishedParts:submitted.length,reusedParts:parts.length-submitted.length,publishedBytes:submitted.reduce((n,r)=>n+r.part.archiveSize,0),totalParts:parts.length});
 }

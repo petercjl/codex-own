@@ -6,6 +6,8 @@ on:
       version: {type: string, required: true}
       upstream: {type: string, required: false, default: ''}
       existing: {type: boolean, required: false, default: false}
+      base_version: {type: string, required: false, default: ''}
+      runtime_qa: {type: boolean, required: false, default: true}
 permissions:
   contents: write
 jobs:
@@ -24,10 +26,11 @@ jobs:
       - uses: actions/checkout@v6
         with: {ref: '${{ inputs.ref }}', fetch-depth: 0}
       - uses: actions/setup-node@v6
-        with: {node-version: '24', package-manager-cache: false}
+        with: {node-version: '24.15.0', package-manager-cache: false}
       - run: npm ci --prefix own
       - run: npm run check --prefix own && npm test --prefix own
       - name: Verify independent Node npm Python on target OS
+        if: inputs.runtime_qa
         run: |
           mkdir -p out/runtime-qa
           node own/ci/prepare-runtimes.mjs out/runtime-qa "${{ matrix.platform }}"
@@ -56,6 +59,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OWN_VERSION: ${{ inputs.version }}
           OWN_PLATFORM: ${{ matrix.platform }}
+          OWN_BASE_VERSION: ${{ inputs.base_version }}
         run: node own/ci/verify-existing.mjs
       - name: Verify canonical archive and local incremental reuse
         env:
@@ -71,3 +75,17 @@ jobs:
             out/own-release-*/manifest-*.json
           if-no-files-found: error
           retention-days: 3
+      - name: Record source-pinned component QA proof
+        run: node own/ci/qa-proof.mjs "${{ matrix.platform }}" "qa-proof-${{ matrix.platform }}.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: proof-${{ matrix.platform }}
+          path: qa-proof-${{ matrix.platform }}.json
+          retention-days: 3
+      - uses: actions/upload-artifact@v7
+        if: inputs.runtime_qa
+        with:
+          name: tools-${{ matrix.platform }}
+          path: out/runtime-qa/runtime-*
+          retention-days: 3
+          if-no-files-found: error

@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {assembleNpmAsset,validateParts} from './npm-assets.mjs';
-import {paths,locked,rejectLinks,exclusive,unpack,fail,tarExecutable,digestFile} from './manager.mjs';
+import {paths,state,locked,rejectLinks,exclusive,unpack,fail,tarExecutable,digestFile} from './manager.mjs';
 const require=createRequire(import.meta.url);
 export const toolEnv=require('./tool-env.cjs');
 export function validateRuntime(m,platform){
@@ -29,8 +29,16 @@ export function runtimeDoctor(base=toolEnv.runtimeRoot(),{version}={}){
 export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,report=()=>{},localAssets,signal}={}){
  const assets=validateRuntime(m,p.platform),base=path.join(p.root,'runtimes');rejectLinks(base);fs.mkdirSync(base,{recursive:true,mode:0o700});
  const previous=toolEnv.active(base),target=path.join(base,'versions',m.version);rejectLinks(target);
- if(previous?.version===m.version){const d=runtimeDoctor(base);if(!d.ok)fail(d.code,d.message||'Invalid private runtime');return {...d,unchanged:true};}
- if(fs.existsSync(target))fail('RUNTIME_VERSION_EXISTS','Existing runtime version preserved; inspect runtime doctor and receipt before recovery');
+ if(previous?.version===m.version){const receipt=path.join(target,'codex-own-runtime.json');const stored=fs.existsSync(receipt)?JSON.parse(fs.readFileSync(receipt)):null;if(!stored||stored.version!==m.version||stored.platform!==p.platform||['node','python'].some(n=>stored.assets?.[n]!==assets[n].sha256))fail('RUNTIME_VERSION_EXISTS','Immutable active runtime differs from requested binding');const d=runtimeDoctor(base);if(!d.ok)fail(d.code,d.message||'Invalid private runtime');return {...d,unchanged:true};}
+ if(fs.existsSync(target)){
+  const receipt=path.join(target,'codex-own-runtime.json');
+  if(!fs.existsSync(receipt))fail('RUNTIME_VERSION_EXISTS','Existing runtime has no verified receipt');
+  const old=JSON.parse(fs.readFileSync(receipt));
+  if(old.version!==m.version||old.platform!==p.platform||['node','python'].some(n=>old.assets?.[n]!==assets[n].sha256))fail('RUNTIME_VERSION_EXISTS','Immutable runtime identity differs from binding');
+  const d=runtimeDoctor(base,{version:m.version});if(!d.ok)fail(d.code,d.message);
+  writeActive(base,{schema:1,version:m.version,platform:p.platform,previous:previous?.version||null,installedAt:new Date().toISOString()});
+  return {...d,reactivated:true};
+ }
  fs.mkdirSync(path.dirname(target),{recursive:true,mode:0o700});
  const stage=fs.mkdtempSync(path.join(base,'stage-')),candidate=path.join(stage,'candidate');fs.mkdirSync(candidate);let created=false,committed=false;
  try{
@@ -67,13 +75,18 @@ export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,repor
   return runtimeDoctor(base);
  }finally{for(const f of [stage,...(created&&!committed?[target]:[])])try{fs.rmSync(f,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{report(`临时目录被系统占用，已保留：${f}`);}}
 }
-export async function installRuntime(m,options={}){const p=options.p||paths();return locked(p,()=>ensureRuntime(m,{...options,p}));}
+export async function installRuntime(m,options={}){const p=options.p||paths();return locked(p,async()=>{const result=await ensureRuntime(m,{...options,p});if(options.selection){const base=path.join(p.root,'runtimes'),active=JSON.parse(fs.readFileSync(path.join(base,'active.json')));writeActive(base,{...active,selection:options.selection,selectedForDesktop:state(p)?.version||null});}return result;});}
+export function restoreRuntimeSelection(selected,{p=paths()}={}){
+ if(!/^node[0-9.]+-python[0-9.]+-r\d+$/.test(selected?.version||''))fail('INVALID_RUNTIME_RECEIPT','Invalid previous tool selection');
+ const base=path.join(p.root,'runtimes'),f=path.join(base,'versions',selected.version,'codex-own-runtime.json');rejectLinks(f);const old=JSON.parse(fs.readFileSync(f));if(old.version!==selected.version||old.platform!==p.platform)fail('INVALID_RUNTIME_RECEIPT','Previous tool platform differs');
+ const result=runtimeDoctor(base,{version:selected.version});if(!result.ok)fail('RUNTIME_INVALID','Previous tools failed verification');writeActive(base,{schema:1,version:selected.version,platform:p.platform,previous:toolEnv.active(base)?.version||null,...(['user-update','user-rollback'].includes(selected.selection)?{selection:selected.selection,selectedForDesktop:selected.selectedForDesktop}:{}),installedAt:new Date().toISOString()});return result;
+}
 export async function rollbackRuntime({p=paths()}={}){return locked(p,async()=>{
  const base=path.join(p.root,'runtimes'),r=toolEnv.active(base);if(!r?.previous)fail('NO_RUNTIME_ROLLBACK','No previous runtime');
  const f=path.join(base,'versions',r.previous,'codex-own-runtime.json');rejectLinks(f);const old=JSON.parse(fs.readFileSync(f));
  if(old.version!==r.previous||old.platform!==p.platform)fail('INVALID_RUNTIME_RECEIPT','Previous runtime does not match');
  const checked=runtimeDoctor(base,{version:r.previous});if(!checked.ok)fail('RUNTIME_INVALID','Previous runtime verification failed; active tools preserved');
- writeActive(base,{schema:1,version:r.previous,platform:p.platform,previous:r.version,installedAt:new Date().toISOString()});return runtimeDoctor(base);
+ writeActive(base,{schema:1,version:r.previous,platform:p.platform,previous:r.version,selection:'user-rollback',selectedForDesktop:state(p)?.version||null,installedAt:new Date().toISOString()});return runtimeDoctor(base);
  });}
 export function runRuntime(args){if(!args.length)fail('COMMAND_REQUIRED','runtime run -- <node|npm|npx|python|python3|pip> [args]');const base=toolEnv.runtimeRoot(),r=toolEnv.active(base);if(!r)fail('RUNTIME_NOT_INSTALLED','Install codex-own runtime first');
  const [name,...rest]=args;const command=name==='node'?{file:r.node,args:rest}:['npm','npx'].includes(name)?{file:r.node,args:[name==='npm'?r.npm:path.join(path.dirname(r.npm),'npx-cli.js'),...rest]}:['python','python3','pip'].includes(name)?{file:r.python,args:[...(name==='pip'?['-m','pip']:[]),...rest]}:null;

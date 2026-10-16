@@ -4,8 +4,9 @@ on:
     inputs:
       release: {description: 'patch, minor, major or exact semver', type: string, default: patch, required: true}
       tag: {description: 'npm dist-tag', type: choice, options: [latest, next], default: latest, required: true}
-      existing: {description: 'Verify previously prepared versioned desktop artifacts', type: boolean, default: true}
-      verified_run: {description: 'Publication-only recovery: reuse unchanged desktop code from passed platform QA jobs', type: string, default: ''}
+      mode: {description: 'Automatic component plan; manager-only refuses unproven reuse', type: choice, options: [auto, manager-only, native, runtime], default: auto, required: true}
+      verified_run: {description: 'Publication recovery only: passed QA run with unchanged component inputs', type: string, default: ''}
+      verify_only: {description: 'Run the planned platform gates without publishing or changing installed apps', type: boolean, default: false}
 permissions:
   contents: read
 concurrency:
@@ -18,41 +19,123 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       ref: ${{ steps.version.outputs.ref }}
+      native: ${{ steps.plan.outputs.native }}
+      runtime: ${{ steps.plan.outputs.runtime }}
+      kind: ${{ steps.plan.outputs.kind }}
+      base_version: ${{ steps.plan.outputs.base_version }}
     steps:
       - uses: actions/checkout@v6
         with: {fetch-depth: 0}
       - uses: actions/setup-node@v6
-        with: {node-version: '24', package-manager-cache: false}
+        with: {node-version: '24.15.0', package-manager-cache: false}
       - id: version
         env: {RELEASE: '${{ inputs.release }}'}
         run: |
           echo "version=$(node own/ci/version.mjs "$RELEASE")" >> "$GITHUB_OUTPUT"
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-  qa:
-    if: inputs.verified_run == ''
-    permissions: {contents: write}
+      - id: plan
+        name: Prove immutable component reuse and classify complete inputs
+        env: {GH_TOKEN: '${{ github.token }}', OWN_VERSION: '${{ steps.version.outputs.version }}', RELEASE_MODE: '${{ inputs.mode }}'}
+        run: node own/ci/release-plan.mjs . "$OWN_VERSION" release-plan.json "$RELEASE_MODE"
+      - uses: actions/upload-artifact@v7
+        with: {name: release-plan, path: release-plan.json, retention-days: 3}
+  manager-qa:
     needs: prepare
-    uses: ./.github/workflows/own-build.yml
-    with:
-      ref: ${{ needs.prepare.outputs.ref }}
-      version: ${{ needs.prepare.outputs.version }}
-      existing: ${{ inputs.existing }}
-  reuse-qa:
-    if: inputs.verified_run != ''
-    needs: prepare
-    runs-on: ubuntu-latest
-    permissions: {contents: read, actions: read}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, platform: darwin-arm64}
+          - {os: windows-latest, platform: win32-x64}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run: {shell: bash}
     steps:
       - uses: actions/checkout@v6
         with: {ref: '${{ needs.prepare.outputs.ref }}', fetch-depth: 0}
       - uses: actions/setup-node@v6
-        with: {node-version: '24', package-manager-cache: false}
-      - name: Verify unchanged source and both platform QA results
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - uses: actions/download-artifact@v7
+        with: {name: release-plan}
+      - run: npm ci --prefix own
+      - run: npm run check --prefix own && npm test --prefix own
+      - name: Packed manager installation and pinned native invocation
+        run: node own/ci/manager-qa.mjs release-plan.json own/artifacts/current.json
+  native:
+    if: needs.prepare.outputs.native == 'true' && inputs.verified_run == ''
+    needs: prepare
+    permissions: {contents: write}
+    uses: ./.github/workflows/own-build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.ref }}
+      version: ${{ needs.prepare.outputs.version }}
+      existing: ${{ needs.prepare.outputs.base_version != '' }}
+      base_version: ${{ needs.prepare.outputs.base_version }}
+      runtime_qa: false
+  runtimes:
+    if: needs.prepare.outputs.runtime == 'true' && inputs.verified_run == ''
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, platform: darwin-arm64}
+          - {os: windows-latest, platform: win32-x64}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run: {shell: bash}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: '${{ needs.prepare.outputs.ref }}'}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - run: npm ci --prefix own
+      - name: Verify independent Node npm Python on target OS
+        run: |
+          mkdir -p out/tools
+          node own/ci/prepare-runtimes.mjs out/tools "${{ matrix.platform }}"
+          node own/ci/test-runtimes.mjs out/tools
+      - name: Record source-pinned runtime QA proof
+        run: node own/ci/qa-proof.mjs "${{ matrix.platform }}" "qa-proof-${{ matrix.platform }}.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: runtime-proof-${{ matrix.platform }}
+          path: qa-proof-${{ matrix.platform }}.json
+          retention-days: 3
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tools-${{ matrix.platform }}
+          path: out/tools/runtime-*
+          retention-days: 3
+          if-no-files-found: error
+  recover-qa:
+    if: inputs.verified_run != ''
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions: {contents: read, actions: read}
+    outputs:
+      source_ref: ${{ steps.proof.outputs.source_ref }}
+      source_run: ${{ steps.proof.outputs.source_run }}
+      source_workflow: ${{ steps.proof.outputs.source_workflow }}
+      trigger_ref: ${{ steps.proof.outputs.trigger_ref }}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: '${{ needs.prepare.outputs.ref }}', fetch-depth: 0}
+      - uses: actions/download-artifact@v7
+        with: {name: release-plan}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - name: Verify publication recovery source and component QA
+        id: proof
         env: {GH_TOKEN: '${{ github.token }}', VERIFIED_RUN: '${{ inputs.verified_run }}'}
-        run: node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN"
+        run: node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN" release-plan.json
   publish:
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.qa.result == 'success' || needs.reuse-qa.result == 'success') }}
-    needs: [prepare, qa, reuse-qa]
+    if: >-
+      ${{ !cancelled() && !inputs.verify_only && needs.prepare.result == 'success' && needs.manager-qa.result == 'success' &&
+      ((inputs.verified_run != '' && needs.recover-qa.result == 'success') ||
+      (inputs.verified_run == '' && (needs.native.result == 'success' || needs.prepare.outputs.native == 'false') &&
+      (needs.runtimes.result == 'success' || needs.prepare.outputs.runtime == 'false'))) }}
+    needs: [prepare, manager-qa, native, runtimes, recover-qa]
     runs-on: ubuntu-latest
     permissions: {contents: write, id-token: write, actions: read}
     steps:
@@ -63,58 +146,71 @@ jobs:
       - run: npm install --global npm@12.2.0
       - run: npm ci --prefix own
       - uses: actions/download-artifact@v7
+        with: {name: release-plan}
+      - uses: actions/download-artifact@v7
+        if: needs.prepare.outputs.native == 'true' || needs.prepare.outputs.runtime == 'true'
         with:
           path: out/verified
           run-id: ${{ inputs.verified_run || github.run_id }}
           github-token: ${{ github.token }}
-      - name: Finalize verified desktop manifest
+      - name: Finalize changed components without rebuilding verified candidates
         env:
           GH_TOKEN: ${{ github.token }}
           OWN_VERSION: ${{ needs.prepare.outputs.version }}
           EXPECTED_REF: ${{ needs.prepare.outputs.ref }}
+          BUILD_NATIVE: ${{ needs.prepare.outputs.native }}
+          BUILD_RUNTIME: ${{ needs.prepare.outputs.runtime }}
+          ARTIFACT_SOURCE_REF: ${{ needs.recover-qa.outputs.source_ref }}
+          ARTIFACT_SOURCE_RUN: ${{ needs.recover-qa.outputs.source_run }}
+          ARTIFACT_SOURCE_WORKFLOW: ${{ needs.recover-qa.outputs.source_workflow }}
+          ARTIFACT_TRIGGER_REF: ${{ needs.recover-qa.outputs.trigger_ref }}
+          VERIFIED_RUN: ${{ inputs.verified_run || github.run_id }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_REF"
-          node own/ci/combine.mjs out/verified "$OWN_VERSION"
-          node own/ci/prepare-runtimes.mjs out/verified
-          if ! gh release view "own-v$OWN_VERSION" >/dev/null 2>&1; then
-            gh release create "own-v$OWN_VERSION" --draft --target "$EXPECTED_REF" --title "codex-own $OWN_VERSION" --notes 'Verified desktop artifacts.'
-            gh release upload "own-v$OWN_VERSION" out/verified/manifest.json
-            find out/verified -name 'codex-own-*.tar.gz' -exec gh release upload "own-v$OWN_VERSION" {} +
+          mkdir -p out/verified
+          if [ "$BUILD_NATIVE" = true ] || [ "$BUILD_RUNTIME" = true ]; then node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN" release-plan.json; fi
+          if [ "$BUILD_NATIVE" = true ]; then node own/ci/combine.mjs out/verified "$OWN_VERSION"; else cp own/artifacts/current.json out/catalog-input.json; node -e "const fs=require('fs');fs.writeFileSync('out/verified/manifest.json',JSON.stringify(JSON.parse(fs.readFileSync('out/catalog-input.json')).manifest))"; fi
+          if [ "$BUILD_RUNTIME" = true ]; then node own/ci/combine-tools.mjs out/verified; else node -e "const fs=require('fs');const p='out/verified/manifest.json',m=JSON.parse(fs.readFileSync(p));m.runtimes=JSON.parse(fs.readFileSync('own/artifacts/current.json')).manifest.runtimes;fs.writeFileSync(p,JSON.stringify(m))"; fi
+          if [ "$BUILD_NATIVE" = true ] || [ "$BUILD_RUNTIME" = true ]; then
+            node own/ci/publish-npm-assets.mjs out/verified
+            node own/ci/verify-npm-assets.mjs out/verified/npm-manifest.json release-plan.json
+          else cp out/verified/manifest.json out/verified/npm-manifest.json; fi
+          node own/ci/artifact-record.mjs out/verified/npm-manifest.json release-plan.json own/artifacts/current.json out/bound-manifest.json
+          cp out/bound-manifest.json own/release.json
+          node own/ci/check-binding-package.mjs release-plan.json out/bound-manifest.json
+          node -e "const fs=require('fs'),f='own/package.json',p=JSON.parse(fs.readFileSync(f));p.ownDesktopManifest=JSON.parse(fs.readFileSync('own/release.json'));fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
+          if [ "$BUILD_NATIVE" = true ]; then
+            node own/ci/publish-artifact-record.mjs out/verified "$OWN_VERSION"
           fi
-          gh release view "own-v$OWN_VERSION" --json assets --jq '.assets[].name' > out/desktop-assets-present.txt
-          while IFS= read -r file; do
-            if ! grep -Fx "$(basename "$file")" out/desktop-assets-present.txt >/dev/null; then
-              gh release upload "own-v$OWN_VERSION" "$file"
-            fi
-          done < <(find out/verified -name 'codex-own-*.tar.gz')
-          node own/ci/publish-npm-assets.mjs out/verified
-          node own/ci/verify-npm-assets.mjs out/verified/npm-manifest.json
-          if ! grep -Fx 'manifest.prepared.json' out/desktop-assets-present.txt >/dev/null; then
-            test ! -e out/manifest-input-backup
-            gh release download "own-v$OWN_VERSION" --pattern manifest.json --dir out/manifest-input-backup
-            mv out/manifest-input-backup/manifest.json out/manifest-input-backup/manifest.prepared.json
-            gh release upload "own-v$OWN_VERSION" out/manifest-input-backup/manifest.prepared.json
-          fi
-          gh release upload "own-v$OWN_VERSION" out/verified/manifest.json --clobber
-          cp out/verified/npm-manifest.json own/release.json
-          node --input-type=module -e "import fs from 'node:fs';const f='own/package.json',p=JSON.parse(fs.readFileSync(f));p.ownDesktopManifest=JSON.parse(fs.readFileSync('own/release.json'));fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add own/release.json own/package.json
-          git diff --cached --quiet || git commit -m 'chore: record verified desktop manifest'
+          git diff --cached --quiet || git commit -m 'chore: bind verified immutable components'
           git push origin HEAD:own-main
-      - name: Publish through npm Trusted Publishing
+      - name: Publish manager through npm Trusted Publishing
         working-directory: own
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-          RELEASE_TAG: ${{ inputs.tag }}
+        env: {GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}', RELEASE_VERSION: '${{ needs.prepare.outputs.version }}', RELEASE_TAG: '${{ inputs.tag }}'}
         run: npx --yes --package @petercjl/npm-release-kit npm-release-kit ci publish --release "$RELEASE_VERSION" --tag "$RELEASE_TAG"
-      - name: Verify registry and activate desktop release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OWN_VERSION: ${{ needs.prepare.outputs.version }}
-          RELEASE_TAG: ${{ inputs.tag }}
+      - name: Verify registry and persist release binding
+        env: {GH_TOKEN: '${{ github.token }}', OWN_VERSION: '${{ needs.prepare.outputs.version }}', RELEASE_TAG: '${{ inputs.tag }}', BUILD_NATIVE: '${{ needs.prepare.outputs.native }}'}
         run: |
           node own/ci/verify-registry.mjs "$OWN_VERSION" "$RELEASE_TAG"
-          gh release edit "own-v$OWN_VERSION" --draft=false --notes 'Verified desktop artifacts and npm manager released.'
+          node own/ci/persist-release.mjs release-plan.json
+          git add own/artifacts/current.json
+          git diff --cached --quiet || git commit -m 'chore: record published component provenance'
+          git push origin HEAD:own-main
+          if [ "$BUILD_NATIVE" = true ]; then gh release edit "own-v$OWN_VERSION" --draft=false --notes 'Immutable desktop artifacts; npm manager binding verified.'; fi
+  audit:
+    if: always()
+    needs: [prepare, manager-qa, native, runtimes, recover-qa, publish]
+    runs-on: ubuntu-latest
+    permissions: {contents: read, actions: read}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - name: Record actual component QA packaging transfer and publication timings
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: node own/ci/timings.mjs "${{ github.run_id }}" release-timings.json
+      - uses: actions/upload-artifact@v7
+        with: {name: release-timings, path: release-timings.json, retention-days: 30}

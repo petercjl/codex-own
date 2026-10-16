@@ -3,9 +3,13 @@ import path from 'node:path';
 import os from 'node:os';
 import {assembleNpmAsset} from '../lib/npm-assets.mjs';
 import {validateManifest,tarExecutable} from '../lib/manager.mjs';
+import {identity} from '../lib/binding.mjs';
 const manifest=JSON.parse(fs.readFileSync(process.argv[2]));
+const plan=process.argv[3]?JSON.parse(fs.readFileSync(process.argv[3])):null;
+const catalog='own/artifacts/current.json',previous=fs.existsSync(catalog)?JSON.parse(fs.readFileSync(catalog)).manifest:null;
 if(manifest.schema!==2)throw Error('npm asset manifest required');
 for(const platform of ['darwin-arm64','win32-x64']){
+  if(plan?.components.desktop==='reuse'){if(identity(manifest.platforms)!==identity(previous?.platforms))throw Error('Reused desktop differs from published binding');continue;}
   const asset=validateManifest(manifest,platform),dir=fs.mkdtempSync(path.join(os.tmpdir(),'own-registry-'));
   try{
     const deadline=Date.now()+15*60*1000;
@@ -21,6 +25,7 @@ for(const platform of ['darwin-arm64','win32-x64']){
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }
 for(const [platform,assets]of Object.entries(manifest.runtimes?.platforms||{}))for(const [name,asset]of Object.entries(assets)){
+ if(plan?.components.runtimes==='reuse'||identity(asset)===identity(previous?.runtimes?.platforms?.[platform]?.[name])){if(identity(asset)!==identity(previous?.runtimes?.platforms?.[platform]?.[name]))throw Error('Reused tools differ from published binding');continue;}
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'own-runtime-registry-'));
  try{await assembleNpmAsset(asset,path.join(dir,'verified.bin'),path.join(dir,'cache'),tarExecutable());console.log(JSON.stringify({ok:true,platform,tool:name,version:manifest.runtimes.version,sha256:asset.sha256}));}
  finally{fs.rmSync(dir,{recursive:true,force:true});}

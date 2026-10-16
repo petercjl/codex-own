@@ -5,7 +5,7 @@ description: Install, update, launch and diagnose the independent codex-own desk
 
 # codex-own desktop lifecycle
 
-Input: the requested install, update, diagnosis or recovery action, existing installation state, optional supplied API key file, and user authorization. Output: manager and desktop versions, verified installation paths, backup evidence and unresolved errors. Package installation alone does not configure model access.
+Input: the requested install, update, diagnosis or recovery action, existing installation state, optional supplied API key file, and user authorization. Output: manager, desktop and tool-runtime versions/identities, verified installation paths, backup evidence and unresolved errors. Package installation alone does not configure model access.
 
 Use the installed `codex-own` CLI. Resolve its current bundled instructions with `codex-own skill source --json`; probe `version`, `capabilities` and `doctor`. Requires Node.js 22+, tar, a supported desktop OS and access to registry.npmjs.org. Install the latest manager from npm; it downloads only the current platform’s desktop payloads from npm. Internal payload prereleases are data, not CLI entry points. macOS ARM64 and Windows x64 are implementation targets; a diagnostic result does not prove Windows GUI compatibility.
 
@@ -13,7 +13,7 @@ Use the installed `codex-own` CLI. Resolve its current bundled instructions with
 
 1. Read `codex-own doctor --json` and `codex-own update check --json` as relevant. Report a missing dependency or unavailable platform explicitly.
 2. For an authorized fresh installation, execute `codex-own install --yes`. An existing independent application requires `--adopt`; explain that the existing application and data are backed up. An unrelated application must be preserved.
-3. For an authorized update, quit codex-own gracefully and run `codex-own update install --yes`. Do not terminate the original Codex. The manager and desktop versions are separate. Updating the npm manager alone does not update the desktop application.
+3. For an authorized update, inspect the bound component differences from `update check`. A matching desktop remains open: `codex-own update install --yes` performs no desktop download or activation. Quit codex-own gracefully only when its desktop changes. Do not terminate the original Codex. Report npm manager, desktop artifact and tool-runtime versions separately; a newer manager can retain an older desktop.
 4. Read `doctor` and `version`, retain the returned backup locations, then use `codex-own launch` when requested. Verify startup separately from installer success.
 
 For installation-only acceptance, verify doctor, version, target and shortcut without configuring credentials or launching the GUI unless requested. Progress goes to stderr; final results remain JSON on stdout.
@@ -35,6 +35,8 @@ For authorized installation or update, use `runtime install --yes` or `runtime u
 Tools own their npm prefix/cache and pip cache; no user/system PATH, shell profile or original Codex runtime is modified. Project npm dependencies belong in project `node_modules`; Python dependencies belong in the project's `.venv`, created with the private Python. pip requires a virtual environment, so use its Python executable with `-m pip` after creating the venv. A project explicitly selecting another interpreter remains an explicit caller choice. Additional Git, compilers and office/media libraries are separate dependencies, not guaranteed by this toolchain. Never copy the original Codex cached runtime or account files to fill a missing dependency.
 
 ## Recovery and boundaries
+
+Component binding contract 2 requires a bridge desktop with embedded updater contract 2 and tool environment contract 1. Manager releases pin exact immutable artifacts, so their version numbers may differ. A manager-only release is not a desktop update; a tool-only update retains the desktop and uses new paths after restart. Legacy pre-bridge clients may need one CLI upgrade. INCOMPATIBLE_BINDING preserves the installed components; inspect the published binding and compatibility instead of forcing a version match.
 
 - APP_RUNNING: request or perform authorized graceful exit, then return to step 3.
 - CHECKSUM_MISMATCH, UNMANAGED_TARGET, UNSAFE_PATH, or incompatible patches: stop; preserve the current application.
