@@ -250,9 +250,19 @@ jobs:
           assert.equal(hash(Buffer.concat([sample.subarray(0,test[0].size),sample.subarray(test[0].size)])),original.sha256);
           assert.throws(()=>split({...original,sha256:'0'.repeat(64)},sample));
           assert.throws(()=>split({...original,size:sample.length+1},sample));
+          async function recover(){
           const target=process.env.REPARTITION_PAYLOAD;
           if(!/^[a-f0-9]{64}$/.test(target)||!/^\d+$/.test(process.env.RECOVERY_RUN||''))throw Error('Repartition requires an exact hash and verified QA recovery run');
           const root='out/verified',file=path.join(root,'manifest.json'),manifest=JSON.parse(fs.readFileSync(file));
+          if(!Object.values(manifest.platforms).some(a=>a.incremental?.blocks?.some(b=>b.sha256===target)))throw Error('Requested desktop block absent');
+          const version='0.0.0-payload.h'+target;
+          const existing=await fetch('https://registry.npmjs.org/@petercjl%2fcodex-own/'+version,{headers:{'cache-control':'no-cache'},signal:AbortSignal.timeout(30000)});
+          if(existing.status===200){
+            const metadata=await existing.json();
+            if(metadata.name!=='@petercjl/codex-own'||metadata.version!==version)throw Error('Registry recovery identity mismatch');
+            console.log(JSON.stringify({transportRecovery:{original:target,alreadyPublic:true,repartitioned:false}}));return;
+          }
+          if(existing.status!==404)throw Error('Registry recovery check HTTP '+existing.status);
           const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]);
           const files=walk(root);let matched=0;
           for(const [platform,asset]of Object.entries(manifest.platforms)){
@@ -274,6 +284,8 @@ jobs:
           if(!matched)throw Error('Requested desktop block absent; recovery refuses an unrelated target');
           // The ordinary publisher rechecks every block and the complete archive digest.
           fs.writeFileSync(file,JSON.stringify(manifest,null,2)+'\n');
+          }
+          recover().catch(error=>{console.error(error);process.exitCode=1;});
           NODE
           fi
           if [ "$BUILD_NATIVE" = true ] || [ "$BUILD_RUNTIME" = true ]; then
@@ -296,7 +308,9 @@ jobs:
           node own/ci/check-binding-package.mjs release-plan.json out/bound-manifest.json
           node -e "const fs=require('fs'),f='own/package.json',p=JSON.parse(fs.readFileSync(f));p.ownDesktopManifest=JSON.parse(fs.readFileSync('own/release.json'));fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
           if [ "$BUILD_NATIVE" = true ]; then
-            node own/ci/publish-artifact-record.mjs out/verified "$OWN_VERSION"
+            # The tag follows this publication commit. The bound record above
+            # independently retains the exact native QA source and run.
+            ARTIFACT_SOURCE_REF="$EXPECTED_REF" node own/ci/publish-artifact-record.mjs out/verified "$OWN_VERSION"
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
