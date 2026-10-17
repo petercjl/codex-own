@@ -70,9 +70,9 @@ test('missing policy bridge and upstream contract drift stop the patch instead o
  assert.equal(patchProductModePreload(policyPreload),policyPreload);assert.throws(()=>patchProductModePreload('unknown preload'),/contract changed/);
 });
 test('desktop patch requires renderer, execution state and preload together, and verifies an already patched archive',()=>{
- const files=new Map([['webview/assets/app-initial-fixture.js',fixture],['webview/assets/app-shared-fixture.js',sharedFixture],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
+ const files=new Map([['webview/assets/app-initial-fixture.js',fixture],['webview/assets/execution-state-a1b2.js',sharedFixture],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
  const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
  const changed=productModeChanges(asar,'fixture');assert.equal(changed.size,3);
  for(const [file,bytes]of changed)files.set(file,bytes.toString());assert.equal(productModeChanges(asar,'fixture').size,0);
- files.delete('webview/assets/app-shared-fixture.js');assert.throws(()=>productModeChanges(asar,'fixture'),/shared=0/);
+ files.delete('webview/assets/execution-state-a1b2.js');assert.throws(()=>productModeChanges(asar,'fixture'),/shared=0/);
 });

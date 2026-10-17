@@ -86,9 +86,7 @@ export function productModeChanges(asar,archive){
       if(source.includes('sidebarElectron.productMode.trigger')&&source.includes('sidebarElectron.productMode.work.description.recommended')&&source.includes('codexLocalAccessStatus:')){
         const result=patchProductModeSource(source);if(result.patched||result.already){renderers++;if(result.patched)changes.set(file,Buffer.from(result.source));}
       }
-    }
-    if(/^webview\/assets\/app-shared-.*\.js$/.test(file)){
-      const source=asar.extractFile(archive,file.replaceAll('/',path.sep)).toString();
+      // Follow the implementation rather than a bundler's current chunk name.
       if(source.includes('previousWorkMode:')&&source.includes('selectedThreadDetailLevel:')){const result=patchProductModeShared(source);shared++;if(result.patched)changes.set(file,Buffer.from(result.source));}
     }
     if(file==='.vite/build/preload.js'){
