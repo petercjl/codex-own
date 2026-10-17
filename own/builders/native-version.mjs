@@ -11,6 +11,6 @@ export async function nativeVersion(file,{platform=process.platform,spawn=spawnS
     const r=spawn(file,['--version'],{encoding:'utf8',timeout:30000,windowsHide:true});
     if(!r.error&&r.status===0&&r.stdout?.trim())return r.stdout.trim();
     if(platform==='win32'&&['UNKNOWN','EBUSY','ETXTBSY'].includes(r.error?.code)&&n+1<attempts){log(`[codex-own] Native CLI launch retry ${n+1}/${attempts-1}: ${r.error.code}; sha256=${hash}`);await wait(delay);continue;}
-    throw Error(`Native CLI version check failed: ${r.error?.code||r.status}; sha256=${hash}; ${r.error?.message||r.stderr||'empty version output'}`);
+    throw Error(`Native CLI version check failed: ${r.error?.code||r.signal||r.status}; sha256=${hash}; ${r.error?.message||r.stderr||'empty version output'}`);
   }
 }

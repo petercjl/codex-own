@@ -54,11 +54,14 @@ else{
  const mod=new Module(resolverPath);mod.filename=resolverPath;mod.paths=Module._nodeModulePaths(path.dirname(resolverPath));mod._compile(code,resolverPath);
  const vendor=withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()),cli=path.join(resources,mac?'codex':'codex.exe');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
- if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.cliVersion=await nativeVersion(cli);provenance.optionalMissingBindings=missing;
+ if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.optionalMissingBindings=missing;
  const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?'codex-own.app':'app');
 }
 const resources=path.join(source,mac?'Contents/Resources':'resources');
 const cli=path.join(resources,mac?'codex-own-cli':'codex.exe');
+// Probe the completed product: on macOS the builder signs the copied binaries
+// and their containing app before they can be launched from their new location.
+provenance.cliVersion=await nativeVersion(path.join(resources,mac?'codex':'codex.exe'));
 run(cli,['--version']);
 run(process.execPath,['own/test-app.mjs',source]);
 if(mac)run('codesign',['--verify','--deep','--strict',source]);
