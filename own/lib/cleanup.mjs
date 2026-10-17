@@ -140,7 +140,7 @@ export function planCleanup({p=paths(),cacheLimitBytes=CLEANUP_POLICY.cacheLimit
   result.plannedBytes=result.actions.reduce((n,a)=>n+a.bytes,0);return result;
 }
 
-function performCleanup(options){
+async function performCleanup(options){
   const p=options.p||paths(),plan=planCleanup({...options,p,lockHeld:true});
   if(plan.deferred)return {...plan,reclaimedBytes:0};
   const intents=path.join(p.manager,'cleanup-intents');rejectLinks(intents);fs.mkdirSync(intents,{recursive:true,mode:0o700});
@@ -151,7 +151,7 @@ function performCleanup(options){
       const file=a.files[i];let before;
       try{
         rejectLinks(file);if(!unchanged(file,a.fingerprints[i])){warnings.push({path:file,code:'CANDIDATE_CHANGED'});break;}
-        before=bytes(file);fs.rmSync(file,{recursive:true,maxRetries:2,retryDelay:100});reclaimedBytes+=before;removed.push({kind:a.kind,path:file,bytes:before});
+        before=bytes(file);await fs.promises.rm(file,{recursive:true,maxRetries:2,retryDelay:100});reclaimedBytes+=before;removed.push({kind:a.kind,path:file,bytes:before});
       }catch(e){let remaining;try{remaining=bytes(file);}catch{}if(Number.isSafeInteger(before)&&Number.isSafeInteger(remaining))reclaimedBytes+=Math.max(0,before-remaining);warnings.push({path:file,code:e.code||'CLEANUP_FAILED'});break;}
     }
   }

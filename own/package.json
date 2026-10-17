@@ -27,7 +27,7 @@
     "directory": "own"
   },
   "scripts": {
-    "test": "node --test --test-reporter=tap test/*.test.mjs",
+    "test": "node --test test/*.test.mjs",
     "check": "node --check bin/codex-own.mjs && node --check lib/manager.mjs"
   },
   "license": "MIT",
