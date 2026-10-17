@@ -8,7 +8,28 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   const meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json'),'utf8'));
   let state={phase:'idle',current:meta.version,updateAvailable:false},window=null,busy=false,receipt=null,announced=null,downloadWorker=null,quitRequested=false;
   const env={...process.env};for(const k of Object.keys(env))if(/^(NODE_OPTIONS|NODE_PATH|ELECTRON_|CODEX_|OPENAI_|CHATGPT_)/.test(k))delete env[k];
-  const emit=patch=>{state={...state,...patch};if(window&&!window.isDestroyed())window.webContents.send('codex-own:update-state',state);};
+  const notice=()=>receipt?'✓':state.updateAvailable?'↓':'';
+  const menuLabel=()=>`更新${notice()?' '+notice():''}`;
+  const badges=new WeakMap();let lastNotice='';
+  function syncBadge(contents){
+    // Windows draws its own menu bar. Style its stable owned menu ID without
+    // exposing updater IPC to the application renderer or changing React state.
+    if(process.platform!=='win32'||!contents.insertCSS)return;
+    const previous=badges.get(contents)||Promise.resolve(null),mark=notice();
+    const next=previous.catch(()=>null).then(async key=>{
+      if(contents.isDestroyed())return null;
+      if(key)await contents.removeInsertedCSS(key).catch(()=>{});
+      if(!mark)return null;
+      return contents.insertCSS(`#application-menu-trigger-codex-own-updates::after { content: " ${mark}"; color: var(--color-text, currentColor); font-weight: 700; }`);
+    }).catch(()=>null);
+    badges.set(contents,next);
+  }
+  function syncNotice(){
+    const menu=Menu.getApplicationMenu(),item=menu?.getMenuItemById('codex-own-updates');
+    if(item)item.label=menuLabel();
+    for(const w of BrowserWindow.getAllWindows?.()||[])if(!w.isDestroyed())syncBadge(w.webContents);
+  }
+  const emit=patch=>{state={...state,...patch};if(notice()!==lastNotice){lastNotice=notice();syncNotice();}if(window&&!window.isDestroyed())window.webContents.send('codex-own:update-state',state);};
   const errors={APP_RUNNING:'应用尚未完全退出，安装已取消。请结束任务后重试。',UNMANAGED_TARGET:'当前 App 尚未由 codex-own 安装器管理，请先完成一次命令行安装。',BUSY:'另一项安装或更新正在运行，请稍后重试。',CHECKSUM_MISMATCH:'下载文件校验失败，当前版本保持不变，请重试。',INSTALLATION_CHANGED:'安装版本已经改变，请重新检查更新。'};
   function run(action){return new Promise((resolve,reject)=>{
     const child=spawn(path.join(bundle,process.platform==='win32'?'node.exe':'node'),[path.join(bundle,'desktop','worker.mjs'),action,meta.version],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
@@ -73,9 +94,13 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   });
   const original=Menu.setApplicationMenu.bind(Menu);
   Menu.setApplicationMenu=menu=>{
-    if(menu&&!menu.getMenuItemById('codex-own-updates'))menu.append(new MenuItem({id:'codex-own-updates',label:'更新',submenu:[{label:'检查 codex-own 更新…',click:()=>{show();void action('check',true);}}]}));
+    if(menu&&!menu.getMenuItemById('codex-own-updates'))menu.append(new MenuItem({id:'codex-own-updates',label:menuLabel(),submenu:[{label:'检查 codex-own 更新…',click:()=>{show();void action('check',true);}}]}));
+    const item=menu?.getMenuItemById('codex-own-updates');if(item)item.label=menuLabel();
     return original(menu);
   };
+  app.on('browser-window-created',(_event,w)=>{
+    w.webContents.on('did-finish-load',()=>syncBadge(w.webContents));
+  });
   app.whenReady().then(()=>{
     const menu=Menu.getApplicationMenu();Menu.setApplicationMenu(menu||new Menu());
     const timer=setTimeout(()=>{void action('check');},15000);timer.unref();
