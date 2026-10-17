@@ -28,7 +28,7 @@
       "side_effects": {
         "external_mutation": true,
         "may_cost_money": false,
-        "authorization": "Only requested install, update, configuration or recovery; read-only checks otherwise."
+        "authorization": "Only requested install, update, configuration, recovery or managed update cleanup; read-only checks otherwise. Cleanup may retire older backups while preserving the latest complete rollback."
       },
       "errors": [
         "CAPABILITY_UNAVAILABLE",

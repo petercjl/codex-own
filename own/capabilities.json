@@ -6,6 +6,8 @@
     "configure",
     "update check",
     "update install",
+    "cleanup plan",
+    "cleanup run",
     "launch",
     "rollback",
     "doctor",
@@ -27,6 +29,19 @@
   "dataPolicy": "independent external directories; preserve credentials and conversations",
   "updatePolicy": "desktop checks npm latest at startup and every six hours; explicit download and restart/install; pinned verified build; backup before switch; CLI remains available for recovery",
   "authentication": "npm install does not grant model access; existing independent credentials remain local",
+  "cleanupPolicy": {
+    "contract": 1,
+    "trigger": "owned main interface loaded and alive for 30 seconds; installed version and component identity must match",
+    "defaultCacheLimitMiB": 2048,
+    "rollbackCopies": 1,
+    "reclaims": ["applied desktop archives", "completed inactive helpers", "superseded complete app/data backup pairs", "least recently used unpinned blocks"],
+    "preserves": ["live app and user data", "private tool versions", "latest complete rollback", "pending/failed/unknown updates", "active processes", "manual recovery backups"],
+    "temporaryCacheExcess": "pending or unknown receipts pin required blocks; locked files remain available for inspection",
+    "diagnosticRecordsPerCategory": 20,
+    "preview": "cleanup plan",
+    "execute": "cleanup run --yes [--cache-limit-mib <0..16384>]",
+    "results": ["reclaimedBytes", "rollbackRetained", "warnings", "cacheLimitExceeded", "report"]
+  },
   "windowsAgentShell": {
     "contract": 1,
     "preferred": "verified system Git Bash; explicit exec_command shell selection",

@@ -50,6 +50,7 @@ export async function assembleNpmAsset(asset, dest, cache, tar, {download = veri
     const file = path.join(cache, `${part.sha256}.bin`);
     safeCache(file);
     if (cached.has(part.sha256)) {
+      const used=new Date();fs.utimesSync(file,used,used);
       report(`[${i+1}/${asset.parts.length}] 复用已校验分片`); return file;
     }
     if (fs.existsSync(file)) fs.unlinkSync(file);

@@ -2,11 +2,14 @@
 const fs=require('node:fs'),path=require('node:path');
 const {spawn}=require('node:child_process');
 const {StringDecoder}=require('node:string_decoder');
+const {pathToFileURL}=require('node:url');
 const CHANNEL='codex-own:update';
 module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},root){
   const bundle=path.join(process.resourcesPath,'own-updater');
   const meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json'),'utf8'));
-  let state={phase:'idle',current:meta.version,updateAvailable:false},window=null,busy=false,receipt=null,announced=null,downloadWorker=null,quitRequested=false;
+  let state={phase:'idle',current:meta.version,updateAvailable:false},window=null,busy=false,receipt=null,announced=null,downloadWorker=null,quitRequested=false,cleanupPromise=null,cleanupScheduled=false,cleanupDone=false,cleanupAttempts=0;
+  const loadGenerations=new WeakMap();
+  const loadedWindows=new WeakSet();
   const env={...process.env};for(const k of Object.keys(env))if(/^(NODE_OPTIONS|NODE_PATH|ELECTRON_|CODEX_|OPENAI_|CHATGPT_)/.test(k))delete env[k];
   const notice=()=>receipt?'✓':state.updateAvailable?'↓':'';
   const menuLabel=()=>`更新${notice()?' '+notice():''}`;
@@ -44,14 +47,35 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
       settled=true;if(error||code!==0||!result)reject(Object.assign(Error('Update worker failed'),error||{code:'WORKER_FAILED'}));else resolve(result);
     });
   });}
+  function ownedMainWindow(w){
+    if(w.isDestroyed()||w.isVisible?.()===false||w.webContents.isDestroyed()||w.webContents.isCrashed?.()||w.webContents.isLoadingMainFrame?.())return false;
+    try{
+      const url=new URL(w.webContents.getURL());
+      return url.protocol==='app:'&&url.host==='-'&&url.pathname==='/index.html'||url.protocol==='file:'&&url.href.split(/[?#]/)[0]===pathToFileURL(path.join(process.resourcesPath,'app.asar','webview','index.html')).href;
+    }catch{return false;}
+  }
+  function scheduleCleanup(w){
+    if(cleanupDone||cleanupScheduled||cleanupAttempts>=5||!loadedWindows.has(w)||!ownedMainWindow(w))return;
+    cleanupScheduled=true;const generation=loadGenerations.get(w)||0;
+    const timer=setTimeout(()=>{
+      cleanupScheduled=false;if(cleanupDone)return;
+      if(!loadedWindows.has(w)||!ownedMainWindow(w)||generation!==(loadGenerations.get(w)||0)){for(const next of BrowserWindow.getAllWindows?.()||[])scheduleCleanup(next);return;}
+      if(busy||cleanupPromise){scheduleCleanup(w);return;}
+      cleanupAttempts++;
+      cleanupPromise=run('cleanup').then(result=>{if(!result.deferred){cleanupDone=true;emit({cleanup:result});}}).catch(e=>{
+        emit({cleanup:{ok:false,reason:e.code||'CLEANUP_FAILED',reclaimedBytes:0}});
+      }).finally(()=>{cleanupPromise=null;if(!cleanupDone)scheduleCleanup(w);});
+    },30000);timer.unref();
+  }
   function show(){
     if(window&&!window.isDestroyed()){window.show();window.focus();return;}
-    window=new BrowserWindow({width:590,height:440,title:'codex-own 更新',icon:path.join(process.resourcesPath,'codex-own.png'),resizable:false,autoHideMenuBar:true,webPreferences:{preload:path.join(bundle,'desktop','preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+    window=new BrowserWindow({width:590,height:520,title:'codex-own 更新',icon:path.join(process.resourcesPath,'codex-own.png'),resizable:false,autoHideMenuBar:true,webPreferences:{preload:path.join(bundle,'desktop','preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
     window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',e=>e.preventDefault());
     window.loadFile(path.join(bundle,'desktop','update.html'));window.on('closed',()=>{window=null;});
   }
   async function action(kind,manual=false){
     if(kind==='state')return state;
+    if(cleanupPromise)await cleanupPromise;
     if(busy)return state;
     if(kind==='install'){
       if(!receipt||state.phase!=='ready')return state;
@@ -99,10 +123,16 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
     return original(menu);
   };
   app.on('browser-window-created',(_event,w)=>{
-    w.webContents.on('did-finish-load',()=>syncBadge(w.webContents));
+    w.on('show',()=>scheduleCleanup(w));
+    const invalidate=()=>{loadedWindows.delete(w);loadGenerations.set(w,(loadGenerations.get(w)||0)+1);};
+    w.webContents.on('did-finish-load',()=>{loadedWindows.add(w);loadGenerations.set(w,(loadGenerations.get(w)||0)+1);syncBadge(w.webContents);scheduleCleanup(w);});
+    w.webContents.on('did-start-navigation',(_event,_url,inPlace,mainFrame)=>{if(mainFrame&&!inPlace)invalidate();});
+    w.webContents.on('did-fail-load',(_event,_code,_message,_url,mainFrame)=>{if(mainFrame!==false)invalidate();});
+    w.webContents.on('render-process-gone',invalidate);
   });
   app.whenReady().then(()=>{
     const menu=Menu.getApplicationMenu();Menu.setApplicationMenu(menu||new Menu());
+    for(const w of BrowserWindow.getAllWindows?.()||[])scheduleCleanup(w);
     const timer=setTimeout(()=>{void action('check');},15000);timer.unref();
     const interval=setInterval(()=>{if(!receipt)void action('check');},6*60*60*1000);interval.unref();
   });

@@ -13,6 +13,7 @@ const cli=path.join(prefix,'node_modules','@petercjl','codex-own','bin','codex-o
 // not a source import or a manually edited VM configuration.
 execFileSync(process.execPath,['--test',path.join(source,'test/model-configuration.test.mjs')],{stdio:'inherit',windowsHide:true,timeout:120000,env:{...process.env,OWN_MODEL_CONFIG_CLI:cli}});
 execFileSync(process.execPath,['--test',path.join(source,'test/windows-agent-shell.test.mjs')],{stdio:'inherit',windowsHide:true,timeout:120000,env:{...process.env,OWN_AGENT_SHELL_MODULE:path.join(prefix,'node_modules','@petercjl','codex-own','lib','windows-agent-shell.cjs')}});
+execFileSync(process.execPath,['--test',path.join(source,'test/cleanup.test.mjs')],{stdio:'inherit',windowsHide:true,timeout:120000,env:{...process.env,OWN_CLEANUP_MODULE:path.join(prefix,'node_modules','@petercjl','codex-own','lib','cleanup.mjs'),OWN_CLEANUP_CLI:cli}});
 const call=args=>JSON.parse(execFileSync(process.execPath,[cli,...args],{encoding:'utf8',windowsHide:true,timeout:60000}));
 assert.equal(call(['version']).manager,JSON.parse(fs.readFileSync('own/package.json')).version);
 const skillRoot=path.join(root,'skills');const first=call(['skill','install','--target-root',skillRoot,'--yes']);
