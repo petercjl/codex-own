@@ -190,7 +190,7 @@ if ($LASTEXITCODE -ne 0) { throw "API 配置失败。" }
 
 ## 安装失败与恢复
 
-安装器核对解压条目，兼容 Windows CRLF 清单，最多重试 3 次。UNPACK_INCOMPLETE/UNPACK_FAILED 提供缺失样例；持续缺失同一批 DLL 或脚本时检查安全软件拦截记录和可信来源，按设备安全策略处理，安装器不会关闭防护。正常和失败安装都尝试清理本次 staging，被占用目录会报告并保留，已校验分片缓存仍可复用。
+安装器直接读取 TAR/PAX/gzip/ZIP 归档中的 Unicode 名称、类型、大小及内容 SHA256，核对解压结果，最多重试 3 次。UNPACK_INCOMPLETE/UNPACK_FAILED 提供缺失样例；持续缺失同一批 DLL 或脚本时检查安全软件拦截记录和可信来源，按设备安全策略处理，安装器不会关闭防护。正常和失败安装都尝试清理本次 staging，被占用目录会报告并保留，已校验分片缓存仍可复用。
 
 Windows 先查看诊断及恢复计划：
 

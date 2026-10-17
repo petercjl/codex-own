@@ -52,7 +52,8 @@ jobs:
         with: {ref: '${{ needs.prepare.outputs.ref }}'}
       - uses: actions/setup-node@v6
         with: {node-version: '${{ matrix.node }}', package-manager-cache: false}
-      - run: npm ci --prefix own
+      - name: Install dependencies using the selected Node's npm CLI
+        run: node -e "const f=require('node:fs'),p=require('node:path'),d=p.dirname(process.execPath),n=[p.join(d,'node_modules/npm/bin/npm-cli.js'),p.resolve(d,'../lib/node_modules/npm/bin/npm-cli.js')].find(f.existsSync);if(!n)throw Error('Selected Node lacks npm');require('node:child_process').execFileSync(process.execPath,[n,'ci','--prefix','own'],{stdio:'inherit'})"
       - name: Actual bootstrap copy extraction and recovery contract
         run: node --test own/test/installation-recovery.test.mjs
       - uses: actions/setup-node@v6

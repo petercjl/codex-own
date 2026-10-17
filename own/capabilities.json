@@ -149,7 +149,7 @@
       "recoveryLock"
     ],
     "extractAttempts": 3,
-    "inventory": "every listed entry, Windows CRLF normalized, path/link safety, tar errors retained",
+    "inventory": "direct Unicode TAR/PAX/gzip/ZIP inventory; entry types, sizes and SHA256; path/link safety; tar errors retained",
     "failedStaging": "finally cleanup; occupied files reported",
     "recovery": "explicit --yes; refuse live/unknown locks, active apps and incomplete transactions",
     "progress": {

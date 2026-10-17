@@ -1,9 +1,13 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import crypto from 'node:crypto';import {execFileSync,spawn} from 'node:child_process';import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';import {gzipSync} from 'node:zlib';
 const lib=process.env.OWN_INSTALL_LIB||path.resolve(import.meta.dirname,'../lib');
 const {copyNewDirectory,removeTemporary}=await import(pathToFileURL(path.join(lib,'file-operations.mjs')));
-const {archiveNames,extractChecked}=await import(pathToFileURL(path.join(lib,'extraction.mjs')));
+const {archiveNames,extractChecked:extractActual}=await import(pathToFileURL(path.join(lib,'extraction.mjs')));
+const extractChecked=(archive,dest,options)=>extractActual(archive,dest,{...options,inventory:()=>archiveNames(options.execute(options.tar,['-tf'])).map(name=>({name,type:name.endsWith('/')?'Directory':'File'}))});
 const {repairPlan,repairRun}=await import(pathToFileURL(path.join(lib,'maintenance.mjs')));
 const {install,locked}=await import(pathToFileURL(path.join(lib,'manager.mjs')));
+const {writeCanonicalArchive}=await import(pathToFileURL(path.join(lib,'content-blocks.mjs')));
+const AdmZip=createRequire(path.join(lib,'../package.json'))('adm-zip');
 function fixture(t){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-install-中文-')));t.after(()=>fs.promises.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100}));const p={root,manager:path.join(root,'manager'),core:path.join(root,'core'),desktop:path.join(root,'desktop'),target:path.join(root,'apps','current'),platform:process.platform+'-'+process.arch};fs.mkdirSync(p.manager);return {root,p};}
 test('strict new directory copy works on the real Node, refuses existing targets and cleans partial copies',t=>{
  const {root}=fixture(t),source=path.join(root,'source'),dest=path.join(root,'new');fs.mkdirSync(source);fs.writeFileSync(path.join(source,'item'),'content');
@@ -15,6 +19,16 @@ test('CRLF inventories, missing files with a successful tar exit, and bounded ex
  const execute=(bin,args)=>{if(args[0]==='-tf')return 'app/\r\napp/main.dll\r\n';writes++;fs.mkdirSync(path.join(dest,'app'),{recursive:true});if(writes>1)fs.writeFileSync(path.join(dest,'app','main.dll'),'bytes');};
  const r=extractChecked(path.join(root,'app.tar'),dest,{tar:'fixture',execute,delay:()=>{}});assert.equal(r.attempts,2);assert.equal(writes,2);assert.equal(fs.existsSync(path.join(dest,'app/main.dll')),true);
  assert.deepEqual(archiveNames('app/\r\napp/a\r\n'),['app/','app/a']);for(const n of ['../private','/root','C:\\Windows\\a','app/../../b'])assert.throws(()=>archiveNames(n+'\n'),{code:'UNSAFE_ARCHIVE'});
+});
+test('Unicode PAX gzip and ZIP inventories verify file bytes even when tar reports success',async t=>{
+ const {root}=fixture(t),source=path.join(root,'source'),name='目录'.repeat(20)+'/文件.txt';fs.mkdirSync(path.join(source,path.dirname(name)),{recursive:true});fs.writeFileSync(path.join(source,name),'HELLO');
+ const tar=path.join(root,'content.tar');await writeCanonicalArchive(source,'app',tar);const gz=path.join(root,'content.tar.gz');fs.writeFileSync(gz,gzipSync(fs.readFileSync(tar)));
+ const zip=path.join(root,'content.zip'),z=new AdmZip();z.addFile('app/'+name,Buffer.from('HELLO'));z.writeZip(zip);
+ for(const [i,archive]of [tar,gz,zip].entries()){
+  const dest=path.join(root,'out-'+i);let count=0;
+  const r=extractActual(archive,dest,{tar:'fixture',delay:()=>{},execute:()=>{count++;fs.mkdirSync(path.join(dest,'app',path.dirname(name)),{recursive:true});fs.writeFileSync(path.join(dest,'app',name),count===1?'WRONG':'HELLO');}});
+  assert.equal(r.attempts,2);assert.equal(fs.readFileSync(path.join(dest,'app',name),'utf8'),'HELLO');
+ }
 });
 test('persistent interception and tar failure cannot report extraction success',t=>{
  const {root}=fixture(t);let calls=0;
