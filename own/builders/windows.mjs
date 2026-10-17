@@ -25,7 +25,7 @@ bundleUpdater(resources);
 const header=asar.getRawHeader(archive).header;
 const pkg=JSON.parse(asar.extractFile(archive,'package.json'));
 const changes=updateMenuChanges(asar,archive);
-for(const [name,data]of productModeChanges(asar,archive)){if(changes.has(name))throw Error('Overlapping product mode patch: '+name);changes.set(name,data);}
+for(const [name,data]of productModeChanges(asar,archive,{priorChanges:changes}))changes.set(name,data);
 pkg.name='codex-own';pkg.productName='codex-own';pkg.description='Independent DeepSeek desktop';
 changes.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
 changes.set(pkg.main,Buffer.from(gateToolStartup('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString(),'own-runtime-win.cjs')));

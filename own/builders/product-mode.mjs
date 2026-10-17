@@ -16,7 +16,7 @@ const text=(s,n)=>s.slice(n.start,n.end);
 const one=(items,name)=>{if(items.length!==1)throw Error(`Product mode contract changed: ${name} count=${items.length}`);return items[0];};
 export function patchProductModeSource(source){
   if(!source.includes('sidebarElectron.productMode.trigger'))return {source,patched:false};
-  if(source.includes('__codexOwnApiMode')){verifyProductModeSource(source);return {source,patched:false,already:true};}
+  if(source.includes(stateMarker)){verifyProductModeSource(source);return {source,patched:false,already:true};}
   const ast=acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'}),states=[],switches=[],selectors=[];
   walk(ast,n=>{
     if(n.type==='ArrowFunctionExpression'&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'get')&&n.body.type==='BlockStatement'){
@@ -45,7 +45,7 @@ export function patchProductModeSource(source){
   edits.push([select.start,select.end,`__codexOwnApiMode()?void 0:(${text(source,select)})`]);
   edits.push([classes.start,classes.end,`(${text(source,classes)})+(__codexOwnApiMode()?" opacity-50 cursor-not-allowed":"")`]);
   for(const [a,b,value]of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,a)+value+source.slice(b);
-  source=helper+source;acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});verifyProductModeSource(source);
+  if(!source.includes(helper.trim()))source=helper+source;acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});verifyProductModeSource(source);
   return {source,patched:true};
 }
 export function verifyProductModeSource(source){
@@ -75,22 +75,23 @@ export function patchProductModeShared(source){
     [setter.body.start+1,`${preferenceMarker}if(__codexOwnApiMode())${setter.params[1].name}="STEPS_COMMANDS";`],
   ];
   for(const [at,value]of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,at)+value+source.slice(at);
-  source=helper+source;acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});verifyProductModeShared(source);return {source,patched:true};
+  if(!source.includes(helper.trim()))source=helper+source;acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});verifyProductModeShared(source);return {source,patched:true};
 }
 function verifyProductModeShared(source){for(const marker of [helper.trim(),detailMarker,preferenceMarker])if(source.split(marker).length!==2)throw Error('API execution mode patch missing or duplicated');}
-export function productModeChanges(asar,archive){
+export function productModeChanges(asar,archive,{priorChanges=new Map()}={}){
   const changes=new Map();let renderers=0,preloads=0,shared=0;
   for(const file of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,''))){
     if(file.startsWith('webview/assets/')&&file.endsWith('.js')){
-      const source=asar.extractFile(archive,file.replaceAll('/',path.sep)).toString();
+      const original=(priorChanges.get(file)||asar.extractFile(archive,file.replaceAll('/',path.sep))).toString();let source=original;
       if(source.includes('sidebarElectron.productMode.trigger')&&source.includes('sidebarElectron.productMode.work.description.recommended')&&source.includes('codexLocalAccessStatus:')){
-        const result=patchProductModeSource(source);if(result.patched||result.already){renderers++;if(result.patched)changes.set(file,Buffer.from(result.source));}
+        const result=patchProductModeSource(source);if(result.patched||result.already){renderers++;source=result.source;}
       }
       // Follow the implementation rather than a bundler's current chunk name.
-      if(source.includes('previousWorkMode:')&&source.includes('selectedThreadDetailLevel:')){const result=patchProductModeShared(source);shared++;if(result.patched)changes.set(file,Buffer.from(result.source));}
+      if(source.includes('previousWorkMode:')&&source.includes('selectedThreadDetailLevel:')){const result=patchProductModeShared(source);shared++;source=result.source;}
+      if(source!==original)changes.set(file,Buffer.from(source));
     }
     if(file==='.vite/build/preload.js'){
-      const source=asar.extractFile(archive,file.replaceAll('/',path.sep)).toString(),updated=patchProductModePreload(source);preloads++;if(updated!==source)changes.set(file,Buffer.from(updated));
+      const source=(priorChanges.get(file)||asar.extractFile(archive,file.replaceAll('/',path.sep))).toString(),updated=patchProductModePreload(source);preloads++;if(updated!==source)changes.set(file,Buffer.from(updated));
     }
   }
   if(renderers!==1||preloads!==1||shared!==1)throw Error(`API product mode entry points missing: renderer=${renderers}, preload=${preloads}, shared=${shared}`);

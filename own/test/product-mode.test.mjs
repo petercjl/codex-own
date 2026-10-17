@@ -76,3 +76,14 @@ test('desktop patch requires renderer, execution state and preload together, and
  for(const [file,bytes]of changed)files.set(file,bytes.toString());assert.equal(productModeChanges(asar,'fixture').size,0);
  files.delete('webview/assets/execution-state-a1b2.js');assert.throws(()=>productModeChanges(asar,'fixture'),/shared=0/);
 });
+test('combined upstream chunks retain execution and menu policy plus an earlier Windows update menu edit',()=>{
+ const combined=fixture+'\nconst saved="saved";\n'+sharedFixture.slice(sharedFixture.indexOf('const executionDetail'));
+ const name='webview/assets/app-initial-combined.js',files=new Map([[name,combined],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
+ const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
+ const priorChanges=new Map([[name,Buffer.from('/* preceding Windows update menu edit */\n'+combined)]]),changes=productModeChanges(asar,'fixture',{priorChanges});
+ assert.equal(changes.size,2);const source=changes.get(name).toString();assert.ok(source.includes('/* preceding Windows update menu edit */'));assert.equal(source.split('const __codexOwnApiMode=').length,2);
+ const context=vm.createContext({codexOwnProductPolicy:{contract:1,apiMode:true}});vm.runInContext(source,context);
+ assert.equal(context.fixture.derivedMode({get:()=> 'STEPS_PROSE'}),'codex');assert.equal(context.sharedFixture.executionDetail({get:()=> 'STEPS_PROSE'}),'STEPS_COMMANDS');
+ assert.equal(context.fixture.Sidebar({codexAvailable:true,mode:'work',onModeSelect:()=>{throw Error('disabled')}}).work.props.onSelect,undefined);
+ for(const [file,bytes]of changes)files.set(file,bytes.toString());assert.equal(productModeChanges(asar,'fixture').size,0);
+});
