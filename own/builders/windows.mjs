@@ -10,6 +10,7 @@ import {updateMenuChanges} from './update-menu.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
 import {isolateShellImport} from './shell-environment.mjs';
+import {productModeChanges} from './product-mode.mjs';
 const require=createRequire(import.meta.url);
 const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -24,6 +25,7 @@ bundleUpdater(resources);
 const header=asar.getRawHeader(archive).header;
 const pkg=JSON.parse(asar.extractFile(archive,'package.json'));
 const changes=updateMenuChanges(asar,archive);
+for(const [name,data]of productModeChanges(asar,archive)){if(changes.has(name))throw Error('Overlapping product mode patch: '+name);changes.set(name,data);}
 pkg.name='codex-own';pkg.productName='codex-own';pkg.description='Independent DeepSeek desktop';
 changes.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
 changes.set(pkg.main,Buffer.from(gateToolStartup('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString(),'own-runtime-win.cjs')));

@@ -8,6 +8,7 @@ import {bundleUpdater} from './updater.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
 import {isolateShellImport} from './shell-environment.mjs';
+import {productModeChanges} from './product-mode.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
@@ -28,6 +29,7 @@ const work=path.join(output,'asar-source');
 const originalArchive=path.join(resources,'app.asar'),header=asar.getRawHeader(originalArchive).header;
 function unpackPacked(dir,prefix=''){for(const [name,e]of Object.entries(dir.files)){const n=prefix+name;if(e.files){unpackPacked(e,n+'/');continue;}if(e.unpacked||e.link)continue;const file=path.join(work,n);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,asar.extractFile(originalArchive,n),{flag:'wx'});}}
 unpackPacked(header);
+for(const [name,data]of productModeChanges(asar,originalArchive))fs.writeFileSync(path.join(work,name),data);
 const pkgPath=path.join(work,'package.json');
 const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));
 const entry=path.join(work,pkg.main);

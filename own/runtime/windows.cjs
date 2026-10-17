@@ -21,4 +21,5 @@ app.setAppUserModelId('local.codex-own');
 app.setName=()=>{};app.setAppUserModelId=()=>{};
 app.setAsDefaultProtocolClient=()=>false;app.removeAsDefaultProtocolClient=()=>false;
 require(path.join(process.resourcesPath,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
+require(path.join(process.resourcesPath,'own-updater','desktop','product-mode.cjs')).install(require('electron'),paths.core);
 module.exports={apply,paths,ensureTools:()=>require(path.join(process.resourcesPath,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply)};

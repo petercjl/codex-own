@@ -38,6 +38,7 @@ export function bundleUpdater(resources,{version=process.env.OWN_VERSION||JSON.p
 }
 export function verifyUpdater(resources){
   const dest=path.join(resources,'own-updater'),meta=JSON.parse(fs.readFileSync(path.join(dest,'desktop-version.json')));
+  fs.statSync(path.join(dest,'desktop/product-mode.cjs'));
   if(meta.schema!==1||meta.updaterContract!==2||meta.runtimeContract!==1||!/^\d+\.\d+\.\d+$/.test(meta.version)||meta.source!=='https://registry.npmjs.org/@petercjl%2fcodex-own/latest')throw Error('Invalid own update source or component contract');
   for(const f of ['desktop/controller.cjs','desktop/preload.cjs','desktop/update.html','desktop/update-ui.js','desktop/worker.mjs','desktop/bootstrap-tools.mjs','desktop/tool-bootstrap.cjs','lib/app-update.mjs','lib/cleanup.mjs','lib/manager.mjs','lib/model-configuration.mjs','lib/windows-agent-shell.cjs','lib/tool-runtime.mjs','lib/tool-env.cjs','lib/archive-inventory.mjs','node_modules/tar/package.json','node_modules/adm-zip/package.json','node_modules/undici/package.json','node_modules/smol-toml/package.json',process.platform==='win32'?'node.exe':'node'])fs.statSync(path.join(dest,f));
   const node=path.join(dest,process.platform==='win32'?'node.exe':'node');

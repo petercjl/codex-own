@@ -9,7 +9,9 @@ import {createRequire} from 'node:module';
 import {updateMenuChanges} from './builders/update-menu.mjs';
 import {verifyWindowsIcon} from './builders/windows-icon.mjs';
 import {verifyWindowsAgentShell} from './ci/windows-shell-qa.mjs';
+import {verifyProductMode} from './builders/product-mode.mjs';
 const app=path.resolve(process.argv[2]),mac=process.platform==='darwin';
+console.log(JSON.stringify({productMode:verifyProductMode(app,createRequire(import.meta.url)('@electron/asar'))}));
 console.log(JSON.stringify({i18n:verifyTranslations(app)}));
 console.log(JSON.stringify({updater:verifyUpdater(path.join(app,mac?'Contents/Resources':'resources'))}));
 if(!mac){assert.equal(updateMenuChanges(createRequire(import.meta.url)('@electron/asar'),path.join(app,'resources','app.asar')).size,0,'Windows standalone update menu missing');console.log(JSON.stringify({standaloneUpdateMenu:true,icon:verifyWindowsIcon(app)}));}
