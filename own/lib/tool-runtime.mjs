@@ -5,6 +5,7 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {assembleNpmAsset,validateParts} from './npm-assets.mjs';
 import {paths,state,locked,rejectLinks,exclusive,unpack,fail,tarExecutable,digestFile} from './manager.mjs';
+import {copyNewDirectory,removeTemporary} from './file-operations.mjs';
 const require=createRequire(import.meta.url);
 export const toolEnv=require('./tool-env.cjs');
 export function validateRuntime(m,platform){
@@ -17,6 +18,8 @@ function writeActive(base,r){
  const f=path.join(base,'active.json');rejectLinks(f);
  if(fs.existsSync(f))fs.copyFileSync(f,f+'.backup-'+crypto.randomUUID(),fs.constants.COPYFILE_EXCL);
  const tmp=f+'.new-'+crypto.randomUUID();exclusive(tmp,r);fs.renameSync(tmp,f);
+ // Bound verified selection receipts, preserving every immutable tool version.
+ try{const history=fs.readdirSync(base).filter(n=>/^active\.json\.backup-[a-f0-9-]{36}$/.test(n)).map(n=>path.join(base,n)).filter(p=>{const s=fs.lstatSync(p);if(!s.isFile()||s.isSymbolicLink())return false;try{const v=JSON.parse(fs.readFileSync(p));return v.schema===1&&/^node[0-9.]+-python[0-9.]+-r\d+$/.test(v.version);}catch{return false;}}).sort((a,b)=>fs.statSync(b).mtimeMs-fs.statSync(a).mtimeMs);for(const p of history.slice(20))fs.unlinkSync(p);}catch{}
 }
 export function runtimeDoctor(base=toolEnv.runtimeRoot(),{version}={}){
  try{const r=toolEnv.active(base,process.platform,version);if(!r)return {ok:false,code:'RUNTIME_NOT_INSTALLED',root:base};
@@ -63,7 +66,7 @@ export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,repor
   // Windows scanners may hold executables after execution. Never rename an
   // executed tool directory: copy to a fresh immutable final path, probe there,
   // and only then atomically switch the small active receipt.
-  fs.mkdirSync(target);created=true;fs.cpSync(candidate,target,{recursive:true,force:false,errorOnExist:true,verbatimSymlinks:true});
+  copyNewDirectory(candidate,target,{onCreate:()=>{created=true;}});
   if(process.platform==='darwin'){const shell=path.join(target,'shell');fs.mkdirSync(shell);for(const [name,body]of Object.entries(toolEnv.shellFiles(base,m.version)))fs.writeFileSync(path.join(shell,name),body,{flag:'wx',mode:0o600});}
   const tested=runtimeDoctor(base,{version:m.version});if(!tested.ok)fail('RUNTIME_PROBE_FAILED',tested.message||'Tool verification failed');
   const expected=m.version.match(/^node([0-9.]+)-python([0-9.]+)-/);
@@ -72,8 +75,8 @@ export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,repor
   exclusive(path.join(target,'codex-own-runtime.json'),{schema:1,version:m.version,platform:p.platform,assets:{node:assets.node.sha256,python:assets.python.sha256},verified:tested});
   writeActive(base,{schema:1,version:m.version,platform:p.platform,previous:previous?.version||null,installedAt:new Date().toISOString()});
   committed=true;
-  return runtimeDoctor(base);
- }finally{for(const f of [stage,...(created&&!committed?[target]:[])])try{fs.rmSync(f,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{report(`临时目录被系统占用，已保留：${f}`);}}
+  return tested;
+ }finally{for(const f of [stage,...(created&&!committed?[target]:[])])await removeTemporary(f,{report});}
 }
 export async function installRuntime(m,options={}){const p=options.p||paths();return locked(p,async()=>{const result=await ensureRuntime(m,{...options,p});if(options.selection){const base=path.join(p.root,'runtimes'),active=JSON.parse(fs.readFileSync(path.join(base,'active.json')));writeActive(base,{...active,selection:options.selection,selectedForDesktop:state(p)?.version||null});}return result;});}
 export function restoreRuntimeSelection(selected,{p=paths()}={}){

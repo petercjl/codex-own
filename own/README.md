@@ -101,11 +101,23 @@ npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
 "$HOME/.local/bin/codex-own" version
 ```
 
-可选：需要使用模型时，再配置 API Key 并启动。将只包含一行 DashScope API Key 的文件放到下载目录，命名为 codex-own-api-key.txt；文件在其他位置时修改路径。配置前退出应用，已有可用配置可跳过配置命令。
+**API Key 文件路径必须改为你实际下载的位置，不能直接复制占位路径。** 配置前先保存任务；命令会关闭 codex-own，完成配置后从 Mac“应用程序”打开 codex-own。
 
 ```bash
-"$HOME/.local/bin/codex-own" configure --api-key-file "$HOME/Downloads/codex-own-api-key.txt" --yes
-"$HOME/.local/bin/codex-own" launch
+apiKeyFile="【填写 API Key 文件的实际完整路径】"
+if [ -f "$apiKeyFile" ]; then
+    ownPattern='^/Applications/codex-own[.]app/Contents/'
+    pkill -TERM -f "$ownPattern" || true
+    for i in {1..10}; do
+        pgrep -f "$ownPattern" >/dev/null || break
+        sleep 1
+    done
+    pkill -KILL -f "$ownPattern" || true
+    "$HOME/.local/bin/codex-own" configure --api-key-file "$apiKeyFile" --yes &&
+    "$HOME/.local/bin/codex-own" doctor
+else
+    printf '%s\n' "请先填写 apiKeyFile，确认文件路径和文件名正确。"
+fi
 ```
 
 以后更新：先退出 codex-own，再更新 npm 管理工具和桌面程序。配置与对话保存在 ~/Library/Application Support/codex-own-independent。
@@ -118,70 +130,88 @@ npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
 
 ## 在 Windows 上通过 PowerShell 安装和测试
 
-适用于运行 x64 Node.js 的 Windows。先从 Node.js 官网安装 Windows x64 的 LTS 版本（要求 Node.js 22 或以上，包含 npm），再重新打开普通用户 PowerShell。建议预留 10 GB 空间，用于下载、解压和备份。
+适用于 Windows x64，使用包含 npm 的官方 Node.js 22+ x64 发行包。可使用系统安装或用户目录的官方便携版。先核对实际 node.exe 位置；多套 Node、第三方 Agent 便携 Node 和 npm 的 .cmd 入口可能选择不同运行时。
 
-[Node.js 官方下载](https://nodejs.org/en/download)
+**下列 $node 使用常见安装路径。请按实际 Node 安装位置修改后执行。** 普通用户 PowerShell 即可，无需改变脚本执行策略。建议首次安装预留至少 10 GB；更新还需保留旧程序和用户数据快照所需空间。
 
-安装验收只需完成前三步。无需 Agent、API Key 或模型登录。
-
-第一步：检查环境并安装 npm 管理工具。使用 .cmd 入口，无需修改 PowerShell 脚本执行策略。逐段执行，每一步成功后再继续。
+第一步：在当前窗口设置 UTF-8，并检查真正执行安装的 Node 和 npm：
 
 ```powershell
-node --version
-node -p "process.arch"
-npm.cmd --version
-npm.cmd install --global @petercjl/codex-own@latest
+$ErrorActionPreference = "Stop"
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
+chcp.com 65001 > $null
+$node = "C:\Program Files\nodejs\node.exe"
+if (-not (Test-Path -LiteralPath $node -PathType Leaf)) { throw "请填写实际的 Node.js 22+ x64 可执行文件路径。" }
+$bootstrap = (& $node -p 'JSON.stringify({version:process.versions.node,arch:process.arch,executable:process.execPath})') | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or [int]($bootstrap.version.Split('.')[0]) -lt 22 -or $bootstrap.arch -ne "x64") { throw "安装引导要求 Node.js 22+ x64，请核对实际路径。" }
+$bootstrap | Format-List
+$npmCli = Join-Path (Split-Path -Parent $node) "node_modules\npm\bin\npm-cli.js"
+if (-not (Test-Path -LiteralPath $npmCli -PathType Leaf)) { throw "所选 Node 目录缺少 npm，请使用包含 npm 的官方 Node.js 发行包。" }
+& $node $npmCli --version
+if ($LASTEXITCODE -ne 0) { throw "npm 检查失败。" }
 ```
 
-process.arch 应输出 x64。第二步：解析命令路径并安装桌面程序。$codexOwn 只在当前窗口有效；打开新窗口后重新执行赋值行。
+第二步：通过同一个 Node 安装并调用管理工具：
 
 ```powershell
-$codexOwn = Join-Path (npm.cmd prefix --global) "codex-own.cmd"
-& $codexOwn install --yes
+& $node $npmCli install --global @petercjl/codex-own@latest --registry=https://registry.npmjs.org
+if ($LASTEXITCODE -ne 0) { throw "管理工具安装失败。" }
+$npmRoot = (& $node $npmCli root --global).Trim()
+if ($LASTEXITCODE -ne 0) { throw "无法取得 npm 全局目录。" }
+$codexOwn = Join-Path $npmRoot "@petercjl\codex-own\bin\codex-own.mjs"
+& $node $codexOwn install --yes --progress stdout
+if ($LASTEXITCODE -ne 0) { throw "桌面安装失败，请保留错误并先诊断。" }
 ```
 
-管理工具和桌面资源全部从 registry.npmjs.org 下载。Windows 桌面资源约 1 GB，具体大小随版本变化。最多并行下载 4 个分片，安装时显示分片编号、下载百分比和已接收大小，然后显示校验、解压、安装。看到“安装完成”和 ok: true 才表示完成。
-
-若已有手动安装的 codex-own，先退出应用，将第二步的安装命令替换为以下接管命令；原安装会被备份。
+第三步：验收结果。doctor 的 bootstrap 应指向所选 Node；installed 有版本，lock 为 false，pendingTransactions 为空；runtime doctor 验证独立 Node/npm/Python。先完成 API 配置，再从 Windows 开始菜单打开 codex-own。
 
 ```powershell
-& $codexOwn install --adopt --yes
+& $node $codexOwn doctor --json
+& $node $codexOwn version
+& $node $codexOwn runtime doctor
 ```
 
-第三步：检查安装结果。doctor 中 installed 应有版本、lock 为 false，pendingTransactions 为空；开始菜单出现 codex-own。仅检查安装时，configured: false 是正常状态。
+$node、$npmCli、$codexOwn 仅对当前窗口有效；换窗口后按前两步重新赋值。已有未受管理的独立安装可用 install --adopt --yes 接管并保留备份。程序位于 %LOCALAPPDATA%\Programs\codex-own\current，配置和对话位于 %LOCALAPPDATA%\codex-own-independent。
+
+**API Key 文件路径必须改为你实际下载的位置，不能直接复制占位路径。** 配置前先保存任务并退出 codex-own；已有可用配置可跳过。安装验收无需 API Key。
 
 ```powershell
-& $codexOwn doctor
-& $codexOwn version
+$apiKeyFile = "【填写 API Key 文件的实际完整路径】"
+if (-not (Test-Path -LiteralPath $apiKeyFile -PathType Leaf)) { throw "请先填写实际 Key 文件路径。" }
+Get-Process -Name "codex-own" -ErrorAction SilentlyContinue | Stop-Process -Force
+if (Get-Process -Name "codex-own" -ErrorAction SilentlyContinue) { throw "应用尚未完全退出。" }
+& $node $codexOwn configure --api-key-file $apiKeyFile --yes
+if ($LASTEXITCODE -ne 0) { throw "API 配置失败。" }
 ```
 
-程序目录：%LOCALAPPDATA%\Programs\codex-own\current。配置与对话目录：%LOCALAPPDATA%\codex-own-independent。二者独立于原版 Codex。
+日常优先使用应用内“更新”。需要手动更新时，退出应用，用同一 $node 和 $npmCli 更新 @petercjl/codex-own@latest，再执行 & $node $codexOwn update install --yes --progress stdout。保留配置与对话。
 
-安装测试通过后即可停止；账号配置和模型对话属于后续使用测试。
+## 安装失败与恢复
 
-可选：需要使用模型时，将只包含一行 DashScope API Key 的文件放到下载目录，命名为 codex-own-api-key.txt。配置前先退出应用，文件位置不同则修改路径；已有可用配置可跳过配置命令。
+安装器核对解压条目，兼容 Windows CRLF 清单，最多重试 3 次。UNPACK_INCOMPLETE/UNPACK_FAILED 提供缺失样例；持续缺失同一批 DLL 或脚本时检查安全软件拦截记录和可信来源，按设备安全策略处理，安装器不会关闭防护。正常和失败安装都尝试清理本次 staging，被占用目录会报告并保留，已校验分片缓存仍可复用。
+
+Windows 先查看诊断及恢复计划：
 
 ```powershell
-& $codexOwn configure --api-key-file "$HOME\Downloads\codex-own-api-key.txt" --yes
-& $codexOwn launch
+& $node $codexOwn doctor --json
+& $node $codexOwn repair plan
 ```
 
-以后更新：先退出 codex-own，再执行以下命令。更新保留独立配置和对话。
+确认 allowed: true 并同意回收失败安装的临时目录后：
 
 ```powershell
-npm.cmd install --global @petercjl/codex-own@latest
-$codexOwn = Join-Path (npm.cmd prefix --global) "codex-own.cmd"
-& $codexOwn update check
-& $codexOwn update install --yes
+& $node $codexOwn repair run --yes
+& $node $codexOwn doctor --json
 ```
 
-下载失败：连续 30 秒无数据会重试当前分片，最多 3 次。出现 DOWNLOAD_FAILED 时检查 npm 网络连接，再执行同一安装命令；已校验分片会复用。下载期间按 Ctrl+C 可以取消。遇到 BUSY 时先确认是否有另一安装进程，保留错误信息，不直接删除锁文件。
+Mac 使用 "$HOME/.local/bin/codex-own" doctor --json、repair plan 和 repair run --yes。恢复备份并移走确认死亡进程的 operation.lock，清理 inactive stage 和有所有权回执的 next 副本；保留应用、配置、密钥、对话、缓存及回滚。活动或未知锁、recovery.lock 和未完成事务需要维护者检查，不能通过删文件强行继续。
 
-npm 安装出现缓存 ENOENT 或缓存损坏提示时，先检查缓存，再重新安装 npm 工具：
+默认 stdout 仅为 JSON，进度走 stderr；--progress stdout 是交互终端显示模式，与 --json 互斥；--quiet 关闭进度。CLI 入口在加载管理器前验证 Node 22+。doctor.bootstrap 返回实际可执行路径、版本及架构。
 
-```powershell
-npm.cmd cache verify
-npm.cmd install --global @petercjl/codex-own@latest
-```
+可发送给 Agent：
 
-管理工具与桌面版本分别报告。API Key 和用户数据保存在 npm 包之外。更多命令见 `codex-own help`。
+> 请检查 codex-own 的安装环境和失败残留，使用 @petercjl/codex-own 的恢复计划诊断，保留配置与对话。
+
+> 请通过 @petercjl/codex-own 修复已确认可清理的安装残留，然后重试安装。

@@ -9,6 +9,7 @@ const run=(args,cwd=source)=>execFileSync(process.execPath,[npm,...args],{cwd,en
 const packed=packResult(run(['pack','--json','--pack-destination',packDir]),'@petercjl/codex-own');const archive=path.join(packDir,packed.filename);
 const prefix=path.join(root,'installed');run(['install','--prefix',prefix,archive,'--ignore-scripts','--no-audit','--no-fund'],root);
 const cli=path.join(prefix,'node_modules','@petercjl','codex-own','bin','codex-own.mjs');
+execFileSync(process.execPath,['--test',path.join(source,'test/installation-recovery.test.mjs')],{stdio:'inherit',windowsHide:true,timeout:120000,env:{...process.env,OWN_INSTALL_LIB:path.join(prefix,'node_modules','@petercjl','codex-own','lib'),OWN_INSTALL_CLI:cli}});
 // The installer must repair an app-created GPT config using its packed entry,
 // not a source import or a manually edited VM configuration.
 execFileSync(process.execPath,['--test',path.join(source,'test/model-configuration.test.mjs')],{stdio:'inherit',windowsHide:true,timeout:120000,env:{...process.env,OWN_MODEL_CONFIG_CLI:cli}});

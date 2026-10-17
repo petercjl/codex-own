@@ -18,6 +18,9 @@ const base=path.join(root,'runtimes'),env=toolEnv.environment(base),r=toolEnv.ac
 assert.equal(process.env.PATH,protectedPath);
 const run=(file,args,options={})=>execFileSync(file,args,{env,encoding:'utf8',windowsHide:true,timeout:120000,...options}).trim();
 assert.equal(run(r.node,['-p','process.execPath']),r.node);
+// Exercise installation semantics under the distributed Node, not only its
+// version string. Node 24.22 on Windows differs from the build Node 24.15.
+execFileSync(r.node,['--test',path.resolve('own/test/installation-recovery.test.mjs')],{encoding:'utf8',env,windowsHide:true,timeout:120000});
 assert.match(run(r.node,[r.npm,'--version']),/^\d+\.\d+\.\d+$/);
 assert.equal(run(r.python,['-c','import sys; print(sys.executable)']),r.python);
 assert.ok(run(r.node,[r.npm,'config','get','prefix']).startsWith(base));

@@ -3,7 +3,9 @@ import crypto from 'node:crypto';
 import {EnvHttpProxyAgent, fetch} from 'undici';
 
 const dispatcher = new EnvHttpProxyAgent();
-export const progress = message => process.stderr.write(`[codex-own] ${message}\n`);
+let progressMode='stderr';
+export function setProgressMode(mode){if(!['stderr','stdout','quiet'].includes(mode))throw Object.assign(new Error('Progress must be stderr, stdout or quiet'),{code:'INVALID_ARGUMENT'});progressMode=mode;}
+export const progress = message => {if(progressMode!=='quiet')(progressMode==='stdout'?process.stdout:process.stderr).write(`[codex-own] ${message}\n`);};
 export function networkFetch(url, options = {}) {
   return fetch(url, {dispatcher, redirect: 'error', ...options});
 }

@@ -20,7 +20,9 @@
     "runtime doctor",
     "runtime env",
     "runtime run",
-    "runtime rollback"
+    "runtime rollback",
+    "repair plan",
+    "repair run"
   ],
   "platforms": {
     "darwin-arm64": "implemented",
@@ -34,13 +36,31 @@
     "trigger": "owned main interface loaded and alive for 30 seconds; installed version and component identity must match",
     "defaultCacheLimitMiB": 2048,
     "rollbackCopies": 1,
-    "reclaims": ["applied desktop archives", "completed inactive helpers", "superseded complete app/data backup pairs", "least recently used unpinned blocks"],
-    "preserves": ["live app and user data", "private tool versions", "latest complete rollback", "pending/failed/unknown updates", "active processes", "manual recovery backups"],
+    "reclaims": [
+      "applied desktop archives",
+      "completed inactive helpers",
+      "superseded complete app/data backup pairs",
+      "least recently used unpinned blocks"
+    ],
+    "preserves": [
+      "live app and user data",
+      "private tool versions",
+      "latest complete rollback",
+      "pending/failed/unknown updates",
+      "active processes",
+      "manual recovery backups"
+    ],
     "temporaryCacheExcess": "pending or unknown receipts pin required blocks; locked files remain available for inspection",
     "diagnosticRecordsPerCategory": 20,
     "preview": "cleanup plan",
     "execute": "cleanup run --yes [--cache-limit-mib <0..16384>]",
-    "results": ["reclaimedBytes", "rollbackRetained", "warnings", "cacheLimitExceeded", "report"]
+    "results": [
+      "reclaimedBytes",
+      "rollbackRetained",
+      "warnings",
+      "cacheLimitExceeded",
+      "report"
+    ]
   },
   "windowsAgentShell": {
     "contract": 1,
@@ -118,5 +138,25 @@
     },
     "sameDesktop": "zero desktop download and activation; app may remain open",
     "legacy": "one bridge desktop upgrade required before ordinary manager-only reuse"
+  },
+  "installationRecovery": {
+    "contract": 1,
+    "bootstrapMinimumNode": 22,
+    "diagnostics": [
+      "bootstrap",
+      "lockDetails",
+      "orphanStages",
+      "recoveryLock"
+    ],
+    "extractAttempts": 3,
+    "inventory": "every listed entry, Windows CRLF normalized, path/link safety, tar errors retained",
+    "failedStaging": "finally cleanup; occupied files reported",
+    "recovery": "explicit --yes; refuse live/unknown locks, active apps and incomplete transactions",
+    "progress": {
+      "default": "stderr; stdout JSON",
+      "human": "--progress stdout",
+      "quiet": "--quiet"
+    },
+    "runtimeSelectionBackupLimit": 20
   }
 }

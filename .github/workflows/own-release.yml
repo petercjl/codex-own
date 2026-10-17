@@ -39,6 +39,26 @@ jobs:
         run: node own/ci/release-plan.mjs . "$OWN_VERSION" release-plan.json "$RELEASE_MODE"
       - uses: actions/upload-artifact@v7
         with: {name: release-plan, path: release-plan.json, retention-days: 3}
+  bootstrap-qa:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest]
+        node: ['22.0.0', '24.22.0']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: '${{ needs.prepare.outputs.ref }}'}
+      - uses: actions/setup-node@v6
+        with: {node-version: '${{ matrix.node }}', package-manager-cache: false}
+      - run: npm ci --prefix own
+      - name: Actual bootstrap copy extraction and recovery contract
+        run: node --test own/test/installation-recovery.test.mjs
+      - uses: actions/setup-node@v6
+        with: {node-version: '20.12.0', package-manager-cache: false}
+      - name: Unsupported bootstrap fails before importing the application
+        run: node -e "const r=require('node:child_process').spawnSync(process.execPath,['own/bin/codex-own.mjs','doctor'],{encoding:'utf8'});require('node:assert/strict').equal(r.status,1);require('node:assert/strict').equal(JSON.parse(r.stderr).code,'NODE_VERSION_UNSUPPORTED')"
   manager-qa:
     needs: prepare
     strategy:
@@ -131,11 +151,11 @@ jobs:
         run: node own/ci/verify-qa-reuse.mjs "$VERIFIED_RUN" release-plan.json
   publish:
     if: >-
-      ${{ !cancelled() && !inputs.verify_only && needs.prepare.result == 'success' && needs.manager-qa.result == 'success' &&
+      ${{ !cancelled() && !inputs.verify_only && needs.prepare.result == 'success' && needs.bootstrap-qa.result == 'success' && needs.manager-qa.result == 'success' &&
       ((inputs.verified_run != '' && needs.recover-qa.result == 'success') ||
       (inputs.verified_run == '' && (needs.native.result == 'success' || needs.prepare.outputs.native == 'false') &&
       (needs.runtimes.result == 'success' || needs.prepare.outputs.runtime == 'false'))) }}
-    needs: [prepare, manager-qa, native, runtimes, recover-qa]
+    needs: [prepare, bootstrap-qa, manager-qa, native, runtimes, recover-qa]
     runs-on: ubuntu-latest
     permissions: {contents: write, id-token: write, actions: read}
     steps:

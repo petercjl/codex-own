@@ -11,6 +11,9 @@ import {ensureRuntime,validateRuntime,restoreRuntimeSelection} from './tool-runt
 import {validateBinding,packageManifest,sameDesktop,identity as bindingHash} from './binding.mjs';
 import {deepseekConfiguration} from './model-configuration.mjs';
 import windowsAgentShell from './windows-agent-shell.cjs';
+import {extractChecked} from './extraction.mjs';
+import {copyNewDirectory,removeTemporary,removeNewTreeSync} from './file-operations.mjs';
+import {lockStatus,temporaryStages} from './maintenance.mjs';
 
 export const packageRoot = path.resolve(import.meta.dirname, '..');
 export const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));
@@ -52,14 +55,7 @@ export function tarExecutable(platform=process.platform,env=process.env,exists=f
   return executable;
 }
 export function unpack(archive,dest) {
-  // Older Windows tar builds convert absolute argv paths through the ANSI code
-  // page. CreateProcessW's cwd supports Unicode; sibling relative args avoid it.
-  const cwd=path.dirname(path.resolve(archive)),source=path.basename(archive),target=path.relative(cwd,path.resolve(dest));
-  const names=execFileSync(tarExecutable(),['-tf',source],{cwd,encoding:'utf8',maxBuffer:30*1024*1024}).split('\n').filter(Boolean);checkEntries(names);
-  fs.mkdirSync(dest);execFileSync(tarExecutable(),['-xf',source,'-C',target],{cwd,stdio:'pipe'});
-  // Bundled framework links may be relative but must stay within the extracted tree.
-  function walk(p){for(const x of fs.readdirSync(p,{withFileTypes:true})){const f=path.join(p,x.name);if(x.isSymbolicLink()){const resolved=path.resolve(path.dirname(f),fs.readlinkSync(f));if(!resolved.startsWith(dest+path.sep))fail('UNSAFE_ARCHIVE','Escaping symlink');}else if(x.isDirectory())walk(f);}}
-  walk(dest);
+  return extractChecked(archive,dest,{tar:tarExecutable(),report:progress});
 }
 export function macOwnProcessIds(lines) {
   return lines.filter(l=>l.includes('codex-own.app/Contents/')&&!l.includes(' ps -')&&!l.includes('/Contents/Resources/cua_node/')&&!/\/Contents\/MacOS\/WinAppHelper(?:\s|$)/.test(l)).map(l=>l.trim().split(/\s+/)[0]);
@@ -91,17 +87,22 @@ export function switchApp({p,source,version,manifest,runtimeSelection,adopt=fals
   const id=crypto.randomUUID(),backup=path.join(p.manager,'backups',id);fs.mkdirSync(backup,{recursive:true,mode:0o700});
   if(exists)backupData(p,path.join(backup,'data'));
   const old=path.join(path.dirname(p.target),'.codex-own-backup-'+id), next=path.join(path.dirname(p.target),'.codex-own-next-'+id);
-  fs.mkdirSync(path.dirname(p.target),{recursive:true});fs.cpSync(source,next,{recursive:true,force:false,errorOnExist:true,dereference:false,verbatimSymlinks:true});
-  const journal=path.join(p.manager,'transaction-'+id+'.json');exclusive(journal,{target:p.target,old,next,version,previous,backup});
+  const ownership=path.join(p.manager,'temporary-'+id+'.json');
+  const journal=path.join(p.manager,'transaction-'+id+'.json');let preparedNext=false;
+  try{
+   fs.mkdirSync(path.dirname(p.target),{recursive:true});copyNewDirectory(source,next,{onCreate:()=>{preparedNext=true;exclusive(ownership,{package:pkg.name,kind:'next',path:next,target:p.target});}});
+   exclusive(journal,{target:p.target,old,next,version,previous,backup});
+  }catch(e){if(preparedNext&&fs.existsSync(next))try{removeNewTreeSync(next);}catch{e.partialTarget=next;}throw e;}
   let moved=false,activated=false;
   try {if(exists){fs.renameSync(p.target,old);moved=true;}fs.renameSync(next,p.target);activated=true;
     const active=path.join(p.root,'runtimes','active.json');
     writeState(p,{schema:1,identity:'local.codex-own',version,...(manifest?{desktop:{version,identity:manifest.platforms[p.platform].sha256},releaseManifest:manifest}:{}),target:p.target,installedAt:new Date().toISOString(),previous:exists?{app:old,data:path.join(backup,'data'),state:previous,runtimeSelection:runtimeSelection===undefined?(fs.existsSync(active)?read(active):null):runtimeSelection}:null});
-  }catch(e){if(activated&&fs.existsSync(p.target))fs.renameSync(p.target,path.join(path.dirname(p.target),'.codex-own-failed-'+id));if(moved)fs.renameSync(old,p.target);throw e;}
+  }catch(e){if(activated&&fs.existsSync(p.target))fs.renameSync(p.target,path.join(path.dirname(p.target),'.codex-own-failed-'+id));if(moved)fs.renameSync(old,p.target);if(fs.existsSync(next))try{removeNewTreeSync(next);}catch{e.partialTarget=next;}throw e;}
   exclusive(path.join(p.manager,'transaction-'+id+'.complete.json'),{ok:true});
+  if(fs.existsSync(ownership))try{fs.unlinkSync(ownership);}catch{}
   return {ok:true,version,target:p.target,backup:exists?old:null,dataBackup:exists?path.join(backup,'data'):null};
 }
-export async function locked(p,fn){rejectLinks(p.root);fs.mkdirSync(p.manager,{recursive:true,mode:0o700});const lock=path.join(p.manager,'operation.lock');let fd;try{fd=fs.openSync(lock,'wx',0o600);}catch{fail('BUSY','Another operation or interrupted lock exists; inspect doctor before recovery');}try{fs.writeSync(fd,JSON.stringify({pid:process.pid,time:new Date().toISOString()}));return await fn();}finally{fs.closeSync(fd);fs.unlinkSync(lock);}}
+export async function locked(p,fn,{recovery=false}={}){rejectLinks(p.root);fs.mkdirSync(p.manager,{recursive:true,mode:0o700});const lock=path.join(p.manager,'operation.lock'),guard=path.join(p.manager,'recovery.lock');if(!recovery&&fs.existsSync(guard))fail('BUSY','Recovery is active');let fd;try{fd=fs.openSync(lock,'wx',0o600);}catch{fail('BUSY','Another operation or interrupted lock exists; inspect doctor and repair plan');}try{if(!recovery&&fs.existsSync(guard))fail('BUSY','Recovery is active');fs.writeSync(fd,JSON.stringify({pid:process.pid,time:new Date().toISOString()}));return await fn();}finally{fs.closeSync(fd);fs.unlinkSync(lock);}}
 export async function latest() {const r=await networkFetch('https://registry.npmjs.org/@petercjl%2fcodex-own/latest',{signal:AbortSignal.timeout(30000)});if(!r.ok)fail('REGISTRY_UNAVAILABLE',`Registry HTTP ${r.status}`);const p=await r.json();if(p.name!==pkg.name)fail('INVALID_MANIFEST','Registry package mismatch');return p.version;}
 export async function manifestFor(v){if(v===pkg.version){const local=read(path.join(packageRoot,'release.json'));if((local.binding?.managerVersion===v||local.version===v)&&Object.keys(local.platforms||{}).length){validateBinding(local,{managerVersion:v});return local;}}if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(v))fail('INVALID_VERSION','Invalid version');const r=await networkFetch(`https://registry.npmjs.org/@petercjl%2fcodex-own/${v}`,{signal:AbortSignal.timeout(30000)});if(!r.ok)fail('MANIFEST_UNAVAILABLE',`npm HTTP ${r.status}`);return packageManifest(await r.json(),v);}
 export function installedBinding(p=paths()){const f=path.join(p.manager,'binding.json');return fs.existsSync(f)?read(f).manifest:null;}
@@ -119,7 +120,7 @@ export async function configure(keyFile,{p=paths(),isRunning=running}={}){if(!ke
  if(!fs.existsSync(models))fs.copyFileSync(path.join(packageRoot,'defaults','models.json'),models,fs.constants.COPYFILE_EXCL);
  if(previous!==updated){const next=config+'.new-'+crypto.randomUUID();fs.writeFileSync(next,updated,{flag:'wx',mode:0o600});fs.renameSync(next,config);if(fs.readFileSync(config,'utf8')!==updated)fail('VERIFY_FAILED','Model configuration did not match the requested provider');}
  return {ok:true,configured:true,backup,configBackup,configPreserved:previous===updated,settingsPreserved:true,modelProvider:'dashscope_deepseek'};});}
-export async function install({version,adopt=false,archive,manifest,expectedCurrent,p=paths(),runtimeInstaller=ensureRuntime,identify=appIdentity}={}) {
+export async function install({version,adopt=false,archive,manifest,expectedCurrent,p=paths(),runtimeInstaller=ensureRuntime,identify=appIdentity,isRunning=running}={}) {
   if(!['darwin-arm64','win32-x64'].includes(p.platform))fail('UNSUPPORTED_PLATFORM',p.platform);
   progress('准备安装：检查版本、平台与独立目录');
   return locked(p,async()=>{const m=manifest||await manifestFor(version||pkg.version);const a=validateManifest(m,p.platform);
@@ -132,8 +133,9 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
       if(m.binding){recordBinding(p,m);if(!prior.desktop||bindingHash(prior.releaseManifest)!==bindingHash(m))writeState(p,{...prior,desktop:{version:m.version,identity:a.sha256},releaseManifest:m});}
       return {ok:true,unchanged:true,version:m.version,managerVersion:m.binding?.managerVersion||pkg.version,runtimeVersion:m.runtimes?.version||null,runtimeChanged:!!tools&&!tools.unchanged,transfer:{downloadBytes:0,downloadBlocks:0},desktopActivated:false};
     }
-    if(running(p).length)fail('APP_RUNNING','Quit codex-own before install/update');
+    if(isRunning(p).length)fail('APP_RUNNING','Quit codex-own before install/update');
     const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive,transfer;
+    try{
     if(f){if(fs.statSync(f).size!==a.size||await digestFile(f)!==a.sha256)fail('CHECKSUM_MISMATCH','Local archive checksum mismatch');}
     else{if(m.schema!==2)fail('NPM_ASSETS_REQUIRED','Update @petercjl/codex-own to the latest npm-only release.');f=path.join(stage,'app.tar');const cache=path.join(p.manager,'npm-assets');rejectLinks(cache);
       if(state(p)?.identity==='local.codex-own'&&fs.existsSync(p.target)&&appIdentity(p.target)==='local.codex-own'){
@@ -143,12 +145,13 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
     progress('校验通过，正在解压桌面程序');
     const content=path.join(stage,'unpacked');unpack(f,content);const source=path.join(content,a.entry);
     if(process.platform==='darwin')execFileSync('codesign',['--verify','--deep','--strict',source],{stdio:'pipe'});
-    if(m.runtimes)await ensureRuntime(m.runtimes,{p,report:progress});
+    if(m.runtimes)await runtimeInstaller(m.runtimes,{p,report:progress});
     progress('正在安装到独立目录');
-    const result=switchApp({p,source,version:m.version,manifest:m,runtimeSelection:previousRuntime,adopt});if(m.binding)recordBinding(p,m);
+    const result=switchApp({p,source,version:m.version,manifest:m,runtimeSelection:previousRuntime,adopt,isRunning});if(m.binding)recordBinding(p,m);
     if(process.platform==='darwin')execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-f',p.target],{stdio:'pipe'});
     else shortcut(p);
-    fs.rmSync(stage,{recursive:true,force:true});progress('安装完成');return {...result,downloadSource:archive?'local-archive':'registry.npmjs.org',...(transfer?{transfer}:{})};
+    progress('安装完成');return {...result,downloadSource:archive?'local-archive':'registry.npmjs.org',...(transfer?{transfer}:{})};
+    }finally{await removeTemporary(stage,{report:progress});}
   });
 }
 export function shortcut(p) {
@@ -165,4 +168,4 @@ export async function rollback({restoreData=false}={}){const p=paths();return lo
   if(prev.state?.releaseManifest){const m=prev.state.releaseManifest;if(!prev.runtimeSelection&&m.runtimes)await ensureRuntime(m.runtimes,{p,report:progress});if(m.binding)recordBinding(p,m);}
   else{const f=path.join(p.manager,'binding.json');if(fs.existsSync(f))fs.renameSync(f,f+'.before-legacy-rollback-'+crypto.randomUUID());}
   writeState(p,{...(prev.state||{schema:1,identity:'local.codex-own',version:'adopted-legacy',target:p.target}),previous:null});return {ok:true,preserved,dataBackup:backup};});}
-export function doctor(){const p=paths(),s=state(p);let tar=true;try{execFileSync(tarExecutable(),['--version'],{stdio:'pipe'});}catch{tar=false;}const pending=fs.existsSync(p.manager)?fs.readdirSync(p.manager).filter(n=>/^transaction-.*\.json$/.test(n)&&!n.endsWith('.complete.json')&&!fs.existsSync(path.join(p.manager,n.replace('.json','.complete.json')))):[];return {ok:tar&&!pending.length,managerVersion:pkg.version,platform:p.platform,supported:['darwin-arm64','win32-x64'].includes(p.platform),installed:s?.version||null,paths:p,tar,pendingTransactions:pending,lock:fs.existsSync(path.join(p.manager,'operation.lock')),configured:fs.existsSync(path.join(p.core,'auth.json')),agentShell:{...windowsAgentShell.discover(),desktopAdapterBundled:process.platform==='win32'&&fs.existsSync(path.join(p.target,'resources','own-updater','lib','windows-agent-shell.cjs')),policyContract:1},windowsGuiTested:false};}
+export function doctor(){const p=paths(),s=state(p);let tar=true;try{execFileSync(tarExecutable(),['--version'],{stdio:'pipe'});}catch{tar=false;}const pending=fs.existsSync(p.manager)?fs.readdirSync(p.manager).filter(n=>/^transaction-.*\.json$/.test(n)&&!n.endsWith('.complete.json')&&!fs.existsSync(path.join(p.manager,n.replace('.json','.complete.json')))):[];return {ok:tar&&!pending.length&&!fs.existsSync(path.join(p.manager,'operation.lock'))&&!fs.existsSync(path.join(p.manager,'recovery.lock')),bootstrap:{nodeVersion:process.version,executable:process.execPath,architecture:process.arch,supported:Number(process.versions.node.split('.')[0])>=22},lockDetails:lockStatus(p),orphanStages:temporaryStages(p),recoveryLock:fs.existsSync(path.join(p.manager,'recovery.lock')),managerVersion:pkg.version,platform:p.platform,supported:['darwin-arm64','win32-x64'].includes(p.platform),installed:s?.version||null,paths:p,tar,pendingTransactions:pending,lock:fs.existsSync(path.join(p.manager,'operation.lock')),configured:fs.existsSync(path.join(p.core,'auth.json')),agentShell:{...windowsAgentShell.discover(),desktopAdapterBundled:process.platform==='win32'&&fs.existsSync(path.join(p.target,'resources','own-updater','lib','windows-agent-shell.cjs')),policyContract:1},windowsGuiTested:false};}
