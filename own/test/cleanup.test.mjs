@@ -100,10 +100,9 @@ async function readyChild(executable,args){
  return child;
 }
 async function stopChild(child){if(child.exitCode!==null||child.signalCode!==null)return;const close=new Promise(resolve=>child.once('close',resolve));child.kill();await close;}
-test('native process inspection protects an actually running owned program and its paired snapshot',async t=>{
- const a=fixture(t),old=a.past('0.6.2');let executable=process.execPath;
- if(process.platform==='win32'){executable=path.join(old.old,'node.exe');fs.copyFileSync(process.execPath,executable,fs.constants.COPYFILE_EXCL);}
- const child=await readyChild(executable,['-e','console.log("READY");setInterval(()=>{},1000)',path.join(old.old,'process-marker')]);
+test('native process inspection protects resources held by an external Node process and their paired snapshot',async t=>{
+ const a=fixture(t),old=a.past('0.6.2');
+ const child=await readyChild(process.execPath,['-e','require("node:fs").openSync(process.argv[1],"r");console.log("READY");setInterval(()=>{},1000)',path.join(old.old,'program.bin')]);
  try{
   assert.ok(activeCleanupRoots([old.old]).includes(old.old));
   const r=await cleanupAfterHealthyStartup('0.6.4',{...a.options,processRoots:activeCleanupRoots});assert.equal(r.ok,true);assert.ok(fs.existsSync(old.old));assert.ok(fs.existsSync(old.backup));

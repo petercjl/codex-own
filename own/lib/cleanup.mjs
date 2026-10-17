@@ -37,7 +37,7 @@ export function activeCleanupRoots(roots){
   if(!roots.length)return [];
   if(process.platform==='win32'){
     const quoted=roots.map(r=>"'"+r.replaceAll("'","''")+"'").join(',');
-    const ps=`$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$roots=@(${quoted});@(Get-CimInstance Win32_Process | ForEach-Object { $f=$_.ExecutablePath; if($f){ foreach($r in $roots){ if($f.Equals($r,[StringComparison]::OrdinalIgnoreCase) -or $f.StartsWith($r+'\\',[StringComparison]::OrdinalIgnoreCase)){$r} } } }) | ConvertTo-Json -Compress`;
+    const ps=`$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$roots=@(${quoted});@(Get-CimInstance Win32_Process | ForEach-Object { $f=$_.ExecutablePath;$c=$_.CommandLine; foreach($r in $roots){$prefix=$r+'\\';if(($f -and ($f.Equals($r,[StringComparison]::OrdinalIgnoreCase) -or $f.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase))) -or ($c -and ($c.IndexOf($prefix,[StringComparison]::OrdinalIgnoreCase) -ge 0))){$r}} }) | ConvertTo-Json -Compress`;
     const text=execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(ps,'utf16le').toString('base64')],{encoding:'utf8',windowsHide:true,timeout:30000});
     const result=text.trim()?JSON.parse(text):[];return [...new Set(Array.isArray(result)?result:[result])];
   }
