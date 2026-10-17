@@ -13,6 +13,7 @@ function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(cons
 const key=p=>p.key?.name??p.key?.value;
 const property=(node,name)=>node?.properties?.find(p=>key(p)===name);
 const text=(s,n)=>s.slice(n.start,n.end);
+const stringValue=n=>n?.type==='Literal'?n.value:n?.type==='TemplateLiteral'&&n.expressions.length===0?n.quasis[0].value.cooked:undefined;
 const one=(items,name)=>{if(items.length!==1)throw Error(`Product mode contract changed: ${name} count=${items.length}`);return items[0];};
 export function patchProductModeSource(source){
   if(!source.includes('sidebarElectron.productMode.trigger'))return {source,patched:false};
@@ -20,7 +21,8 @@ export function patchProductModeSource(source){
   const ast=acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'}),states=[],switches=[],selectors=[];
   walk(ast,n=>{
     if(n.type==='ArrowFunctionExpression'&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'get')&&n.body.type==='BlockStatement'){
-      const s=text(source,n.body);if(s.includes('conversationDetailMode')&&s.includes('STEPS_PROSE')&&s.length<2000)states.push(n);
+      const s=text(source,n.body),r=n.body.body.find(n=>n.type==='ReturnStatement')?.argument;
+      if(s.includes('conversationDetailMode')&&s.includes('STEPS_PROSE')&&s.length<2000&&r?.type==='ConditionalExpression'&&stringValue(r.consequent)==='work'&&stringValue(r.alternate)==='codex')states.push(n);
     }
     if(n.type==='FunctionDeclaration'&&n.params[1]?.type==='ObjectPattern'&&property(n.params[1],'nextMode')&&property(n.params[1],'codexLocalAccessStatus'))switches.push(n);
     if(n.type==='FunctionDeclaration'&&n.body.end-n.body.start<30000&&text(source,n.body).includes('sidebarElectron.productMode.trigger')&&text(source,n.body).includes('sidebarElectron.productMode.work.description.recommended'))selectors.push(n);
