@@ -71,6 +71,11 @@ const index=bytes.indexOf(sentinel);
 if(index<0||bytes.lastIndexOf(sentinel)!==index||bytes[index+32]!==1||bytes[index+33]!==1)throw Error('Unknown framework integrity contract');
 crypto.createHash('sha256').update('Resources/app.asarSHA256'+hash).digest().copy(bytes,index+34);
 fs.writeFileSync(framework,bytes);
+// Resources is not a nested-code directory for codesign --deep. The copied
+// standalone CLI needs its own ad-hoc signature before sealing the parent app.
+const standaloneCli=path.join(resources,'codex');
+execFileSync('codesign',['--force','--sign','-',standaloneCli],{stdio:'inherit'});
+execFileSync('codesign',['--verify','--strict',standaloneCli],{stdio:'inherit'});
 execFileSync('codesign',['--force','--deep','--sign','-',app],{stdio:'inherit'});
 execFileSync('codesign',['--verify','--deep','--strict',app],{stdio:'inherit'});
 fs.writeFileSync(path.join(output,'build-manifest.json'),JSON.stringify({app,source,version:pkg.version,asarHeaderHash:hash,identity:info.CFBundleIdentifier,stateRoot:'~/Library/Application Support/codex-own-independent',created:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
