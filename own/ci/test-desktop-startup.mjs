@@ -25,6 +25,7 @@ fs.writeFileSync(path.join(core,'config.toml'),`cli_auth_credentials_store = "fi
 const reservation=net.createServer();await new Promise(r=>reservation.listen(0,'127.0.0.1',r));const port=reservation.address().port;await new Promise(r=>reservation.close(r));
 const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|DASHSCOPE_|ANTHROPIC_|AZURE_OPENAI_|GH_TOKEN$|GITHUB_TOKEN$)/.test(k))delete env[k];
 Object.assign(env,{HOME:home,CFFIXED_USER_HOME:home,USERPROFILE:home,LOCALAPPDATA:local,APPDATA:path.join(home,'AppData/Roaming'),ELECTRON_ENABLE_LOGGING:'1'});
+for(const directory of [env.APPDATA,env.LOCALAPPDATA])fs.mkdirSync(directory,{recursive:true});
 const executable=path.join(app,mac?'Contents/MacOS/codex-own-launch':'codex-own.exe');
 const log=fs.openSync(path.join(out,'desktop.log'),'wx');
 const child=spawn(executable,[`--remote-debugging-port=${port}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${path.join(root,'desktop')}`,'--disable-gpu','--no-first-run'],{env,detached:mac,windowsHide:true,stdio:['ignore',log,log]});
