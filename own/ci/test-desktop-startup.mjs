@@ -10,9 +10,14 @@ const resources=path.join(app,mac?'Contents/Resources':'resources'),bundle=path.
 const embedded=JSON.parse(fs.readFileSync(path.join(bundle,'release.json'))),meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json')));
 assert.equal(embedded.runtimes.version,meta.toolRuntimeVersion);
 await installRuntime(embedded.runtimes,{p:{root,manager:path.join(root,'manager'),core:path.join(root,'core'),desktop:path.join(root,'desktop'),target:app,platform:`${process.platform}-${process.arch}`},report:m=>console.error(m)});
+// Exercise the API-mode workbench with a fixture credential and a loopback-only
+// provider. The separate protocol fixture verifies successful model responses.
+const core=path.join(root,'core');fs.mkdirSync(core,{recursive:true});
+fs.writeFileSync(path.join(core,'auth.json'),JSON.stringify({auth_mode:'apikey',OPENAI_API_KEY:'sk-fixture-only-no-service-access'}),{flag:'wx',mode:0o600});
+fs.writeFileSync(path.join(core,'config.toml'),`cli_auth_credentials_store = "file"\nforced_login_method = "api"\nmodel = "deepseek-v4.1-flash"\nmodel_provider = "offline_fixture"\nmodel_catalog_json = ${JSON.stringify(path.resolve('own/defaults/models.json'))}\n[model_providers.offline_fixture]\nname = "Offline GUI fixture"\nbase_url = "http://127.0.0.1:9/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n`,{flag:'wx',mode:0o600});
 const reservation=net.createServer();await new Promise(r=>reservation.listen(0,'127.0.0.1',r));const port=reservation.address().port;await new Promise(r=>reservation.close(r));
-const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_)/.test(k))delete env[k];
-Object.assign(env,{HOME:home,USERPROFILE:home,LOCALAPPDATA:local,APPDATA:path.join(home,'AppData/Roaming'),ELECTRON_ENABLE_LOGGING:'1'});
+const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|DASHSCOPE_|ANTHROPIC_|AZURE_OPENAI_|GH_TOKEN$|GITHUB_TOKEN$)/.test(k))delete env[k];
+Object.assign(env,{HOME:home,CFFIXED_USER_HOME:home,USERPROFILE:home,LOCALAPPDATA:local,APPDATA:path.join(home,'AppData/Roaming'),ELECTRON_ENABLE_LOGGING:'1'});
 const executable=path.join(app,mac?'Contents/MacOS/codex-own-launch':'codex-own.exe');
 const log=fs.openSync(path.join(out,'desktop.log'),'wx');
 const child=spawn(executable,[`--remote-debugging-port=${port}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${path.join(root,'desktop')}`,'--disable-gpu','--no-first-run'],{env,detached:mac,windowsHide:true,stdio:['ignore',log,log]});
