@@ -1,5 +1,15 @@
 # codex-own operations
 
+## Building current official desktop inputs
+
+`own/build.mjs` synchronizes only the runner's target platform and preserves the official bundled CLI by default, keeping the desktop and protocol engine together. `OWN_CLI_SOURCE=rebuild` explicitly selects the Rebuild vendor resolver; an unavailable selected vendor stops the build. Source package versions, program-tree identities, original ASAR and CLI hashes are recorded in the candidate manifest. macOS inputs must pass their original code signature check; Windows MSIX downloads must match the Microsoft Store package digest.
+
+The upstream adapter locates one resource-bearing macOS application independently of its bundle name, preserves ASAR links and unpacked native entries, and updates the executable that actually contains the Windows ASAR integrity resource. Only the two explicitly named optional device bindings may be absent; any other missing unpacked input fails. Unpacked native hashes in an ASAR can predate official code signing; preserve signed bytes and validate the complete official package rather than imposing stale pre-sign hashes.
+
+Native archived deletion is accepted only when the archived-thread controls and deletion method call are present in executable frontend structure. Older layouts require both legacy patches. Unknown layouts fail instead of treating zero replacements as success. Candidate QA also runs a real offline Responses turn and thread start/resume/archive/delete against a temporary profile; no real credential or external model endpoint is involved.
+
+`own-build.yml` can be dispatched against an isolated branch for verification and short-lived CI artifacts. It has read-only repository permissions and contains no publish or merge job. This path does not change npm tags, GitHub Releases, installed applications or the scheduled sync policy.
+
 ## Incremental desktop distribution (0.4.0+)
 
 Builds preserve the complete signed application as the recovery `.tar.gz` artifact. In parallel, `canonicalize.mjs` writes a deterministic uncompressed `.tar` with sorted paths, normalized modes/timestamps and relative symlinks. `canonical-tar-cdc-v1` uses content-defined 16–64 MiB raw blocks (32 MiB rolling-hash mask). npm compresses each payload independently. Do not gzip the whole canonical archive before splitting: that would invalidate unchanged content after a small edit.
