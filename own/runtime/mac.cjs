@@ -24,6 +24,7 @@ function apply() {
     CODEX_OWN_LEGACY_RUNTIME_ROOT: path.join(root,'runtimes','upstream-disabled'),
   });
   require(path.join(resources,'own-updater','lib','tool-env.cjs')).apply(path.join(root,'runtimes'));
+  require(path.join(resources,'own-updater','lib','api-input-compat.cjs')).install({cli,core:paths.core});
   return paths;
 }
 for (const value of Object.values(paths)) fs.mkdirSync(value, {recursive: true, mode: 0o700});
@@ -42,6 +43,7 @@ app.setAsDefaultProtocolClient = () => false;
 app.removeAsDefaultProtocolClient = () => false;
 require(path.join(resources,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
 require(path.join(resources,'own-updater','desktop','product-mode.cjs')).install(require('electron'),paths.core);
+require(path.join(resources,'own-updater','desktop','thread-titles.cjs')).install(require('electron'),paths.core);
 app.whenReady().then(() => {
   const icon = nativeImage.createFromPath(path.join(resources, 'codex-own.png'));
   if (app.dock && !icon.isEmpty()) {

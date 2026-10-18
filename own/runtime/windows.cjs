@@ -14,6 +14,7 @@ function apply(){
  process.env.CODEX_OWN_LEGACY_RUNTIME_ROOT=path.join(root,'runtimes','upstream-disabled');
  require(path.join(process.resourcesPath,'own-updater','lib','tool-env.cjs')).apply(path.join(root,'runtimes'));
  require(path.join(process.resourcesPath,'own-updater','lib','windows-agent-shell.cjs')).install({cli,core:paths.core});
+ require(path.join(process.resourcesPath,'own-updater','lib','api-input-compat.cjs')).install({cli,core:paths.core});
  return paths;
 }
 apply();app.setName('codex-own');app.setPath('userData',paths.desktop);app.setPath('logs',paths.logs);
@@ -22,4 +23,5 @@ app.setName=()=>{};app.setAppUserModelId=()=>{};
 app.setAsDefaultProtocolClient=()=>false;app.removeAsDefaultProtocolClient=()=>false;
 require(path.join(process.resourcesPath,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
 require(path.join(process.resourcesPath,'own-updater','desktop','product-mode.cjs')).install(require('electron'),paths.core);
+require(path.join(process.resourcesPath,'own-updater','desktop','thread-titles.cjs')).install(require('electron'),paths.core);
 module.exports={apply,paths,ensureTools:()=>require(path.join(process.resourcesPath,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply)};
