@@ -120,7 +120,7 @@ jobs:
         with: {ref: '${{ inputs.ref }}', fetch-depth: 0}
       - uses: actions/setup-node@v6
         with: {node-version: '24.15.0', package-manager-cache: false}
-      - run: npm ci --prefix own
+      - run: npm ci --prefix own && npm ci
       - name: Verify source binding and launch isolated desktop
         env:
           GH_TOKEN: ${{ github.token }}

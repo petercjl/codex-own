@@ -3,6 +3,8 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import net from 'node:net';import assert from 'node:assert/strict';import {spawn,execFileSync} from 'node:child_process';
 import {installRuntime} from '../lib/tool-runtime.mjs';
+import {createRequire} from 'node:module';
+import {nativeDeviceContract} from './native-device-contract.mjs';
 const app=path.resolve(process.argv[2]),out=path.resolve(process.argv[3]),mac=process.platform==='darwin';
 if(fs.existsSync(out))throw Error('Choose a fresh GUI evidence directory');fs.mkdirSync(out,{recursive:true});
 // Darwin Unix-domain socket paths are limited to roughly 104 bytes.
@@ -11,6 +13,11 @@ const local=path.join(home,'AppData/Local'),root=mac?path.join(home,'Library/App
 const resources=path.join(app,mac?'Contents/Resources':'resources'),bundle=path.join(resources,'own-updater');
 const embedded=JSON.parse(fs.readFileSync(path.join(bundle,'release.json'))),meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json')));
 assert.equal(embedded.runtimes.version,meta.toolRuntimeVersion);
+if(process.env.OWN_GUI_MANIFEST){
+ const source=path.resolve(process.env.OWN_GUI_MANIFEST),target=path.join(out,'verified-manifest.json');fs.statSync(source);assert.ok(!fs.existsSync(target));
+ const manifest=JSON.parse(fs.readFileSync(source));assert.equal(manifest.version,meta.version);assert.equal(manifest.platforms[`${process.platform}-${process.arch}`]?.entry,path.basename(app));
+ fs.copyFileSync(source,target,fs.constants.COPYFILE_EXCL);
+}
 if(mac)assert.ok(Buffer.byteLength(path.join(root,'core/ipc/ipc.sock'))<104,'GUI fixture IPC path is too long');
 if(process.argv[4]){
  const cache=path.resolve(process.argv[4]),dest=path.join(root,'runtimes/npm-assets');assert.ok(fs.lstatSync(cache).isDirectory());fs.mkdirSync(dest,{recursive:true});
@@ -48,6 +55,16 @@ try{
  const screenshot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'desktop.png'),Buffer.from(screenshot.data,'base64'),{flag:'wx'});
  fs.writeFileSync(path.join(out,'renderer.json'),JSON.stringify({...state,text:state.text.slice(0,2000)},null,2),{flag:'wx'});
  assert.equal(state.ready,'complete');assert.ok(state.buttons>=5&&state.composer>=1&&state.text.trim().length>30,'Desktop workbench did not become interactive');
+ if(!mac){
+  const asar=createRequire(import.meta.url)('@electron/asar'),archive=path.join(resources,'app.asar');
+  const bridges=asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>/^webview\/assets\/codex-micro-bridge-[\w-]+\.js$/.test(n));
+  assert.equal(bridges.length,1,'Expected one native device bridge');
+  const contract=nativeDeviceContract(asar.extractFile(archive,bridges[0].replaceAll('/',path.sep)).toString());
+  const result=await call('Runtime.evaluate',{expression:`(async()=>{const api=(await import(${JSON.stringify('app://-'+contract.module)}))[${JSON.stringify(contract.binding)}];if(api?.codexMicro==null)throw Error('Native device host service unavailable');await api.codexMicro.getState();await new Promise(r=>setTimeout(r,1500));const state=await api.codexMicro.getState();return JSON.stringify({runtime:'official Owl',status:state.status,error:state.error,physicalDeviceCommunicationTested:false});})()`,awaitPromise:true,returnByValue:true});
+  assert.ok(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));const native=JSON.parse(result.result.value);
+  fs.writeFileSync(path.join(out,'native-device-service.json'),JSON.stringify(native,null,2),{flag:'wx'});
+  assert.ok(['not-detected','detected','connected'].includes(native.status),'Native device discovery failed');assert.equal(native.error,null);
+ }
  assert.equal(events.filter(e=>e.method==='Runtime.exceptionThrown').length,0,'Renderer raised an unhandled exception');
  console.log(JSON.stringify({ok:true,platform:process.platform,nativeDesktopLaunched:true,rendererHydrated:true,workbenchControlsAndComposer:true,screenshot:path.join(out,'desktop.png'),profile:root,realCredentialsUsed:false,interactiveFeaturesTested:false}));
 }finally{

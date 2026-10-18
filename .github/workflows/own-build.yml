@@ -69,6 +69,21 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = macOS ]; then APP="out/own-release-$OWN_VERSION-darwin-arm64.noindex/built/codex-own.app"; else APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"; fi
           node own/ci/test-official-compat.mjs "$APP"
+      - name: Verify desktop workbench and Owl native device service
+        if: ${{ !inputs.existing }}
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+          OWN_GUI_MANIFEST: out/own-release-${{ inputs.version }}-${{ matrix.platform }}.noindex/manifest-${{ matrix.platform }}.json
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then APP="out/own-release-$OWN_VERSION-darwin-arm64.noindex/built/codex-own.app"; else APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"; fi
+          node own/ci/test-desktop-startup.mjs "$APP" out/gui-smoke
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && !inputs.existing }}
+        with:
+          name: gui-${{ matrix.platform }}
+          path: out/gui-smoke
+          if-no-files-found: warn
+          retention-days: 3
       - name: Verify prepared desktop artifacts
         if: ${{ inputs.existing }}
         env:
