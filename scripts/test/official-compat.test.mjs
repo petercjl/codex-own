@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
-const {findMacApplication,missingUnpacked,patchWindowsIntegrity,repackAsar,extractAsar,selectPlatforms}=require('../upstream-compat.js');
+const {findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,patchWindowsIntegrity,repackAsar,extractAsar,selectPlatforms}=require('../upstream-compat.js');
 const {hasNativeArchiveDelete}=require('../patch-archive-native.js');
 const {copyrightPatches}=require('../patch-copyright-rule.js');
 const asar=require('@electron/asar');
@@ -15,10 +15,22 @@ test('Mac locator supports either official bundle name and refuses ambiguous app
  const root=fixture();for(const name of ['Codex.app','ChatGPT.app']){const app=path.join(root,name);fs.mkdirSync(path.join(app,'Contents/Resources'),{recursive:true});fs.writeFileSync(path.join(app,'Contents/Resources/app.asar'),'');assert.equal(findMacApplication(root),app);fs.rmSync(app,{recursive:true});}
  for(const name of ['One.app','Two.app']){fs.mkdirSync(path.join(root,name,'Contents/Resources'),{recursive:true});fs.writeFileSync(path.join(root,name,'Contents/Resources/app.asar'),'');}assert.throws(()=>findMacApplication(root),/ambiguous/i);
 });
-test('unknown missing unpacked files stop extraction; known optional device bindings are explicit',()=>{
+test('missing unpacked files stop extraction unless a caller explicitly supplies an allowance',()=>{
  const root=fixture(),archive=path.join(root,'app.asar');
  assert.deepEqual(missingUnpacked({files:{'critical.node':{unpacked:true}}},archive,{allowed:new Set(['critical.node'])}),['critical.node']);
  assert.throws(()=>missingUnpacked({files:{'critical.node':{unpacked:true}}},archive),/critical.node/);
+});
+test('MSIX scoped native paths restore exact package bytes, reject collisions and remain idempotent',async()=>{
+ const root=fixture(),input=path.join(root,'input'),name='node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node';
+ const file=path.join(input,name),bytes=Buffer.alloc(256);bytes.write('MZ');bytes.writeUInt32LE(128,0x3c);bytes.write('PE\0\0',128);bytes.writeUInt16LE(0x8664,132);
+ fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,bytes);const archive=path.join(root,'app.asar');await asar.createPackageWithOptions(input,archive,{unpack:'*.node'});
+ const normal=path.join(archive+'.unpacked',name),encoded=path.join(archive+'.unpacked',name.replaceAll('@','%40'));
+ fs.mkdirSync(path.dirname(encoded),{recursive:true});fs.renameSync(normal,encoded);
+ assert.throws(()=>extractAsar(archive,path.join(root,'missing')),/missing/i);
+ const records=restoreMsixUnpackedPaths(archive);assert.equal(records.length,1);assert.equal(records[0].sha256,crypto.createHash('sha256').update(bytes).digest('hex'));assert.deepEqual(fs.readFileSync(normal),bytes);
+ assert.deepEqual(restoreMsixUnpackedPaths(archive),[]);assert.deepEqual(missingUnpacked(asar.getRawHeader(archive).header,archive),[]);
+ fs.writeFileSync(normal,'collision');assert.throws(()=>restoreMsixUnpackedPaths(archive),/collision/);fs.unlinkSync(normal);
+ const wrong=Buffer.from(bytes);wrong.writeUInt16LE(0x14c,132);fs.writeFileSync(encoded,wrong);assert.throws(()=>restoreMsixUnpackedPaths(archive),/Windows x64 PE/);assert.ok(!fs.existsSync(normal));
 });
 test('Windows integrity targets the executable carrying the resource and rejects absent or duplicate matches',()=>{
  const root=fixture(),before='a'.repeat(64),after='b'.repeat(64);fs.writeFileSync(path.join(root,'Codex.exe'),'launcher');fs.writeFileSync(path.join(root,'ChatGPT.exe'),'resource:'+before);

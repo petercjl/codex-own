@@ -5,7 +5,16 @@ import os from 'node:os';
 import http from 'node:http';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
+import {createRequire} from 'node:module';
 const app=path.resolve(process.argv[2]),mac=process.platform==='darwin';
+if(!mac){
+ const require=createRequire(import.meta.url),base=path.join(app,'resources/app.asar.unpacked/node_modules/@worklouder/device-kit-oai/node_modules');
+ const serial=require(path.join(base,'@serialport/bindings-cpp/build/Release/bindings.node')),hid=require(path.join(base,'node-hid/build/Release/HID.node'));
+ assert.equal(typeof serial.list,'function');assert.equal(typeof hid.devices,'function');
+ const ports=await new Promise((resolve,reject)=>serial.list((error,result)=>error?reject(error):resolve(result)));
+ assert.ok(Array.isArray(ports));assert.ok(Array.isArray(hid.devices()));
+ console.log(JSON.stringify({ok:true,windowsNativeDeviceBindingsLoaded:true,serialEnumeration:true,hidEnumeration:true,physicalDeviceInteractionTested:false}));
+}
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'own-official-native-'));
 let requests=0,fixtureError;
 const server=http.createServer(async(req,res)=>{

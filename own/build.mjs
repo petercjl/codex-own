@@ -35,7 +35,7 @@ else{
  provenance.originalAsarSha256=await digestFile(archive);
  const header=asar.getRawHeader(archive).header;
  const extract=path.join(root,'src',platform,'_asar');
- // A narrowly checked fallback for optional absent upstream device bindings.
+ // Every unpacked entry must exist after verified MSIX path restoration.
  const missing=missingUnpacked(header,archive);
  function entries(d,prefix=''){const out=[];for(const [name,e]of Object.entries(d.files)){const n=prefix+name;if(e.files)out.push(...entries(e,n+'/'));else out.push([n,e]);}return out;}
  const files=entries(header);
@@ -53,7 +53,8 @@ else{
  const vendor=cliSource==='rebuild'?withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()):null,cli=path.join(resources,mac?'codex':'codex.exe');
  if(cliSource==='rebuild'&&!vendor)throw Error('Selected Rebuild CLI unavailable');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
- if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.optionalMissingBindings=missing;
+ if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.missingUnpackedBindings=missing;
+ if(!mac)provenance.msixPathRestorations=JSON.parse(fs.readFileSync(path.join(root,'src',platform,'msix-path-restorations.json')));
  const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?'codex-own.app':'app');
 }
 const resources=path.join(source,mac?'Contents/Resources':'resources');

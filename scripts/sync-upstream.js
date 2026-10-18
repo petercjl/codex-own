@@ -22,7 +22,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const {selectPlatforms,extractAsar}=require('./upstream-compat');
+const {selectPlatforms,extractAsar,restoreMsixUnpackedPaths}=require('./upstream-compat');
 const crypto=require('node:crypto');
 
 // TLS certs for MS delivery CDN
@@ -218,7 +218,10 @@ async function syncWin(destDir) {
     throw new Error(`Windows: resources dir not found${alt ? `, app.asar at ${alt}` : ""}`);
   }
 
+  const restored=restoreMsixUnpackedPaths(path.join(resourcesDir,'app.asar'));
+  console.log('   [MSIX scoped paths restored] '+JSON.stringify(restored));
   assembleOutput(resourcesDir, destDir, "Windows");
+  fs.writeFileSync(path.join(destDir,'msix-path-restorations.json'),JSON.stringify(restored,null,2),{flag:'wx'});
   return info;
 }
 
@@ -234,8 +237,7 @@ function assembleOutput(resourcesDir, destDir, label) {
   // 1. Extract app.asar → _asar/ (for patching)
   const asarDest = path.join(destDir, "_asar");
   console.log("   [asar extract] -> _asar/");
-  const extraction=extractAsar(asarPath,asarDest);
-  if(extraction.missingOptionalBindings.length)console.log('   [optional absent] '+JSON.stringify(extraction.missingOptionalBindings));
+  extractAsar(asarPath,asarDest);
 
   // 2. Copy app.asar.unpacked/ as-is (native modules)
   const unpackedSrc = path.join(resourcesDir, "app.asar.unpacked");
