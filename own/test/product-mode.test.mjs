@@ -89,16 +89,17 @@ test('combined upstream chunks retain execution and menu policy plus an earlier 
 });
 
 test('API users enter the workbench while authentication and gateway readiness remain enforced',()=>{
- const route=`function route({auth:a,codexFeatureAccess:f,backendOnboardingCompleted:done,gatewayOAuthReadiness:gateway='ready'}){return a.isLoading?null:!a.authMethod?'login':f.status==='loading'?null:gateway==='required'?'login':done?'app':'welcome'};globalThis.route=route;`;
+ const route=`function route({auth:a,codexFeatureAccess:f,backendOnboardingCompleted:done,gatewayOAuthReadiness:gateway='ready'}){return a.isLoading?null:!a.authMethod&&a.requiresAuth?'login':f.status==='loading'?null:gateway==='required'?'login':done?'app':'welcome'};globalThis.route=route;`;
  for(const apiMode of [true,false]){
   const source=patchProductModeSource(fixture+route).source,c=vm.createContext({codexOwnProductPolicy:{contract:1,apiMode}});vm.runInContext(source,c);
   const input={auth:{authMethod:'apikey'},codexFeatureAccess:{status:'allowed'},backendOnboardingCompleted:false};
   assert.equal(c.route(input),apiMode?'app':'welcome');
-  assert.equal(c.route({...input,auth:{authMethod:null}}),'login');
+  assert.equal(c.route({...input,auth:{authMethod:null,requiresAuth:true}}),'login');
   assert.equal(c.route({...input,auth:{authMethod:'apikey',isLoading:true}}),null);
   assert.equal(c.route({...input,codexFeatureAccess:{status:'loading'}}),null);
   assert.equal(c.route({...input,gatewayOAuthReadiness:'required'}),'login');
   assert.equal(c.route({...input,auth:{authMethod:'chatgpt'}}),'welcome');
+  assert.equal(c.route({...input,auth:{authMethod:null,requiresAuth:false}}),apiMode?'app':'welcome');
   assert.equal(patchProductModeSource(source).source,source);
  }
  assert.throws(()=>patchProductModeSource(fixture+route.replace('codexFeatureAccess:f','changedFeatureAccess:f')),/onboarding route gate/);

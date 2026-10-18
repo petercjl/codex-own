@@ -67,3 +67,11 @@ own/lib/app-update.mjs owns stable version comparison, schema-2 manifest validat
 Desktop builds bundle only the updater code, runtime dependencies and standalone Node for their platform. On macOS a Homebrew-linked Node is refused; use an official standalone binary through OWN_UPDATER_NODE when building locally. GitHub setup-node supplies the platform runtime in CI. Global npm manager and desktop updater may have different versions after in-app updates, which is expected. Bundled Skills remain managed by the global CLI's skill commands; an App update does not silently edit Agent skill directories.
 
 Prepared archive migration can explicitly set provenance.upgradeNpmUpdater=true. Verification then upgrades a fresh extracted copy, preserving original resources and regenerating ASAR/PE/framework integrity and macOS signatures. Existing and fresh artifacts must pass the bundled-runtime import gate in own/test-app.mjs. Unit tests cover checks, failed/tampered downloads, ready-state recovery, safe handoff, menu reconstruction and IPC sender validation; those gates do not by themselves establish native GUI success.
+
+## Official desktop adaptation checks
+
+API-mode policy routes authenticated API-key and authentication-free custom-provider sessions directly into the Codex workbench. Existing authentication, provider readiness and gateway checks still run. ChatGPT personalization onboarding remains available to subscription sessions; this overlay does not rewrite saved onboarding data.
+
+The isolated GUI smoke requires workbench controls and a composer, and preserves screenshots and renderer errors. Its credentials are fixtures and its provider is loopback-only. macOS uses Chromium's test-only mock keychain to avoid real keychain access; this switch is confined to the test launcher. Real-keychain integration and live provider credentials require separate acceptance evidence. Test cleanup includes Owl child processes bound to the unique candidate/profile.
+
+Experimental own-build and build workflow dispatches only create and verify CI artifacts. They do not publish npm, activate GitHub releases or merge own-main. Bind GUI verification to the successful native-build run and matching native-source fingerprint.

@@ -44,7 +44,7 @@ export function patchProductModeSource(source){
   if(source.includes('backendOnboardingCompleted:')){
     const gate=one(onboarding,'onboarding route gate'),auth=property(gate.params[0],'auth').value,completed=property(gate.params[0],'backendOnboardingCompleted').value;
     if(auth.type!=='Identifier'||completed.type!=='Identifier')throw Error('Unsupported onboarding route bindings');
-    edits.push([gate.body.start+1,gate.body.start+1,`${onboardingMarker}if(__codexOwnApiMode()&&${auth.name}.authMethod==="apikey")${completed.name}=true;`]);
+    edits.push([gate.body.start+1,gate.body.start+1,`${onboardingMarker}if(__codexOwnApiMode()&&(${auth.name}.authMethod==="apikey"||(${auth.name}.authMethod==null&&${auth.name}.requiresAuth===false)))${completed.name}=true;`]);
   }
   const items=[];walk(selector.body,n=>{
     if(n.type==='ObjectExpression'&&property(n,'onSelect')?.value.type==='Identifier'&&property(n,'SubText')?.value.type==='Identifier'&&property(n,'rightIconAsset')?.value.type==='Identifier')items.push(n);
