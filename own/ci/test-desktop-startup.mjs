@@ -1,4 +1,5 @@
 // Launch only the supplied candidate against a new profile and verified tools.
+// macOS uses Chromium's test-only mock keychain; never access real keychain items.
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import net from 'node:net';import assert from 'node:assert/strict';import {spawn,execFileSync} from 'node:child_process';
 import {installRuntime} from '../lib/tool-runtime.mjs';
@@ -28,7 +29,7 @@ Object.assign(env,{HOME:home,CFFIXED_USER_HOME:home,USERPROFILE:home,LOCALAPPDAT
 for(const directory of [env.APPDATA,env.LOCALAPPDATA])fs.mkdirSync(directory,{recursive:true});
 const executable=path.join(app,mac?'Contents/MacOS/codex-own-launch':'codex-own.exe');
 const log=fs.openSync(path.join(out,'desktop.log'),'wx');
-const child=spawn(executable,[`--remote-debugging-port=${port}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${path.join(root,'desktop')}`,'--disable-gpu','--no-first-run'],{env,detached:mac,windowsHide:true,stdio:['ignore',log,log]});
+const child=spawn(executable,[...(mac?['--use-mock-keychain']:[]),`--remote-debugging-port=${port}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${path.join(root,'desktop')}`,'--disable-gpu','--no-first-run'],{env,detached:mac,windowsHide:true,stdio:['ignore',log,log]});
 let launchError;child.on('error',e=>{launchError=e});let socket,id=0;const pending=new Map(),events=[];
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 try{
@@ -43,14 +44,22 @@ try{
  socket.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(m.method==='Runtime.exceptionThrown'||m.method==='Log.entryAdded')events.push(m);if(p){pending.delete(m.id);clearTimeout(p.timer);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
  const call=(method,params={})=>new Promise((resolve,reject)=>{const key=++id,timer=setTimeout(()=>{pending.delete(key);reject(Error('CDP timeout '+method))},10000);pending.set(key,{resolve,reject,timer});socket.send(JSON.stringify({id:key,method,params}));});
  await call('Runtime.enable');await call('Log.enable');
- let state;for(let i=0;i<180;i++){const result=await call('Runtime.evaluate',{expression:'JSON.stringify({title:document.title,url:location.href,ready:document.readyState,text:document.body?.innerText||"",elements:document.body?.querySelectorAll("*").length||0,html:document.body?.innerHTML.slice(0,5000),policy:globalThis.codexOwnProductPolicy})',returnByValue:true});state=JSON.parse(result.result.value);if(state.ready==='complete'&&state.elements>20&&state.text.trim().length>15)break;await delay(500);}
+ let state;for(let i=0;i<180;i++){const result=await call('Runtime.evaluate',{expression:'JSON.stringify({title:document.title,url:location.href,ready:document.readyState,buttons:document.querySelectorAll("button").length,composer:document.querySelectorAll("textarea,[contenteditable=true]").length,text:document.body?.innerText||"",elements:document.body?.querySelectorAll("*").length||0,html:document.body?.innerHTML.slice(0,5000),policy:globalThis.codexOwnProductPolicy})',returnByValue:true});state=JSON.parse(result.result.value);if(state.ready==='complete'&&state.buttons>=5&&state.composer>=1&&state.text.trim().length>30)break;await delay(500);}
  const screenshot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'desktop.png'),Buffer.from(screenshot.data,'base64'),{flag:'wx'});
  fs.writeFileSync(path.join(out,'renderer.json'),JSON.stringify({...state,text:state.text.slice(0,2000)},null,2),{flag:'wx'});
- assert.equal(state.ready,'complete');assert.ok(state.elements>20&&state.text.trim().length>15,'Renderer did not hydrate');
+ assert.equal(state.ready,'complete');assert.ok(state.buttons>=5&&state.composer>=1&&state.text.trim().length>30,'Desktop workbench did not become interactive');
  console.log(JSON.stringify({ok:true,platform:process.platform,nativeDesktopLaunched:true,rendererHydrated:true,screenshot:path.join(out,'desktop.png'),profile:root,realCredentialsUsed:false,interactiveFeaturesTested:false}));
 }finally{
  socket?.close();for(const p of pending.values())clearTimeout(p.timer);
  fs.writeFileSync(path.join(out,'renderer-events.json'),JSON.stringify(events,null,2),{flag:'wx'});
- if(mac){try{process.kill(-child.pid,'SIGTERM')}catch{child.kill()}}else{try{execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{stdio:'pipe',timeout:10000})}catch{child.kill()}}
+ if(mac){
+  // Owl starts application processes outside the launcher's process group.
+  // Bind cleanup to this candidate and its unique test profile, then include
+  // descendants before terminating the launch process.
+  const rows=execFileSync('ps',['-axo','pid=,ppid=,command='],{encoding:'utf8'}).split('\n').map(l=>l.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)).filter(Boolean).map(m=>({pid:+m[1],parent:+m[2],command:m[3]}));
+  const owned=new Set([child.pid,...rows.filter(r=>r.command.startsWith(app+path.sep)&&r.command.includes(root)).map(r=>r.pid)]);
+  for(let changed=true;changed;){changed=false;for(const r of rows)if(owned.has(r.parent)&&!owned.has(r.pid)){owned.add(r.pid);changed=true;}}
+  for(const pid of [...owned].reverse())try{process.kill(pid,'SIGTERM')}catch{}
+ }else{try{execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{stdio:'pipe',timeout:10000})}catch{child.kill()}}
  fs.closeSync(log);
 }

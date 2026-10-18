@@ -7,6 +7,7 @@ const stateMarker='/* codex-own:api-mode-state-v1 */';
 const switchMarker='/* codex-own:api-mode-switch-v1 */';
 const menuMarker='/* codex-own:api-mode-menu-v1 */';
 const detailMarker='/* codex-own:api-detail-state-v1 */';
+const onboardingMarker='/* codex-own:api-onboarding-state-v1 */';
 const preferenceMarker='/* codex-own:api-detail-write-v1 */';
 export const policyPreload=';(()=>{const {contextBridge,ipcRenderer}=require("electron");const p=ipcRenderer.sendSync("codex-own:product-policy:v1");if(!p||p.contract!==1||typeof p.apiMode!=="boolean")throw Error("codex-own product policy unavailable");contextBridge.exposeInMainWorld("codexOwnProductPolicy",{contract:1,apiMode:p.apiMode});})();\n';
 function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const c of v)walk(c,fn);else if(v&&typeof v==='object')walk(v,fn);}}
@@ -18,12 +19,13 @@ const one=(items,name)=>{if(items.length!==1)throw Error(`Product mode contract 
 export function patchProductModeSource(source){
   if(!source.includes('sidebarElectron.productMode.trigger'))return {source,patched:false};
   if(source.includes(stateMarker)){verifyProductModeSource(source);return {source,patched:false,already:true};}
-  const ast=acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'}),states=[],switches=[],selectors=[];
+  const ast=acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'}),states=[],switches=[],selectors=[],onboarding=[];
   walk(ast,n=>{
     if(n.type==='ArrowFunctionExpression'&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'get')&&n.body.type==='BlockStatement'){
       const s=text(source,n.body),r=n.body.body.find(n=>n.type==='ReturnStatement')?.argument;
       if(s.includes('conversationDetailMode')&&s.includes('STEPS_PROSE')&&s.length<2000&&r?.type==='ConditionalExpression'&&stringValue(r.consequent)==='work'&&stringValue(r.alternate)==='codex')states.push(n);
     }
+    if(n.type==='FunctionDeclaration'&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'backendOnboardingCompleted')&&property(n.params[0],'auth')&&property(n.params[0],'codexFeatureAccess'))onboarding.push(n);
     if(n.type==='FunctionDeclaration'&&n.params[1]?.type==='ObjectPattern'&&property(n.params[1],'nextMode')&&property(n.params[1],'codexLocalAccessStatus'))switches.push(n);
     if(n.type==='FunctionDeclaration'&&n.body.end-n.body.start<30000&&text(source,n.body).includes('sidebarElectron.productMode.trigger')&&text(source,n.body).includes('sidebarElectron.productMode.work.description.recommended'))selectors.push(n);
   });
@@ -39,6 +41,11 @@ export function patchProductModeSource(source){
   const [available,selected,newChat]=['codexAvailable','mode','onNewChat'].map(k=>property(pattern,k)?.value);
   if([available,selected,newChat].some(n=>n?.type!=='Identifier'))throw Error('Unsupported product mode selector bindings');
   edits.push([declaration.end,declaration.end,`${menuMarker}if(__codexOwnApiMode()){${available.name}=true;${selected.name}="codex";${newChat.name}=void 0;}`]);
+  if(source.includes('backendOnboardingCompleted:')){
+    const gate=one(onboarding,'onboarding route gate'),auth=property(gate.params[0],'auth').value,completed=property(gate.params[0],'backendOnboardingCompleted').value;
+    if(auth.type!=='Identifier'||completed.type!=='Identifier')throw Error('Unsupported onboarding route bindings');
+    edits.push([gate.body.start+1,gate.body.start+1,`${onboardingMarker}if(__codexOwnApiMode()&&${auth.name}.authMethod==="apikey")${completed.name}=true;`]);
+  }
   const items=[];walk(selector.body,n=>{
     if(n.type==='ObjectExpression'&&property(n,'onSelect')?.value.type==='Identifier'&&property(n,'SubText')?.value.type==='Identifier'&&property(n,'rightIconAsset')?.value.type==='Identifier')items.push(n);
   });
@@ -52,6 +59,7 @@ export function patchProductModeSource(source){
 }
 export function verifyProductModeSource(source){
   for(const marker of [helper.trim(),stateMarker,switchMarker,menuMarker])if(source.split(marker).length!==2)throw Error('API product mode patch missing or duplicated');
+  if(source.includes('backendOnboardingCompleted:')&&source.split(onboardingMarker).length!==2)throw Error('API onboarding route patch missing or duplicated');
   if(!source.includes('disabled:__codexOwnApiMode(),"aria-disabled":__codexOwnApiMode()'))throw Error('API product mode disabled item missing');
   return true;
 }
