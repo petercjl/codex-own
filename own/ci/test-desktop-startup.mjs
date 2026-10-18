@@ -48,7 +48,8 @@ try{
  const screenshot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'desktop.png'),Buffer.from(screenshot.data,'base64'),{flag:'wx'});
  fs.writeFileSync(path.join(out,'renderer.json'),JSON.stringify({...state,text:state.text.slice(0,2000)},null,2),{flag:'wx'});
  assert.equal(state.ready,'complete');assert.ok(state.buttons>=5&&state.composer>=1&&state.text.trim().length>30,'Desktop workbench did not become interactive');
- console.log(JSON.stringify({ok:true,platform:process.platform,nativeDesktopLaunched:true,rendererHydrated:true,screenshot:path.join(out,'desktop.png'),profile:root,realCredentialsUsed:false,interactiveFeaturesTested:false}));
+ assert.equal(events.filter(e=>e.method==='Runtime.exceptionThrown').length,0,'Renderer raised an unhandled exception');
+ console.log(JSON.stringify({ok:true,platform:process.platform,nativeDesktopLaunched:true,rendererHydrated:true,workbenchControlsAndComposer:true,screenshot:path.join(out,'desktop.png'),profile:root,realCredentialsUsed:false,interactiveFeaturesTested:false}));
 }finally{
  socket?.close();for(const p of pending.values())clearTimeout(p.timer);
  fs.writeFileSync(path.join(out,'renderer-events.json'),JSON.stringify(events,null,2),{flag:'wx'});
