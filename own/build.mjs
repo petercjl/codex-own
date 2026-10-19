@@ -18,12 +18,33 @@ const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${pro
 if(!mac&&key!=='win32-x64')throw Error('Unsupported build platform '+key);
 const platform=mac?'mac-arm64':'win',version=process.env.OWN_VERSION||JSON.parse(fs.readFileSync(path.join(root,'own/package.json'))).version;
 if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version))throw Error('Invalid version');
-const output=path.join(root,'out','own-release-'+version+'-'+key+'.noindex');if(fs.existsSync(output))throw Error('Build output exists');fs.mkdirSync(output,{recursive:true});
+const local=process.argv.includes('--local-only'),development=process.argv.includes('--development');
+if(development&&(!local||!mac))throw Error('Development builds require macOS and --local-only');
+if(development)process.env.OWN_DEVELOPMENT='1';
+if(process.env.OWN_DEVELOPMENT&&!local)throw Error('Development identity cannot enter the release pipeline');
+const argument=name=>{const i=process.argv.indexOf(name);if(i<0)return null;const value=process.argv[i+1];if(!value||value.startsWith('--'))throw Error('Missing '+name);return path.resolve(value);};
+const output=argument('--output')||path.join(root,'out','own-release-'+version+'-'+key+'.noindex');if(fs.existsSync(output))throw Error('Build output exists');fs.mkdirSync(output,{recursive:true});
 const run=(cmd,args,options={})=>execFileSync(cmd,args,{cwd:root,stdio:'inherit',...options});
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||null,ownSourceRef:run('git',['rev-parse','HEAD'],{encoding:'utf8',stdio:'pipe'}).trim(),updaterNodeSha256:await digestFile(process.execPath),toolchain:{node:process.version,platform:key,image:process.env.ImageVersion||null}};
 const existingIndex=process.argv.indexOf('--existing-app');
-if(existingIndex>=0){source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};}
+const prepared=argument('--prepared-app');
+if(existingIndex>=0){
+ source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};
+ if(process.argv.includes('--refresh-overlay')){
+  if(!local||!development||!mac)throw Error('Overlay refresh requires a local Mac development build');
+  run('codesign',['--verify','--deep','--strict',source]);
+  const copy=path.join(output,'codex-own 开发版.app');run('ditto',[source,copy]);source=copy;
+  await(await import('./builders/refresh-development.mjs')).refreshDevelopment(source,output);
+ }
+}
+else if(prepared){
+ if(!local||!mac)throw Error('Prepared local input requires macOS --local-only');
+ run('codesign',['--verify','--deep','--strict',prepared]);
+ provenance={...provenance,kind:'verified-local-upstream-input',originalAsarSha256:await digestFile(path.join(prepared,'Contents/Resources/app.asar'))};
+ const built=path.join(output,'built');run(process.execPath,['own/builders/mac.mjs',built],{env:{...process.env,OWN_PREPARED_APP:prepared}});
+ source=path.join(built,development?'codex-own 开发版.app':'codex-own.app');
+}
 else{
  run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform]);
  const cache=path.join(os.tmpdir(),'codex-sync',mac?'arm64-extract':'win-extract');
@@ -55,7 +76,7 @@ else{
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
  if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.missingUnpackedBindings=missing;
  if(!mac)provenance.msixPathRestorations=JSON.parse(fs.readFileSync(path.join(root,'src',platform,'msix-path-restorations.json')));
- const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?'codex-own.app':'app');
+ const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?(development?'codex-own 开发版.app':'codex-own.app'):'app');
 }
 const resources=path.join(source,mac?'Contents/Resources':'resources');
 const cli=path.join(resources,mac?'codex-own-cli':'codex.exe');
@@ -65,6 +86,7 @@ provenance.cliVersion=await nativeVersion(path.join(resources,mac?'codex':'codex
 run(cli,['--version']);
 run(process.execPath,['own/test-app.mjs',source]);
 if(mac)run('codesign',['--verify','--deep','--strict',source]);
+if(local){const result={ok:true,localOnly:true,development,app:source,provenance};fs.writeFileSync(path.join(output,'local-build.json'),JSON.stringify(result,null,2),{flag:'wx'});console.log(JSON.stringify(result));process.exit(0);}
 const filename=`codex-own-${key}.tar.gz`,target=path.join(output,filename);
 run(tarExecutable(),['-czf',target,'-C',path.dirname(source),path.basename(source)]);
 const manifest={schema:1,repository:'petercjl/codex-own',version,provenance,platforms:{[key]:{entry:path.basename(source),url:`https://github.com/petercjl/codex-own/releases/download/own-v${version}/${filename}`,sha256:await digestFile(target),size:fs.statSync(target).size}}};

@@ -8,8 +8,10 @@ import {nativeDeviceContract} from './native-device-contract.mjs';
 const app=path.resolve(process.argv[2]),out=path.resolve(process.argv[3]),mac=process.platform==='darwin';
 if(fs.existsSync(out))throw Error('Choose a fresh GUI evidence directory');fs.mkdirSync(out,{recursive:true});
 // Darwin Unix-domain socket paths are limited to roughly 104 bytes.
-const home=fs.realpathSync(fs.mkdtempSync(path.join(mac?'/private/tmp':os.tmpdir(),'og-')));
-const local=path.join(home,'AppData/Local'),root=mac?path.join(home,'Library/Application Support/codex-own-independent'):path.join(local,'codex-own-independent');
+const home=fs.realpathSync(fs.mkdtempSync(path.join(mac?'/private/tmp':os.tmpdir(),mac?'o':'og-')));
+const development=mac&&fs.existsSync(path.join(app,'Contents/Resources/own-development.json'));
+const profileHome=development?path.join(home,'.codex-own-dev'):home;
+const local=path.join(home,'AppData/Local'),root=mac?path.join(profileHome,'Library/Application Support/codex-own-independent'):path.join(local,'codex-own-independent');
 const resources=path.join(app,mac?'Contents/Resources':'resources'),bundle=path.join(resources,'own-updater');
 const embedded=JSON.parse(fs.readFileSync(path.join(bundle,'release.json'))),meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json')));
 assert.equal(embedded.runtimes.version,meta.toolRuntimeVersion);
@@ -34,7 +36,9 @@ const reservation=net.createServer();await new Promise(r=>reservation.listen(0,'
 const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|DASHSCOPE_|ANTHROPIC_|AZURE_OPENAI_|GH_TOKEN$|GITHUB_TOKEN$)/.test(k))delete env[k];
 Object.assign(env,{HOME:home,CFFIXED_USER_HOME:home,USERPROFILE:home,LOCALAPPDATA:local,APPDATA:path.join(home,'AppData/Roaming'),ELECTRON_ENABLE_LOGGING:'1'});
 for(const directory of [env.APPDATA,env.LOCALAPPDATA])fs.mkdirSync(directory,{recursive:true});
-const executable=path.join(app,mac?'Contents/MacOS/codex-own-launch':'codex-own.exe');
+// The distribution launcher intentionally resolves the real OS account home.
+// Enter Owl directly for this fixture so it cannot open a user's live profile.
+const executable=path.join(app,mac?'Contents/MacOS/ChatGPT':'codex-own.exe');
 const log=fs.openSync(path.join(out,'desktop.log'),'wx');
 const child=spawn(executable,[...(mac?['--use-mock-keychain']:[]),`--remote-debugging-port=${port}`,'--remote-debugging-address=127.0.0.1',`--user-data-dir=${path.join(root,'desktop')}`,'--disable-gpu','--no-first-run'],{env,detached:mac,windowsHide:true,stdio:['ignore',log,log]});
 let launchError;child.on('error',e=>{launchError=e});let socket,id=0;const pending=new Map(),events=[];

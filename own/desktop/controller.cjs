@@ -5,6 +5,15 @@ const {StringDecoder}=require('node:string_decoder');
 const {pathToFileURL}=require('node:url');
 const CHANNEL='codex-own:update';
 module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},root){
+  const identity=require('../lib/instance.cjs').identity(process.resourcesPath);
+  if(!identity.automaticUpdates){
+    app.setAboutPanelOptions({applicationName:identity.name});
+    app.on('browser-window-created',(_event,window)=>{
+      const title=()=>window.setTitle(identity.name);title();
+      window.on('page-title-updated',event=>{event.preventDefault();title();});
+    });
+    return;
+  }
   const bundle=path.join(process.resourcesPath,'own-updater');
   const meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json'),'utf8'));
   let state={phase:'idle',current:meta.version,updateAvailable:false},window=null,busy=false,receipt=null,announced=null,downloadWorker=null,quitRequested=false,cleanupPromise=null,cleanupScheduled=false,cleanupDone=false,cleanupAttempts=0;

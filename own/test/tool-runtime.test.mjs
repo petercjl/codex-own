@@ -20,8 +20,8 @@ test('managed runtime discovery builds a private child environment without mutat
  fs.writeFileSync(path.join(base,'active.json'),JSON.stringify({schema:1,version,platform:key}),{flag:'wx'});
  const sep=win?';':':',inherited={PATH:['system-tools',path.join(os.homedir(),'.cache','codex-runtimes','bin'),'project-tools'].join(sep),NODE_OPTIONS:'--import=/original/private.mjs',NODE_PATH:'/original/node_modules',PYTHONPATH:'/system/python',VIRTUAL_ENV:'project-venv',NPM_CONFIG_USERCONFIG:'system-npmrc',OPENAI_API_KEY:'private-fixture'};
  const before=structuredClone(inherited),env=toolEnv.environment(base,inherited);assert.deepEqual(inherited,before);
- assert.equal(toolEnv.active(base).node,node);assert.equal(env.NODE_OPTIONS,undefined);assert.equal(env.NODE_PATH,undefined);assert.equal(env.PYTHONPATH,undefined);assert.equal(env.VIRTUAL_ENV,'project-venv');assert.equal(env.OPENAI_API_KEY,inherited.OPENAI_API_KEY);
- assert.ok(env.NPM_CONFIG_PREFIX.startsWith(base));assert.ok(env.NPM_CONFIG_USERCONFIG.startsWith(base));assert.equal(env.PYTHONNOUSERSITE,'1');assert.equal(env.PIP_REQUIRE_VIRTUALENV,'true');assert.equal(env.PATH.includes('codex-runtimes'),false);assert.ok(env.PATH.includes('project-tools'));
+ assert.equal(toolEnv.active(base).node,node);assert.equal(env.NODE_OPTIONS,undefined);assert.equal(env.NODE_PATH,undefined);assert.equal(env.PYTHONPATH,undefined);assert.equal(env.VIRTUAL_ENV,undefined);assert.equal(env.OPENAI_API_KEY,inherited.OPENAI_API_KEY);
+ assert.ok(env.NPM_CONFIG_PREFIX.startsWith(base));assert.ok(env.NPM_CONFIG_USERCONFIG.startsWith(base));assert.equal(env.PYTHONNOUSERSITE,'1');assert.equal(env.PIP_REQUIRE_VIRTUALENV,'true');assert.equal(env.PATH.includes('codex-runtimes'),false);assert.equal(env.PATH.includes('project-tools'),false);
  const receipt=path.join(base,'active.json');fs.copyFileSync(receipt,receipt+'.backup',fs.constants.COPYFILE_EXCL);fs.writeFileSync(receipt,JSON.stringify({schema:1,version:'../../original',platform:key}));assert.equal(runtimeDoctor(base).ok,false);
 });
 test('failed runtime installation releases shared lock and preserves active state',async t=>{

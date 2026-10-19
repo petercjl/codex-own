@@ -10,21 +10,26 @@ import {gateToolStartup} from './tool-gate.mjs';
 import {isolateShellImport} from './shell-environment.mjs';
 import {productModeChanges} from './product-mode.mjs';
 import {titleChanges} from './thread-titles.mjs';
+import {launcherScript} from './mac-launcher.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root = path.resolve(import.meta.dirname, '../..');
 const output = path.resolve(process.argv[2] || path.join(root, 'out', 'own-build'));
+const development=process.env.OWN_DEVELOPMENT==='1';
+if(process.env.OWN_DEVELOPMENT&&!development)throw Error('OWN_DEVELOPMENT must be 1 when selected');
+const productName=development?'codex-own 开发版':'codex-own',scheme=development?'codex-own-dev':'codex-own';
 const source = process.env.OWN_PREPARED_APP; if (!source) throw Error('Prepared upstream app required');
 if (process.platform !== 'darwin' || process.arch !== 'arm64') throw Error('This build is verified for macOS ARM64 only');
 if (fs.existsSync(output)) throw Error(`Output already exists: ${output}. Choose a fresh output directory.`);
 for (const file of [source, path.join(root,'resources/own/codex-own.icns'), path.join(root,'resources/own/codex-own.png')]) fs.statSync(file);
 fs.mkdirSync(output, {recursive:true});
-const app = path.join(output,'codex-own.app');
+const app = path.join(output,productName+'.app');
 execFileSync('ditto',[source,app]);
 const resources=path.join(app,'Contents/Resources');
 bundleUpdater(resources);
+if(development)fs.writeFileSync(path.join(resources,'own-development.json'),JSON.stringify({schema:1,channel:'development',name:productName,automaticUpdates:false,sourceRef:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()}),{flag:'wx'});
 fs.writeFileSync(path.join(resources,'codex-own-cli'),'#!/bin/sh\nset -eu\nown_resources="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$own_resources/codex" "$@"\n',{flag:'wx',mode:0o755});
 const work=path.join(output,'asar-source');
 const originalArchive=path.join(resources,'app.asar'),header=asar.getRawHeader(originalArchive).header;
@@ -49,10 +54,10 @@ fs.writeFileSync(startup,isolateShellImport(before,'own-runtime.cjs').source);
 // All app-owned deep links use the personal scheme; web/service URLs stay intact.
 function patchLinks(dir){for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
  const file=path.join(dir,ent.name);if(ent.isDirectory()){if(ent.name!=='node_modules')patchLinks(file);}
- else if(/\.(js|html)$/.test(ent.name)){const a=fs.readFileSync(file,'utf8'),b=isolateRuntimeSource(a.replaceAll('codex://','codex-own://'));if(a!==b)fs.writeFileSync(file,b);}
+  else if(/\.(js|html)$/.test(ent.name)){const a=fs.readFileSync(file,'utf8'),b=isolateRuntimeSource(a.replaceAll('codex://',scheme+'://'));if(a!==b)fs.writeFileSync(file,b);}
 }}
 patchLinks(work);
-pkg.name='codex-own';pkg.productName='codex-own';
+pkg.name=development?'codex-own-development':'codex-own';pkg.productName=productName;
 fs.writeFileSync(pkgPath,JSON.stringify(pkg,null,2)+'\n');
 header.files['.vite'].files.build.files['own-runtime.cjs']={size:0,offset:'0'};
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');let offset=0;const packed=[];
@@ -62,14 +67,14 @@ const archive=fs.readFileSync(path.join(resources,'app.asar'));
 const hash=crypto.createHash('sha256').update(archive.subarray(16,16+archive.readUInt32LE(12))).digest('hex');
 const infoFile=path.join(app,'Contents/Info.plist');
 const info=plist.parse(fs.readFileSync(infoFile,'utf8'));
-Object.assign(info,{CFBundleIdentifier:'local.codex-own',CFBundleName:'codex-own',CFBundleDisplayName:'codex-own',CFBundleExecutable:'codex-own-launch',CFBundleIconFile:'codex-own.icns',CFBundleAlternateNames:['codex-own'],CrProductDirName:'codex-own-independent',CFBundleURLTypes:[{CFBundleURLName:'codex-own',CFBundleURLSchemes:['codex-own']}],ElectronAsarIntegrity:{'Resources/app.asar':{algorithm:'SHA256',hash}}});
+Object.assign(info,{CFBundleIdentifier:development?'local.codex-own.development':'local.codex-own',CFBundleName:productName,CFBundleDisplayName:productName,CFBundleExecutable:'codex-own-launch',CFBundleIconFile:'codex-own.icns',CFBundleAlternateNames:[productName],CrProductDirName:'codex-own-independent',CFBundleURLTypes:[{CFBundleURLName:scheme,CFBundleURLSchemes:[scheme]}],ElectronAsarIntegrity:{'Resources/app.asar':{algorithm:'SHA256',hash}}});
 delete info.CFBundleIconName;delete info.CodexAppIconBaseName;delete info.CFBundleIconAssets;
 fs.writeFileSync(infoFile,plist.build(info));
 for(const ext of ['png','icns'])fs.copyFileSync(path.join(root,`resources/own/codex-own.${ext}`),path.join(resources,`codex-own.${ext}`));
 // Force the known runtime icon filenames to the new asset as well.
 for(const name of fs.readdirSync(resources).filter(n=>/^icon-(chatgpt|codex|space).*\.png$/.test(n)))fs.copyFileSync(path.join(resources,'codex-own.png'),path.join(resources,name));
 const launcher=path.join(app,'Contents/MacOS/codex-own-launch');
-fs.writeFileSync(launcher,'#!/bin/sh\nset -eu\nown_root="$HOME/Library/Application Support/codex-own-independent"\nmkdir -p "$own_root/desktop" "$own_root/core" "$own_root/tmp"\nexec "$(dirname "$0")/ChatGPT" --user-data-dir="$own_root/desktop" "$@"\n',{flag:'wx',mode:0o755});
+fs.writeFileSync(launcher,launcherScript(development),{flag:'wx',mode:0o755});
 const framework=fs.realpathSync(path.join(app,'Contents/Frameworks/Codex Framework.framework/Codex Framework'));
 const bytes=fs.readFileSync(framework),sentinel=Buffer.from('AGbevlPCksUGKNL8TSn7wGmJEuJsXb2A');
 const index=bytes.indexOf(sentinel);

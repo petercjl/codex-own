@@ -47,6 +47,9 @@ function install({cli,core,processApi=childProcess}={}){
  const original=processApi.spawn;
  processApi.spawn=function(file,args,options){
   if(!serverInvocation(file,args,cli))return original.apply(this,arguments);
+  const tools=require('./tool-env.cjs');
+  const backendEnv=tools.environment(path.join(core,'..','runtimes'),options?.env||process.env);
+  if(backendEnv)options={...options,env:backendEnv};
   const {parse}=require('smol-toml');
   const configPath=path.join(core,'config.toml');
   const baseline=fs.existsSync(configPath)?parse(fs.readFileSync(configPath,'utf8')):{};
@@ -54,7 +57,7 @@ function install({cli,core,processApi=childProcess}={}){
   // for its lifetime. A per-session override can only turn the adapter off.
   const baseActive=enabled(baseline);
   const invocation=baseActive?require('./subagent-bridge.cjs').invocation({cli:file,args,options,core,config:baseline}):null;
-  const child=invocation?original.call(this,invocation.file,invocation.args,invocation.options):original.apply(this,arguments);
+  const child=invocation?original.call(this,invocation.file,invocation.args,invocation.options):original.call(this,file,args,options);
   if(!baseActive||!child.stdin)return child;
   const active=message=>{
    const c=message?.params?.config;

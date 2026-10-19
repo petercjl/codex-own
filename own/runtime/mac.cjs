@@ -3,8 +3,10 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const root = path.join(os.homedir(), 'Library', 'Application Support', 'codex-own-independent');
 const resources = process.resourcesPath;
+const identity=require(path.join(resources,'own-updater','lib','instance.cjs')).identity(resources);
+const profileHome=identity.channel==='development'?path.join(os.homedir(),'.codex-own-dev'):os.homedir();
+const root = path.join(profileHome, 'Library', 'Application Support', 'codex-own-independent');
 const paths = {root, core: path.join(root, 'core'), desktop: path.join(root, 'desktop'), tmp: path.join(root, 'tmp')};
 const cli = path.join(resources, 'codex-own-cli');
 function apply() {
@@ -23,7 +25,7 @@ function apply() {
     TMPDIR: paths.tmp,
     CODEX_OWN_LEGACY_RUNTIME_ROOT: path.join(root,'runtimes','upstream-disabled'),
   });
-  require(path.join(resources,'own-updater','lib','tool-env.cjs')).apply(path.join(root,'runtimes'));
+  require(path.join(resources,'own-updater','lib','tool-env.cjs')).apply(path.join(root,'runtimes'),process.env,process.platform,{host:true});
   require(path.join(resources,'own-updater','lib','api-input-compat.cjs')).install({cli,core:paths.core});
   return paths;
 }
@@ -34,7 +36,7 @@ if (!fs.existsSync(config)) fs.writeFileSync(config,
   '# codex-own private configuration\ncli_auth_credentials_store = "file"\nforced_login_method = "api"\n', {flag:'wx',mode:0o600});
 apply();
 const {app, nativeImage} = require('electron');
-app.setName('codex-own');
+app.setName(identity.name);
 app.setPath('userData', paths.desktop);
 app.setPath('logs', path.join(root, 'logs'));
 // The upstream native default-name hook runs later; pin the public identity.

@@ -1,6 +1,8 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const {Transform,Readable}=require('node:stream');
+const patchCompat=require('./patch-compat.cjs');
+const toolHistory=require('./tool-history-compat.cjs');
 function selected(config){return config?.forced_login_method==='api'&&config.model_provider==='dashscope_deepseek'&&config.model_providers?.dashscope_deepseek?.wire_api==='responses'&&typeof config.model==='string'&&config.model.startsWith('deepseek-');}
 function normalizeBody(body){
  if(!body||!Array.isArray(body.input)||typeof body.model!=='string'||!body.model.startsWith('deepseek-'))return body;
@@ -17,7 +19,7 @@ function normalizeBody(body){
   });
   changed=true;return {type:'message',role:'user',content};
  });
- const result=changed?{...body,input}:body;
+ const result=toolHistory.history(patchCompat.history(changed?{...body,input}:body));
  const format=result.text?.format;
  if(format?.type!=='json_schema')return result;
  if(!format.schema||typeof format.schema!=='object'||Array.isArray(format.schema))throw Object.assign(Error('Invalid structured response schema'),{code:'API_RESPONSE_SCHEMA_INVALID'});
@@ -75,7 +77,13 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1
    for(const [k,v] of Object.entries(req.headers))if(!['host','connection','content-length','content-encoding','accept-encoding','transfer-encoding','proxy-authorization'].includes(k)&&v!==undefined)headers[k]=v;
    const response=await fetchApi(target,{method:'POST',headers,body:payload,signal:abort.signal,...dispatcher?{dispatcher}:{}});
    res.writeHead(response.status,{'content-type':response.headers.get('content-type')||'application/json','cache-control':'no-store'});
-   if(response.body)await new Promise((resolve,reject)=>{const stream=Readable.fromWeb(response.body);stream.once('error',reject);res.once('error',reject);res.once('finish',resolve);res.once('close',()=>{stream.destroy();resolve();});stream.pipe(res);});
+   if(response.body&&response.ok&&body.model?.startsWith('deepseek-')&&(response.headers.get('content-type')||'').includes('application/json')){
+    res.end(JSON.stringify(patchCompat.response(await response.json())));
+   }else if(response.body)await new Promise((resolve,reject)=>{
+    const stream=Readable.fromWeb(response.body),adapter=response.ok&&body.model?.startsWith('deepseek-')&&(response.headers.get('content-type')||'').includes('text/event-stream')?patchCompat.eventStream():null;
+    stream.once('error',reject);adapter?.once('error',reject);res.once('error',reject);res.once('finish',resolve);res.once('close',()=>{stream.destroy();adapter?.destroy();resolve();});
+    if(adapter)stream.pipe(adapter).pipe(res);else stream.pipe(res);
+   });
    else res.end();
   }catch(error){
    if(!res.headersSent&&!res.destroyed){res.writeHead(502,{'content-type':'application/json'});res.end(JSON.stringify({error:{code:error.code||'AGENT_BRIDGE_FAILED',message:'The local API compatibility request could not be completed'}}));}
