@@ -46,7 +46,8 @@ for(const name of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replac
 }
 if(shellPatches!==1||updaterPatches===0)throw Error('Required Windows isolation patch missing');
 // Rebuild packed data while preserving every original unpacked/link entry.
-// Some optional device native bindings are absent in the upstream MSIX itself.
+// MSIX scoped paths must already resolve to the original signed native files.
+require('../../scripts/upstream-compat.js').missingUnpacked(header,archive);
 const runtimeEntry=header.files['.vite'].files.build.files;
 runtimeEntry['own-runtime-win.cjs']={size:0,offset:'0'};
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');

@@ -22,6 +22,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const {selectPlatforms,extractAsar,restoreMsixUnpackedPaths}=require('./upstream-compat');
+const crypto=require('node:crypto');
 
 // TLS certs for MS delivery CDN
 const certsDir = path.join(__dirname, "certs");
@@ -45,6 +47,7 @@ const FORCE = args.includes("--force");
 const CHECK_ONLY = args.includes("--check-only");
 const SKIP_MAC = args.includes("--skip-mac");
 const SKIP_WIN = args.includes("--skip-win");
+const SELECTED=selectPlatforms(args);
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -63,7 +66,10 @@ function httpGet(url) {
 
 function curlDownload(url, dest, label) {
   console.log(`  [dl] ${label}`);
-  execSync(`curl -L --retry 3 --retry-delay 2 -o "${dest}" "${url}"`, { stdio: "inherit" });
+  if(fs.existsSync(dest))throw Error('Download target exists: '+dest);
+  const partial=dest+'.partial-'+crypto.randomUUID();
+  execSync(`curl -fL --retry 3 --retry-delay 2 -o "${partial}" "${url}"`, { stdio: "inherit" });
+  fs.renameSync(partial,dest);
 }
 
 function extractArchive(archive, dest) {
@@ -135,6 +141,7 @@ async function getAppcastVersion(url) {
     version: latest.shortVersionString || latest.title,
     build: String(latest.version || ""),
     url: enc?.["@_url"] || "",
+    size:Number(enc?.["@_length"]||0),
   };
 }
 
@@ -148,7 +155,7 @@ async function getWindowsVersion() {
   const pkg = pkgs[0];
   const url = await msstore.getDownloadUrl(pkg.updateID, pkg.revisionNumber, "Retail", pkg.digest);
   const verMatch = pkg.name.match(/_(\d+\.\d+\.\d+(?:\.\d+)?)_/);
-  return { version: verMatch?.[1] || "unknown", url, packageName: pkg.name };
+  return { version: verMatch?.[1] || "unknown", url, packageName: pkg.name, size:Number(pkg.size),digest:pkg.digest };
 }
 
 // ─── Extract macOS ──────────────────────────────────────────────
@@ -168,6 +175,7 @@ async function syncMac(variant, appcastUrl, destDir) {
   } else {
     console.log(`   [cache] ${zipPath}`);
   }
+  if(info.size&&fs.statSync(zipPath).size!==info.size)throw Error('Official ZIP size mismatch; preserve and inspect cached input');
 
   console.log("   [unzip]");
   clearDir(extractDir);
@@ -196,6 +204,9 @@ async function syncWin(destDir) {
   } else {
     console.log(`   [cache] ${msixPath}`);
   }
+  if(info.size&&fs.statSync(msixPath).size!==info.size)throw Error('Official MSIX size mismatch');
+  const hash=crypto.createHash('sha1');for await(const b of fs.createReadStream(msixPath))hash.update(b);
+  if(!info.digest||hash.digest('base64')!==info.digest)throw Error('Microsoft Store package digest mismatch');
 
   console.log("   [unzip]");
   clearDir(extractDir);
@@ -207,7 +218,10 @@ async function syncWin(destDir) {
     throw new Error(`Windows: resources dir not found${alt ? `, app.asar at ${alt}` : ""}`);
   }
 
+  const restored=restoreMsixUnpackedPaths(path.join(resourcesDir,'app.asar'));
+  console.log('   [MSIX scoped paths restored] '+JSON.stringify(restored));
   assembleOutput(resourcesDir, destDir, "Windows");
+  fs.writeFileSync(path.join(destDir,'msix-path-restorations.json'),JSON.stringify(restored,null,2),{flag:'wx'});
   return info;
 }
 
@@ -223,7 +237,7 @@ function assembleOutput(resourcesDir, destDir, label) {
   // 1. Extract app.asar → _asar/ (for patching)
   const asarDest = path.join(destDir, "_asar");
   console.log("   [asar extract] -> _asar/");
-  execSync(`npx asar extract "${asarPath}" "${asarDest}"`);
+  extractAsar(asarPath,asarDest);
 
   // 2. Copy app.asar.unpacked/ as-is (native modules)
   const unpackedSrc = path.join(resourcesDir, "app.asar.unpacked");
@@ -269,32 +283,35 @@ async function main() {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 
   const results = {};
+  let failed=0;
 
   // Detect versions
-  if (!SKIP_MAC) {
+  if (SELECTED.includes('mac-arm64')) {
     try {
       const arm64Info = await getAppcastVersion(APPCAST_ARM64);
       console.log(`\n   mac-arm64: ${arm64Info.version} (build ${arm64Info.build})`);
       results["mac-arm64"] = arm64Info;
-    } catch (e) { console.error(`   [x] mac-arm64 check: ${e.message}`); }
-
+    } catch (e) { failed++;console.error(`   [x] mac-arm64 check: ${e.message}`); }
+  }
+  if (SELECTED.includes('mac-x64')) {
     try {
       const x64Info = await getAppcastVersion(APPCAST_X64);
       console.log(`   mac-x64:   ${x64Info.version} (build ${x64Info.build})`);
       results["mac-x64"] = x64Info;
-    } catch (e) { console.error(`   [x] mac-x64 check: ${e.message}`); }
+    } catch (e) { failed++;console.error(`   [x] mac-x64 check: ${e.message}`); }
   }
 
-  if (!SKIP_WIN) {
+  if (SELECTED.includes('win')) {
     try {
       const winInfo = await getWindowsVersion();
       console.log(`   win:       ${winInfo.version}`);
       results.win = winInfo;
-    } catch (e) { console.error(`   [x] win check: ${e.message}`); }
+    } catch (e) { failed++;console.error(`   [x] win check: ${e.message}`); }
   }
 
   if (CHECK_ONLY) {
     console.log("\n== Check only, skipping download ==");
+    if(failed)throw Error(`${failed} upstream version checks failed`);
     return;
   }
 
@@ -302,18 +319,19 @@ async function main() {
   if (!SKIP_MAC && results["mac-arm64"]) {
     try {
       results["mac-arm64"] = await syncMac("arm64", APPCAST_ARM64, path.join(SRC_DIR, "mac-arm64"));
-    } catch (e) { console.error(`   [x] mac-arm64: ${e.message}`); }
+    } catch (e) { failed++;console.error(`   [x] mac-arm64: ${e.message}`); }
   }
   if (!SKIP_MAC && results["mac-x64"]) {
     try {
       results["mac-x64"] = await syncMac("x64", APPCAST_X64, path.join(SRC_DIR, "mac-x64"));
-    } catch (e) { console.error(`   [x] mac-x64: ${e.message}`); }
+    } catch (e) { failed++;console.error(`   [x] mac-x64: ${e.message}`); }
   }
   if (!SKIP_WIN && results.win) {
     try {
       results.win = await syncWin(path.join(SRC_DIR, "win"));
-    } catch (e) { console.error(`   [x] win: ${e.message}`); }
+    } catch (e) { failed++;console.error(`   [x] win: ${e.message}`); }
   }
+  if(failed)throw Error(`${failed} upstream synchronization stages failed; version record unchanged`);
 
   const saved = loadVersions();
   for (const [key, info] of Object.entries(results)) {

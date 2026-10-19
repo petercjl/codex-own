@@ -12,6 +12,7 @@ import {sourceTree} from './ci/source-tree.mjs';
 import {exposeVendorResolver,withSystemTar} from './builders/upstream-resolver.mjs';
 import {nativeVersion} from './builders/native-version.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
+const {missingUnpacked}=require('../scripts/upstream-compat.js');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${process.arch}`,mac=key==='darwin-arm64';
 if(!mac&&key!=='win32-x64')throw Error('Unsupported build platform '+key);
@@ -24,24 +25,20 @@ let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||null,ownSour
 const existingIndex=process.argv.indexOf('--existing-app');
 if(existingIndex>=0){source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};}
 else{
- let syncError;try{run(process.execPath,['scripts/sync-upstream.js','--force',mac?'--skip-win':'--skip-mac']);}catch(e){syncError=e;}
+ run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform]);
  const cache=path.join(os.tmpdir(),'codex-sync',mac?'arm64-extract':'win-extract');
  function findApp(dir,depth=0){if(depth>4)return null;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory()&&e.name.endsWith('.app'))return p;if(e.isDirectory()){const found=findApp(p,depth+1);if(found)return found;}}return null;}
- const original=mac?findApp(cache):path.join(cache,'app');if(!original)throw syncError||Error('Missing source application');
+ const original=mac?findApp(cache):path.join(cache,'app');if(!original)throw Error('Missing source application');
+ if(mac)run('codesign',['--verify','--deep','--strict',original]);
  provenance.originalProgramTree=await sourceTree(original);
  const sourceResources=path.join(original,mac?'Contents/Resources':'resources'),archive=path.join(sourceResources,'app.asar');
  provenance.originalAsarSha256=await digestFile(archive);
  const header=asar.getRawHeader(archive).header;
  const extract=path.join(root,'src',platform,'_asar');
- // A narrowly checked fallback for optional absent upstream device bindings.
- const missing=[];
+ // Every unpacked entry must exist after verified MSIX path restoration.
+ const missing=missingUnpacked(header,archive);
  function entries(d,prefix=''){const out=[];for(const [name,e]of Object.entries(d.files)){const n=prefix+name;if(e.files)out.push(...entries(e,n+'/'));else out.push([n,e]);}return out;}
  const files=entries(header);
- if(syncError){
-  for(const [n,e]of files)if(e.unpacked&&!fs.existsSync(archive+'.unpacked/'+n))missing.push(n);
-  const allowed=['node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node','node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node'];
-  if(!missing.length||missing.some(n=>!allowed.includes(n)))throw syncError;
- }
  for(const [n,e]of files){if(e.link||e.unpacked)continue;const f=path.join(extract,n);fs.mkdirSync(path.dirname(f),{recursive:true});const b=asar.extractFile(archive,n.replaceAll('/',path.sep));if(e.integrity?.hash&&sha(b)!==e.integrity.hash)throw Error('Source integrity mismatch '+n);fs.writeFileSync(f,b);}
  run(process.execPath,['scripts/patch-all.js',platform]);
  source=path.join(output,'prepared');fs.cpSync(original,source,{recursive:true,verbatimSymlinks:true,errorOnExist:true,force:false});
@@ -52,9 +49,12 @@ else{
  // Run the upstream's exact CLI resolution function, never select a different provider here.
  const resolverPath=path.join(root,'scripts/build-from-upstream.js'),code=exposeVendorResolver(fs.readFileSync(resolverPath,'utf8'));
  const mod=new Module(resolverPath);mod.filename=resolverPath;mod.paths=Module._nodeModulePaths(path.dirname(resolverPath));mod._compile(code,resolverPath);
- const vendor=withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()),cli=path.join(resources,mac?'codex':'codex.exe');
+ const cliSource=process.env.OWN_CLI_SOURCE||'bundled';if(!['bundled','rebuild'].includes(cliSource))throw Error('Unknown OWN_CLI_SOURCE');
+ const vendor=cliSource==='rebuild'?withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()):null,cli=path.join(resources,mac?'codex':'codex.exe');
+ if(cliSource==='rebuild'&&!vendor)throw Error('Selected Rebuild CLI unavailable');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
- if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.optionalMissingBindings=missing;
+ if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.missingUnpackedBindings=missing;
+ if(!mac)provenance.msixPathRestorations=JSON.parse(fs.readFileSync(path.join(root,'src',platform,'msix-path-restorations.json')));
  const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?'codex-own.app':'app');
 }
 const resources=path.join(source,mac?'Contents/Resources':'resources');

@@ -13,6 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const {findMacApplication,repackAsar,patchWindowsIntegrity,patchMacFramework}=require('./upstream-compat');
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const SRC_DIR = path.join(PROJECT_ROOT, "src");
@@ -102,7 +103,7 @@ function resolveCodexVendor(platform) {
 
 // ─── macOS build ────────────────────────────────────────────────
 
-function buildMac(platform) {
+async function buildMac(platform) {
   const platformDir = path.join(SRC_DIR, platform);
   const asarDir = path.join(platformDir, "_asar");
 
@@ -126,7 +127,7 @@ function buildMac(platform) {
       }
       return null;
     };
-    appPath = findApp(extractDir);
+    appPath = findMacApplication(extractDir);
   }
 
   if (!appPath) {
@@ -135,6 +136,7 @@ function buildMac(platform) {
   }
 
   console.log(`   [source] ${appPath}`);
+  execSync(`codesign --verify --deep --strict "${appPath}"`,{stdio:'pipe'});
 
   // 2. Copy .app to output (ditto preserves symlinks + resource forks)
   const outAppDir = path.join(OUT_DIR, platform);
@@ -148,7 +150,8 @@ function buildMac(platform) {
   // 3. Repack patched ASAR
   const asarPath = path.join(resourcesDir, "app.asar");
   console.log("   [asar pack] _asar/ -> app.asar");
-  execSync(`npx asar pack "${asarDir}" "${asarPath}"`);
+  const newHeaderHash=await repackAsar(path.join(appPath,'Contents/Resources/app.asar'),asarDir,asarPath);
+  patchMacFramework(outApp,newHeaderHash);
 
   // 4. Update ASAR integrity hash in Info.plist
   const infoPlist = path.join(outApp, "Contents", "Info.plist");
@@ -170,8 +173,9 @@ function buildMac(platform) {
     execSync(`codesign --sign - --force --deep "${outApp}"`, { stdio: "pipe" });
     console.log("   [ok] ad-hoc signed");
   } catch (e) {
-    console.log(`   [!] ad-hoc sign failed: ${e.message}`);
+    throw Error(`ad-hoc sign failed: ${e.message}`);
   }
+  execSync(`codesign --verify --deep --strict "${outApp}"`,{stdio:'pipe'});
 
   // 8. Create DMG
   const version = getVersion(asarDir);
@@ -185,7 +189,7 @@ function buildMac(platform) {
 
 // ─── Windows build ──────────────────────────────────────────────
 
-function buildWin(platform) {
+async function buildWin(platform) {
   const platformDir = path.join(SRC_DIR, platform);
   const asarDir = path.join(platformDir, "_asar");
 
@@ -220,7 +224,7 @@ function buildWin(platform) {
 
   // Repack patched ASAR
   console.log("   [asar pack] _asar/ -> app.asar");
-  execSync(`npx asar pack "${asarDir}" "${asarPath}"`);
+  await repackAsar(path.join(appDir,'resources/app.asar'),asarDir,asarPath);
 
   // Compute new hash and patch exe
   const newHash = computeAsarHeaderHash(asarPath);
@@ -228,12 +232,8 @@ function buildWin(platform) {
 
   if (oldHash !== newHash) {
     // Find Codex.exe in app root
-    const exePath = path.join(outApp, "Codex.exe");
-    if (fs.existsSync(exePath)) {
-      patchExeHash(exePath, oldHash, newHash);
-    } else {
-      console.log("   [!] Codex.exe not found for hash patching");
-    }
+    const exePath=patchWindowsIntegrity(outApp,oldHash,newHash);
+    console.log('   [integrity] verified target: '+path.basename(exePath));
   }
 
   // Replace codex CLI
@@ -290,6 +290,14 @@ function updateAsarIntegrity(asarPath, infoPlistPath) {
 // ─── Shared ─────────────────────────────────────────────────────
 
 function replaceCodex(platform, resourcesDir, binName) {
+  const choice=process.env.OWN_CLI_SOURCE||'bundled';
+  if(choice==='bundled'){
+    const dest=path.join(resourcesDir,binName);
+    if(!fs.existsSync(dest)&&platform.startsWith('mac'))fs.copyFileSync(path.join(resourcesDir,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),dest);
+    if(!fs.existsSync(dest))throw Error('Official bundled CLI missing');
+    console.log('   [codex] preserving official bundled CLI');return;
+  }
+  if(choice!=='rebuild')throw Error('Unknown OWN_CLI_SOURCE');
   const vendor = resolveCodexVendor(platform);
   if (vendor) {
     const dest = path.join(resourcesDir, binName);
@@ -297,7 +305,7 @@ function replaceCodex(platform, resourcesDir, binName) {
     try { fs.chmodSync(dest, 0o755); } catch {}
     console.log(`   [codex] replaced with @cometix/codex`);
   } else {
-    console.log(`   [!] @cometix/codex not found, keeping upstream codex`);
+    throw Error('Selected Rebuild CLI unavailable');
   }
 }
 
@@ -326,9 +334,9 @@ function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   if (platform.startsWith("mac")) {
-    buildMac(platform);
+    return buildMac(platform).catch(e=>{console.error(e);process.exitCode=1;});
   } else {
-    buildWin(platform);
+    return buildWin(platform).catch(e=>{console.error(e);process.exitCode=1;});
   }
 }
 

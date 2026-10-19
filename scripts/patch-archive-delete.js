@@ -273,6 +273,13 @@ function main() {
   const platform = args.find((a) =>
     ["mac-arm64", "mac-x64", "win"].includes(a),
   );
+  const controls=locateBundles({dir:'assets',pattern:/^data-controls-(?!settings-).*\.js$/,...(platform?{platform}:{})});
+  const native=controls.filter(b=>require('./patch-archive-native').hasNativeArchiveDelete(fs.readFileSync(b.path,'utf8')));
+  if(native.length===controls.length&&native.length){
+    console.log('  [verified-native] Archived conversation UI provides deleteArchivedConversation and delete controls');
+    return;
+  }
+  if(native.length)throw Error('Mixed native and legacy archived deletion layouts; select a platform explicitly');
 
   console.log("  [layer 1] app-main: delete-conversation route");
   const appMainBundles = locateBundles({
@@ -291,6 +298,9 @@ function main() {
   const btnPatched = patchDataControls(dataControlsBundles);
 
   console.log(`  [done] routes: ${routePatched}, buttons: ${btnPatched}`);
+  const routesReady=appMainBundles.length&&appMainBundles.every(b=>fs.readFileSync(b.path,'utf8').includes('delete-conversation'));
+  const buttonsReady=dataControlsBundles.length&&dataControlsBundles.every(b=>fs.readFileSync(b.path,'utf8').includes('delete-conversation'));
+  if(!routesReady||!buttonsReady)throw Error('Archived deletion patch contract not satisfied');
 }
 
 main();

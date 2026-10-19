@@ -1,5 +1,15 @@
 # codex-own operations
 
+## Building current official desktop inputs
+
+`own/build.mjs` synchronizes only the runner's target platform and preserves the official bundled CLI by default, keeping the desktop and protocol engine together. `OWN_CLI_SOURCE=rebuild` explicitly selects the Rebuild vendor resolver; an unavailable selected vendor stops the build. Source package versions, program-tree identities, original ASAR and CLI hashes are recorded in the candidate manifest. macOS inputs must pass their original code signature check; Windows MSIX downloads must match the Microsoft Store package digest.
+
+The upstream adapter locates one resource-bearing macOS application independently of its bundle name, preserves ASAR links and unpacked native entries, and updates the executable that actually contains the Windows ASAR integrity resource. Windows MSIX ZIP extraction preserves URI-encoded scoped directory names such as `%40worklouder`; the adapter restores the equivalent ASAR `@worklouder` paths using the original signed files. Restored file hashes and paths are recorded in candidate provenance. Missing unpacked files, path collisions and unexpected binary architectures stop the build. Unpacked native hashes in an ASAR can predate official code signing; preserve signed bytes and validate the complete official package rather than imposing stale pre-sign hashes.
+
+Native archived deletion is accepted only when the archived-thread controls and deletion method call are present in executable frontend structure. Older layouts require both legacy patches. Unknown layouts fail instead of treating zero replacements as success. Candidate QA runs a real offline Responses turn and thread start/resume/archive/delete against a temporary profile, then verifies the desktop workbench and reads native device-service state through the application's own Owl-hosted RPC. Windows native bindings link against Owl's chrome.dll and are verified in that runtime. No real credential or external model endpoint is involved. Physical hardware input remains a separate acceptance check.
+
+`own-build.yml` can be dispatched against an isolated branch for verification and short-lived CI artifacts. It has read-only repository permissions and contains no publish or merge job. This path does not change npm tags, GitHub Releases, installed applications or the scheduled sync policy.
+
 ## Incremental desktop distribution (0.4.0+)
 
 Builds preserve the complete signed application as the recovery `.tar.gz` artifact. In parallel, `canonicalize.mjs` writes a deterministic uncompressed `.tar` with sorted paths, normalized modes/timestamps and relative symlinks. `canonical-tar-cdc-v1` uses content-defined 16–64 MiB raw blocks (32 MiB rolling-hash mask). npm compresses each payload independently. Do not gzip the whole canonical archive before splitting: that would invalidate unchanged content after a small edit.
@@ -57,3 +67,11 @@ own/lib/app-update.mjs owns stable version comparison, schema-2 manifest validat
 Desktop builds bundle only the updater code, runtime dependencies and standalone Node for their platform. On macOS a Homebrew-linked Node is refused; use an official standalone binary through OWN_UPDATER_NODE when building locally. GitHub setup-node supplies the platform runtime in CI. Global npm manager and desktop updater may have different versions after in-app updates, which is expected. Bundled Skills remain managed by the global CLI's skill commands; an App update does not silently edit Agent skill directories.
 
 Prepared archive migration can explicitly set provenance.upgradeNpmUpdater=true. Verification then upgrades a fresh extracted copy, preserving original resources and regenerating ASAR/PE/framework integrity and macOS signatures. Existing and fresh artifacts must pass the bundled-runtime import gate in own/test-app.mjs. Unit tests cover checks, failed/tampered downloads, ready-state recovery, safe handoff, menu reconstruction and IPC sender validation; those gates do not by themselves establish native GUI success.
+
+## Official desktop adaptation checks
+
+API-mode policy routes authenticated API-key and authentication-free custom-provider sessions directly into the Codex workbench. Existing authentication, provider readiness and gateway checks still run. ChatGPT personalization onboarding remains available to subscription sessions; this overlay does not rewrite saved onboarding data.
+
+The isolated GUI smoke requires workbench controls and a composer, and preserves screenshots and renderer errors. Its credentials are fixtures and its provider is loopback-only. macOS uses Chromium's test-only mock keychain to avoid real keychain access; this switch is confined to the test launcher. Real-keychain integration and live provider credentials require separate acceptance evidence. Test cleanup includes Owl child processes bound to the unique candidate/profile.
+
+Experimental own-build and build workflow dispatches only create and verify CI artifacts. They do not publish npm, activate GitHub releases or merge own-main. Bind GUI verification to the successful native-build run and matching native-source fingerprint.

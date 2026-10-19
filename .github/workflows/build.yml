@@ -1,4 +1,4 @@
-name: Build & Release (Manual)
+name: Manual desktop build and isolated GUI verification
 
 on:
   workflow_dispatch:
@@ -9,13 +9,25 @@ on:
         default: "all"
         type: choice
         options: [all, mac, windows, linux]
+      gui_artifact_run:
+        description: 'Successful own-build run with identical native source; GUI smoke only'
+        type: string
+        default: ''
+      ref:
+        description: 'Source commit for GUI verification'
+        type: string
+        default: ''
+      artifact_version:
+        description: 'Verified local artifact version'
+        type: string
+        default: '0.0.3'
 
 env:
   NODE_VERSION: "24"
 
 jobs:
   build-mac:
-    if: inputs.platform == 'all' || inputs.platform == 'mac'
+    if: ${{ !inputs.gui_artifact_run && (inputs.platform == 'all' || inputs.platform == 'mac') }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -40,7 +52,7 @@ jobs:
           path: out/*.dmg
 
   build-windows:
-    if: inputs.platform == 'all' || inputs.platform == 'windows'
+    if: ${{ !inputs.gui_artifact_run && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -65,7 +77,7 @@ jobs:
           path: out/*.zip
 
   build-linux:
-    if: inputs.platform == 'all' || inputs.platform == 'linux'
+    if: ${{ !inputs.gui_artifact_run && (inputs.platform == 'all' || inputs.platform == 'linux') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -92,3 +104,35 @@ jobs:
             out/make/deb/**/*.deb
             out/make/rpm/**/*.rpm
             out/make/zip/**/*.zip
+  gui:
+    if: ${{ inputs.gui_artifact_run != '' }}
+    permissions: {contents: read, actions: read}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, platform: darwin-arm64}
+          - {os: windows-latest, platform: win32-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: '${{ inputs.ref }}', fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - run: npm ci --prefix own && npm ci
+      - name: Verify source binding and launch isolated desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_RUN: ${{ inputs.gui_artifact_run }}
+          OWN_VERSION: ${{ inputs.artifact_version }}
+          OWN_PLATFORM: ${{ matrix.platform }}
+        shell: bash
+        run: node own/ci/verify-gui-input.mjs "$VERIFIED_RUN" "$OWN_PLATFORM" "$OWN_VERSION"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gui-${{ matrix.platform }}
+          path: out/gui-smoke/
+          if-no-files-found: warn
+          retention-days: 3
