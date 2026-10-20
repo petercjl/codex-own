@@ -40,6 +40,16 @@ If publication has an unknown outcome, inspect the npm exact version/tag, Git ta
 
 ## Local installation
 
+### Stable macOS release signing
+
+Formal builds pin the public certificate fingerprint in `own/builders/release-signing.json`. The formal App and its native `Contents/MacOS/ChatGPT` executable must both satisfy the pinned certificate and `local.codex-own` identifier. Missing, changed, expired or untrusted signing identities stop the build; there is no ad-hoc fallback. This certificate is separate from the local development signing identity.
+
+Local provisioning uses `own/ci/release-signing.mjs --create` and stores its encrypted export, private keychain and password outside the repository under the account's Application Support directory. Provisioning preserves the default keychain and original search list. Enabling code-signing trust with `--trust`, or uploading the encrypted export and password to GitHub, requires explicit user authorization. Preserve the encrypted export for recovery; certificate rotation changes the installed identity and requires a separate migration.
+
+GitHub Actions imports `OWN_MAC_RELEASE_P12_BASE64` and `OWN_MAC_RELEASE_PASSWORD` into an ephemeral private signing keychain, checks the pinned fingerprint, grants code-signing trust only on that runner, and deletes temporary signing material at job completion. Secrets are scoped to the import step and never enter Git, npm, release artifacts or installed applications. `test-release-signing.mjs` compiles two different native fixtures and cross-verifies their designated requirements; this proves signature continuity, not macOS privacy consent retention.
+
+The current release certificate is self-signed and does not provide Apple Developer ID distribution or notarization. The first transition from an ad-hoc build requires the user to authorize the new formal identity once. Confirm permission retention through a later real desktop update before reporting the entire privacy-consent workflow verified. Never edit the TCC database or weaken its checks.
+
 ### Local development builds and instance isolation
 
 `node own/build.mjs --local-only --development --output <fresh-directory>` builds the Mac development identity and runs native checks without producing release archives. A previously signed, patched upstream app may be selected with `--prepared-app <path>`. Development output is `codex-own 开发版.app`, identifier `local.codex-own.development`, scheme `codex-own-dev`; its launcher keeps the native OS account HOME and selects data under `~/.codex-own-dev`. Stable launchers also resolve the OS account instead of inheriting another Agent's HOME. Existing profile roots and conversations remain in place. Development builds disable the npm updater and its cleanup controller; they cannot enter the release packaging pipeline.

@@ -88,6 +88,9 @@ jobs:
     needs: prepare
     permissions: {contents: write}
     uses: ./.github/workflows/own-build.yml
+    secrets:
+      OWN_MAC_RELEASE_P12_BASE64: ${{ secrets.OWN_MAC_RELEASE_P12_BASE64 }}
+      OWN_MAC_RELEASE_PASSWORD: ${{ secrets.OWN_MAC_RELEASE_PASSWORD }}
     with:
       ref: ${{ needs.prepare.outputs.ref }}
       version: ${{ needs.prepare.outputs.version }}

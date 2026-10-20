@@ -8,6 +8,7 @@ import {upgradeUpdater} from '../builders/upgrade-updater.mjs';
 import {canonicalize} from './canonicalize.mjs';
 import {networkFetch} from '../lib/network.mjs';
 import {writeCanonicalArchive} from '../lib/content-blocks.mjs';
+import {verifyMacReleaseSignature} from '../builders/mac-signing.mjs';
 const version=process.env.OWN_VERSION,key=process.env.OWN_PLATFORM,baseVersion=process.env.OWN_BASE_VERSION||version;
 const dir=path.resolve('out',`own-release-${version}-${key}.noindex`);fs.mkdirSync(dir,{recursive:true});
 const gh=(args)=>execFileSync('gh',args,{stdio:'inherit'});
@@ -52,6 +53,7 @@ if(manifest.provenance?.upgradeNpmUpdater===true||fs.existsSync(path.join(dest,a
 }
 execFileSync(process.execPath,['own/test-app.mjs',path.join(dest,a.entry)],{stdio:'inherit'});
 if(key==='darwin-arm64')execFileSync('codesign',['--verify','--deep','--strict',path.join(dest,a.entry)],{stdio:'inherit'});
+if(key==='darwin-arm64')verifyMacReleaseSignature(path.join(dest,a.entry));
 const canonical=await canonicalize(path.join(dest,a.entry),a,file);
 manifest.provenance={...manifest.provenance,overlaySource:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),updaterNodeSha256:await digestFile(process.execPath),toolchain:{node:process.version,platform:key,image:process.env.ImageVersion||null}};
 manifest.platforms[key]=canonical;

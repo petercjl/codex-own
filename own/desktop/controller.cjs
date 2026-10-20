@@ -135,6 +135,9 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
     w.on('show',()=>scheduleCleanup(w));
     const invalidate=()=>{loadedWindows.delete(w);loadGenerations.set(w,(loadGenerations.get(w)||0)+1);};
     w.webContents.on('did-finish-load',()=>{loadedWindows.add(w);loadGenerations.set(w,(loadGenerations.get(w)||0)+1);syncBadge(w.webContents);scheduleCleanup(w);});
+    // Owl may still report main-frame loading during both finish-load and show.
+    // Retry only after it stops; loadedWindows still rejects failed navigation.
+    w.webContents.on('did-stop-loading',()=>scheduleCleanup(w));
     w.webContents.on('did-start-navigation',(_event,_url,inPlace,mainFrame)=>{if(mainFrame&&!inPlace)invalidate();});
     w.webContents.on('did-fail-load',(_event,_code,_message,_url,mainFrame)=>{if(mainFrame!==false)invalidate();});
     w.webContents.on('render-process-gone',invalidate);

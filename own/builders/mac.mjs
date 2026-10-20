@@ -11,7 +11,7 @@ import {isolateShellImport} from './shell-environment.mjs';
 import {productModeChanges} from './product-mode.mjs';
 import {titleChanges} from './thread-titles.mjs';
 import {launcherScript} from './mac-launcher.mjs';
-import {macSigningArguments,withMacSigning} from './mac-signing.mjs';
+import {macSigningArguments,withMacSigning,sealMacBundle} from './mac-signing.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
@@ -89,7 +89,7 @@ const standaloneCli=path.join(resources,'codex');
 withMacSigning(development,signing=>{
 execFileSync('codesign',['--force',...signing,standaloneCli],{stdio:'inherit'});
 execFileSync('codesign',['--verify','--strict',standaloneCli],{stdio:'inherit'});
-execFileSync('codesign',['--force','--deep',...signing,app],{stdio:'inherit'});
+sealMacBundle(app,signing,{development});
 execFileSync('codesign',['--verify','--deep','--strict',app],{stdio:'inherit'});
 });
 fs.writeFileSync(path.join(output,'build-manifest.json'),JSON.stringify({app,source,version:pkg.version,asarHeaderHash:hash,identity:info.CFBundleIdentifier,stateRoot:'~/Library/Application Support/codex-own-independent',created:new Date().toISOString()},null,2)+'\n',{flag:'wx'});

@@ -57,15 +57,30 @@ export function tarExecutable(platform=process.platform,env=process.env,exists=f
 export function unpack(archive,dest) {
   return extractChecked(archive,dest,{tar:tarExecutable(),report:progress});
 }
-export function macOwnProcessIds(lines) {
-  return lines.filter(l=>l.includes('codex-own.app/Contents/')&&!l.includes(' ps -')&&!l.includes('/Contents/Resources/cua_node/')&&!/\/Contents\/MacOS\/WinAppHelper(?:\s|$)/.test(l)).map(l=>l.trim().split(/\s+/)[0]);
+export function macOwnProcessIds(lines,target='/Applications/codex-own.app') {
+  const prefix=path.posix.resolve(target)+'/Contents/';
+  return lines.flatMap(line=>{
+    const match=line.trim().match(/^(\d+)\s+(.+)$/);
+    if(!match||!match[2].startsWith(prefix))return [];
+    const executable=match[2].slice(prefix.length);
+    // Electron's crash reporters may outlive the app. They hold no user tasks
+    // and must not block replacement after the app/renderer/backend have quit.
+    if(executable.startsWith('Resources/cua_node/')||/^MacOS\/WinAppHelper(?:\s|$)/.test(executable)||/^Frameworks\/.+\/Helpers\/browser_crashpad_handler(?:\s|$)/.test(executable))return [];
+    return [match[1]];
+  });
 }
 export function running(p=paths()) {
   if(process.platform==='darwin'){
     const lines=execFileSync('ps',['-axo','pid=,command='],{encoding:'utf8'}).split('\n');
-    return macOwnProcessIds(lines);
+    return macOwnProcessIds(lines,p.target);
   }
   const out=execFileSync('powershell.exe',['-NoProfile','-Command',"@(Get-Process -Name 'codex-own' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id) -join ','"],{encoding:'utf8'}).trim();return out?out.split(','):[];
+}
+export function unregisterStagedMacApp(stage,{platform=process.platform,run=execFileSync,report=progress}={}) {
+  if(platform!=='darwin')return;
+  if(!/^stage-[A-Za-z0-9_-]+$/.test(path.posix.basename(stage)))fail('UNSAFE_PATH','Expected an owned installation stage');
+  try{run('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-u',path.posix.join(stage,'unpacked','codex-own.app')],{stdio:'pipe',timeout:10000});}
+  catch{report('临时应用入口注销未完成；当前安装不受影响。');}
 }
 export function appIdentity(app) {
   if(process.platform==='darwin')return execFileSync('/usr/libexec/PlistBuddy',['-c','Print :CFBundleIdentifier',path.join(app,'Contents','Info.plist')],{encoding:'utf8'}).trim();
@@ -134,7 +149,7 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
       return {ok:true,unchanged:true,version:m.version,managerVersion:m.binding?.managerVersion||pkg.version,runtimeVersion:m.runtimes?.version||null,runtimeChanged:!!tools&&!tools.unchanged,transfer:{downloadBytes:0,downloadBlocks:0},desktopActivated:false};
     }
     if(isRunning(p).length)fail('APP_RUNNING','Quit codex-own before install/update');
-    const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive,transfer;
+    const stage=fs.mkdtempSync(path.join(p.manager,'stage-'));let f=archive,transfer,extracted=false;
     try{
     if(f){if(fs.statSync(f).size!==a.size||await digestFile(f)!==a.sha256)fail('CHECKSUM_MISMATCH','Local archive checksum mismatch');}
     else{if(m.schema!==2)fail('NPM_ASSETS_REQUIRED','Update @petercjl/codex-own to the latest npm-only release.');f=path.join(stage,'app.tar');const cache=path.join(p.manager,'npm-assets');rejectLinks(cache);
@@ -143,7 +158,7 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
       }
       transfer=await assembleNpmAsset(a,f,cache,tarExecutable());}
     progress('校验通过，正在解压桌面程序');
-    const content=path.join(stage,'unpacked');unpack(f,content);const source=path.join(content,a.entry);
+    const content=path.join(stage,'unpacked');unpack(f,content);const source=path.join(content,a.entry);extracted=true;
     if(process.platform==='darwin')execFileSync('codesign',['--verify','--deep','--strict',source],{stdio:'pipe'});
     if(m.runtimes)await runtimeInstaller(m.runtimes,{p,report:progress});
     progress('正在安装到独立目录');
@@ -151,7 +166,7 @@ export async function install({version,adopt=false,archive,manifest,expectedCurr
     if(process.platform==='darwin')execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-f',p.target],{stdio:'pipe'});
     else shortcut(p);
     progress('安装完成');return {...result,downloadSource:archive?'local-archive':'registry.npmjs.org',...(transfer?{transfer}:{})};
-    }finally{await removeTemporary(stage,{report:progress});}
+    }finally{await removeTemporary(stage,{report:progress});if(extracted)unregisterStagedMacApp(stage);}
   });
 }
 export function shortcut(p) {

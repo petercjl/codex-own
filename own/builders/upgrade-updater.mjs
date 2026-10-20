@@ -10,6 +10,7 @@ import {updateMenuChanges} from './update-menu.mjs';
 import {applyWindowsIcon} from './windows-icon.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
+import {withMacSigning,sealMacBundle} from './mac-signing.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const root=path.resolve(import.meta.dirname,'..');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -60,7 +61,7 @@ export async function upgradeUpdater(app,{version,node}={}){
    const bytes=fs.readFileSync(framework),sentinel=Buffer.from('AGbevlPCksUGKNL8TSn7wGmJEuJsXb2A'),i=bytes.indexOf(sentinel);
    if(i<0||bytes.lastIndexOf(sentinel)!==i||bytes[i+32]!==1||bytes[i+33]!==1)throw Error('Unknown framework integrity contract');
    crypto.createHash('sha256').update('Resources/app.asarSHA256'+headerHash).digest().copy(bytes,i+34);fs.writeFileSync(framework,bytes);
-   execFileSync('codesign',['--force','--deep','--sign','-',app],{stdio:'pipe'});execFileSync('codesign',['--verify','--deep','--strict',app],{stdio:'pipe'});
+   withMacSigning(false,signing=>sealMacBundle(app,signing));execFileSync('codesign',['--verify','--deep','--strict',app],{stdio:'pipe'});
  }else{
    const PE=require('pe-library'),exeFile=path.join(app,'codex-own.exe'),exe=PE.NtExecutable.from(fs.readFileSync(exeFile),{ignoreCert:true}),res=PE.NtExecutableResource.from(exe);
    const integrity=res.entries.find(e=>e.type==='INTEGRITY'&&e.id==='ELECTRONASAR');if(!integrity)throw Error('PE integrity resource missing');

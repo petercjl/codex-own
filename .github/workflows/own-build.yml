@@ -9,6 +9,9 @@ on:
       base_version: {type: string, required: false, default: ''}
       runtime_qa: {type: boolean, required: false, default: false}
   workflow_call:
+    secrets:
+      OWN_MAC_RELEASE_P12_BASE64: {required: false}
+      OWN_MAC_RELEASE_PASSWORD: {required: false}
     inputs:
       ref: {type: string, required: true}
       version: {type: string, required: true}
@@ -37,6 +40,24 @@ jobs:
         with: {node-version: '24.15.0', package-manager-cache: false}
       - run: npm ci --prefix own
       - run: npm run check --prefix own && npm test --prefix own
+      - name: Import pinned macOS release signer
+        if: ${{ matrix.platform == 'darwin-arm64' }}
+        env:
+          OWN_MAC_RELEASE_P12_BASE64: ${{ secrets.OWN_MAC_RELEASE_P12_BASE64 }}
+          OWN_MAC_RELEASE_PASSWORD: ${{ secrets.OWN_MAC_RELEASE_PASSWORD }}
+        run: node own/ci/release-signing.mjs --ci-import
+      - name: Verify release identity across changed native builds
+        if: ${{ matrix.platform == 'darwin-arm64' }}
+        env:
+          OWN_MAC_SIGNING_ROOT: ${{ runner.temp }}/codex-own-release-signing
+        run: node own/ci/test-release-signing.mjs out/release-signing-verification.noindex
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && matrix.platform == 'darwin-arm64' }}
+        with:
+          name: release-signing-darwin-arm64
+          path: out/release-signing-verification.noindex/result.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify independent Node npm Python on target OS
         if: inputs.runtime_qa
         run: |
@@ -56,7 +77,9 @@ jobs:
         env:
           OWN_VERSION: ${{ inputs.version }}
           OWN_UPSTREAM_SHA: ${{ inputs.upstream }}
-        run: node own/build.mjs
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then export OWN_MAC_SIGNING_ROOT="$RUNNER_TEMP/codex-own-release-signing"; fi
+          node own/build.mjs
       - name: Verify Windows candidate installation
         if: ${{ !inputs.existing && matrix.platform == 'win32-x64' }}
         env:
@@ -93,7 +116,9 @@ jobs:
           OWN_VERSION: ${{ inputs.version }}
           OWN_PLATFORM: ${{ matrix.platform }}
           OWN_BASE_VERSION: ${{ inputs.base_version }}
-        run: node own/ci/verify-existing.mjs
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then export OWN_MAC_SIGNING_ROOT="$RUNNER_TEMP/codex-own-release-signing"; fi
+          node own/ci/verify-existing.mjs
       - name: Verify canonical archive and local incremental reuse
         env:
           OWN_VERSION: ${{ inputs.version }}
@@ -122,3 +147,6 @@ jobs:
           path: out/runtime-qa/publish/*
           retention-days: 3
           if-no-files-found: error
+      - name: Remove ephemeral release signing material
+        if: ${{ always() && matrix.platform == 'darwin-arm64' }}
+        run: node own/ci/release-signing.mjs --ci-cleanup

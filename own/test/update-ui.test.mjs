@@ -35,6 +35,18 @@ test('a hidden prewarmed renderer waits until its main interface is actually sho
  const a=setup(t);await Promise.resolve();const w=new a.electron.BrowserWindow({});let visible=false;w.isVisible=()=>visible;w.url='app://-/index.html';w.webContents.emit('did-finish-load');assert.equal(a.timers.filter(x=>x.ms===30000).length,0);
  visible=true;w.emit('show');assert.equal(a.timers.filter(x=>x.ms===30000).length,1);assert.equal(a.spawns.length,0);
 });
+test('cleanup waits for loading to stop after finish-load and show events',async t=>{
+ const a=setup(t);await Promise.resolve();const w=new a.electron.BrowserWindow({});w.url='app://-/index.html';w.loading=true;
+ w.webContents.emit('did-finish-load');w.emit('show');assert.equal(a.timers.filter(x=>x.ms===30000).length,0);
+ w.loading=false;w.webContents.emit('did-stop-loading');
+ const timer=a.timers.find(x=>x.ms===30000);assert.ok(timer);
+ a.reply={ok:true,reclaimedBytes:1};timer.fn();await new Promise(r=>setImmediate(r));assert.equal(a.spawns[0].args[1],'cleanup');
+});
+test('loading-stop after failed navigation cannot supply successful-load evidence',async t=>{
+ const a=setup(t);await Promise.resolve();const w=new a.electron.BrowserWindow({});w.url='app://-/index.html';w.loading=true;
+ w.webContents.emit('did-finish-load');w.webContents.emit('did-fail-load',{},-2,'failed',w.url,true);
+ w.loading=false;w.webContents.emit('did-stop-loading');assert.equal(a.timers.filter(x=>x.ms===30000).length,0);
+});
 test('a visible URL alone and a failed main-frame navigation do not confirm a successful load',async t=>{
  const a=setup(t);await Promise.resolve();const w=new a.electron.BrowserWindow({});w.url='app://-/index.html';w.emit('show');assert.equal(a.timers.filter(x=>x.ms===30000).length,0);
  w.webContents.emit('did-finish-load');const timer=a.timers.filter(x=>x.ms===30000).at(-1);w.webContents.emit('did-start-navigation',{},w.url,false,true);w.webContents.emit('did-fail-load',{},-2,'failed',w.url,true);timer.fn();assert.equal(a.spawns.length,0);

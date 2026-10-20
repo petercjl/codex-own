@@ -11,6 +11,7 @@ import {canonicalize} from './ci/canonicalize.mjs';
 import {sourceTree} from './ci/source-tree.mjs';
 import {exposeVendorResolver,withSystemTar} from './builders/upstream-resolver.mjs';
 import {nativeVersion} from './builders/native-version.mjs';
+import {verifyMacReleaseSignature} from './builders/mac-signing.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {missingUnpacked}=require('../scripts/upstream-compat.js');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
@@ -86,6 +87,7 @@ provenance.cliVersion=await nativeVersion(path.join(resources,mac?'codex':'codex
 run(cli,['--version']);
 run(process.execPath,['own/test-app.mjs',source]);
 if(mac)run('codesign',['--verify','--deep','--strict',source]);
+if(mac&&!development)provenance.signing=verifyMacReleaseSignature(source);
 if(local){const result={ok:true,localOnly:true,development,app:source,provenance};fs.writeFileSync(path.join(output,'local-build.json'),JSON.stringify(result,null,2),{flag:'wx'});console.log(JSON.stringify(result));process.exit(0);}
 const filename=`codex-own-${key}.tar.gz`,target=path.join(output,filename);
 run(tarExecutable(),['-czf',target,'-C',path.dirname(source),path.basename(source)]);
