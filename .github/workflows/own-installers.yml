@@ -64,6 +64,8 @@ jobs:
           OWN_MAC_RELEASE_PASSWORD: ${{ secrets.OWN_MAC_RELEASE_PASSWORD }}
         run: node own/ci/release-signing.mjs --ci-import
       - name: Build full installer from exact published components
+        env:
+          OWN_MAC_SIGNING_ROOT: ${{ runner.temp }}/codex-own-release-signing
         run: node own/installers/build.mjs '${{ needs.prepare.outputs.version }}' 'out/first-installer-${{ matrix.platform }}'
       - name: Verify offline first install repeat install and npm update adoption
         run: node own/installers/test-native.mjs 'out/first-installer-${{ matrix.platform }}' '${{ needs.prepare.outputs.version }}'

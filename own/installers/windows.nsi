@@ -14,6 +14,7 @@ Var KeyFile
 Var KeyInput
 Var Parameters
 Var Installing
+!define MUI_CUSTOMFUNCTION_ABORT PreventInstallAbort
 !define MUI_WELCOMEPAGE_TEXT "安装 codex-own ${VERSION}，包含完整桌面应用与独立 Node、npm、Python。$\r$\n$\r$\n安装无需预装开发工具；请预留至少 10 GB 可用空间，并先完全退出 codex-own。$\r$\n$\r$\n安装后可从开始菜单打开，后续在应用内更新。已有配置与对话会保留。"
 !insertmacro MUI_PAGE_WELCOME
 Page custom ApiPage ApiLeave
@@ -38,7 +39,7 @@ Function DisableCancel
  GetDlgItem $0 $HWNDPARENT 2
  EnableWindow $0 0
 FunctionEnd
-Function .onUserAbort
+Function PreventInstallAbort
  ${If} $Installing == 1
   Abort
  ${EndIf}
