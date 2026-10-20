@@ -1,0 +1,93 @@
+name: codex-own full first installers
+on:
+  workflow_dispatch:
+    inputs:
+      version: {description: 'Exact public npm manager version, or latest', type: string, default: latest, required: true}
+      publish: {description: 'Publish both verified full installers', type: boolean, default: true}
+  workflow_run:
+    workflows: ['Publish codex-own npm']
+    types: [completed]
+    branches: [own-main]
+permissions: {contents: read}
+concurrency:
+  group: codex-own-full-installers
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'petercjl/codex-own' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - id: version
+        env: {REQUESTED: '${{ inputs.version || ''latest'' }}'}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const requested=process.env.REQUESTED;
+          if(requested!=='latest'&&!/^\d+\.\d+\.\d+$/.test(requested))throw Error('Exact stable release required');
+          const r=await fetch('https://registry.npmjs.org/@petercjl%2fcodex-own/'+requested);if(!r.ok)throw Error('Public npm version missing');
+          const p=await r.json();if(p.name!=='@petercjl/codex-own'||!/^\d+\.\d+\.\d+$/.test(p.version)||p.ownDesktopManifest?.binding?.managerVersion!==p.version)throw Error('Release binding invalid');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'version='+p.version+'\n');
+          JS
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, platform: darwin-arm64}
+          - {os: windows-latest, platform: win32-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults: {run: {shell: bash}}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - run: npm ci --prefix own --no-audit --no-fund
+      - run: node --test own/test/first-installers.test.mjs
+      - name: Install and verify NSIS build dependency
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) { choco install nsis --yes --no-progress; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+          & $nsis /VERSION
+      - name: Import pinned macOS release signer
+        if: runner.os == 'macOS'
+        env:
+          OWN_MAC_RELEASE_P12_BASE64: ${{ secrets.OWN_MAC_RELEASE_P12_BASE64 }}
+          OWN_MAC_RELEASE_PASSWORD: ${{ secrets.OWN_MAC_RELEASE_PASSWORD }}
+        run: node own/ci/release-signing.mjs --ci-import
+      - name: Build full installer from exact published components
+        run: node own/installers/build.mjs '${{ needs.prepare.outputs.version }}' 'out/first-installer-${{ matrix.platform }}'
+      - name: Verify offline first install repeat install and npm update adoption
+        run: node own/installers/test-native.mjs 'out/first-installer-${{ matrix.platform }}' '${{ needs.prepare.outputs.version }}'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: first-installer-${{ matrix.platform }}
+          path: out/first-installer-${{ matrix.platform }}/*
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+      - name: Remove ephemeral signing material
+        if: always() && runner.os == 'macOS'
+        run: node own/ci/release-signing.mjs --ci-cleanup
+  publish:
+    if: github.ref == 'refs/heads/own-main' && (github.event_name == 'workflow_run' || inputs.publish)
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions: {contents: write, actions: read}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: {node-version: '24.15.0', package-manager-cache: false}
+      - uses: actions/download-artifact@v7
+        with: {pattern: 'first-installer-*', path: out/first-installers}
+      - name: Publish both verified immutable first-install packages
+        env: {GH_TOKEN: '${{ github.token }}', OWN_INSTALLER_VERSION: '${{ needs.prepare.outputs.version }}'}
+        run: node own/installers/publish.mjs out/first-installers
