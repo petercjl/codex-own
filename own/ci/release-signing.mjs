@@ -5,9 +5,12 @@ const ci=process.argv.includes('--ci-import')||process.argv.includes('--ci-clean
 if(ci&&(process.env.GITHUB_ACTIONS!=='true'||!path.isAbsolute(process.env.RUNNER_TEMP||'')))throw Error('CI signing requires a GitHub runner temporary directory.');
 const root=ci?path.join(process.env.RUNNER_TEMP,'codex-own-release-signing'):path.join(os.userInfo().homedir,'Library/Application Support/codex-own-release-signing');
 const chain=path.join(root,'release.keychain-db'),cert=path.join(root,'certificate.pem'),manifest=path.join(root,'identity.json'),p12=path.join(root,'signing.p12');
-const security=(args,options={})=>{try{return execFileSync('/usr/bin/security',args,{encoding:'utf8',stdio:['pipe','pipe','pipe'],...options});}catch{throw Error('Keychain operation failed; signing material preserved for inspection.');}},quote=s=>'"'+s.replaceAll('\\','\\\\').replaceAll('"','\\"')+'"';
+const security=(args,options={})=>{try{return execFileSync('/usr/bin/security',args,{encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:60000,...options});}catch{throw Error('Keychain operation failed; signing material preserved for inspection.');}},quote=s=>'"'+s.replaceAll('\\','\\\\').replaceAll('"','\\"')+'"';
+// Hosted runners have no user available for macOS trust dialogs. Scope this
+// noninteractive admin-domain operation to the ephemeral CI host only.
+const ciTrust=args=>execFileSync('/usr/bin/sudo',['-n','/usr/bin/security',...args],{stdio:'pipe',timeout:30000});
 if(process.argv.includes('--ci-cleanup')){
- if(fs.existsSync(root)){if(fs.lstatSync(root).isSymbolicLink())throw Error('Unsafe CI signing directory.');if(fs.existsSync(cert))try{security(['remove-trusted-cert',cert]);}catch{}if(fs.existsSync(chain))security(['delete-keychain',chain]);fs.rmSync(root,{recursive:true});}
+ if(fs.existsSync(root)){if(fs.lstatSync(root).isSymbolicLink())throw Error('Unsafe CI signing directory.');if(fs.existsSync(cert))try{ciTrust(['remove-trusted-cert','-d',cert]);}catch{}if(fs.existsSync(chain))security(['delete-keychain',chain]);fs.rmSync(root,{recursive:true});}
  console.log(JSON.stringify({ok:true,ephemeralSigningRemoved:true}));process.exit(0);
 }
 const write=(name,content)=>fs.writeFileSync(path.join(root,name),content,{flag:'wx',mode:0o600});
@@ -32,6 +35,7 @@ if(process.argv.includes('--create')||ci){
  if(ci){const policy=JSON.parse(fs.readFileSync(new URL('../builders/release-signing.json',import.meta.url)));if(sha1!==policy.sha1)throw Error('Release certificate does not match the pinned public identity.');}
  const before=security(['list-keychains','-d','user']),defaultBefore=security(['default-keychain','-d','user']);let imported=false;
  try{
+  if(ci)console.error('Importing the pinned signer into the ephemeral private keychain');
   security(['-i'],{input:`create-keychain -p ${password} ${quote(chain)}\nunlock-keychain -p ${password} ${quote(chain)}\nimport ${quote(p12)} -k ${quote(chain)} -P ${password} -x -T /usr/bin/codesign\nset-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${password} ${quote(chain)}\n`});fs.chmodSync(chain,0o600);
   if(!security(['find-identity','-p','codesigning',chain]).includes(sha1))throw Error('Signing identity import failed; preserve partial setup.');
   write('identity.json',JSON.stringify({schema:1,bundleIdentifier:'local.codex-own',sha1},null,2)+'\n');imported=true;
@@ -42,7 +46,7 @@ if(process.argv.includes('--create')||ci){
   if(security(['default-keychain','-d','user'])!==defaultBefore)throw Error('Default keychain changed; inspect before continuing.');
   if(imported&&fs.existsSync(key))fs.unlinkSync(key);
  }
- if(ci){security(['add-trusted-cert','-r','trustRoot','-p','codeSign','-k',chain,cert]);fs.unlinkSync(p12);}
+ if(ci){console.error('Applying code-signing-only trust on the ephemeral GitHub runner');ciTrust(['add-trusted-cert','-d','-r','trustRoot','-p','codeSign','-k','/Library/Keychains/System.keychain',cert]);fs.unlinkSync(p12);}
 }
 const identity=JSON.parse(fs.readFileSync(manifest,'utf8')),certificate=new crypto.X509Certificate(fs.readFileSync(cert));
 if(identity.bundleIdentifier!=='local.codex-own'||identity.sha1!==certificate.fingerprint.replaceAll(':',''))throw Error('Release signing identity mismatch.');
