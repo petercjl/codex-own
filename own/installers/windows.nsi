@@ -83,6 +83,7 @@ Section "安装 codex-own"
  ${EndIf}
  Pop $0
  Pop $1
+ StrCpy $Installing 0
  ${If} $0 != 0
   ${Switch} $0
    ${Case} 2
