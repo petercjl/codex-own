@@ -25,6 +25,9 @@ try{
  const snapshot=()=>JSON.parse(execFileSync(node,['--input-type=module','-e',inspect,lib],{env,encoding:'utf8'}));const first=snapshot();
  const sentinel=path.join(first.core,'installer-preservation-sentinel.txt');fs.writeFileSync(sentinel,'configuration-and-chat-preserved',{flag:'wx',mode:0o600});
  run();const second=snapshot();assert.equal(second.target,first.target);assert.equal(fs.readFileSync(sentinel,'utf8'),'configuration-and-chat-preserved');
+ // An ordinary uninstall keeps user data and the installation receipt. A full
+ // installer must restore missing program files instead of taking a no-op path.
+ fs.rmSync(first.target,{recursive:true,force:true});run();snapshot();assert.equal(fs.readFileSync(sentinel,'utf8'),'configuration-and-chat-preserved');
  const smoke=`import fs from 'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';const base=process.argv[1],m=await import(pathToFileURL(path.join(base,'manager.mjs'))),u=await import(pathToFileURL(path.join(base,'app-update.mjs')));const s=m.state(),manifest=s.releaseManifest;const r=await u.prepareUpdate(s.version,{resolve:async()=>manifest.binding.managerVersion,manifest:async()=>manifest});if(!r.unchanged)throw Error('Native first install not adopted by existing updater');console.log(JSON.stringify({ok:true,updaterRecognizesInstallation:true,zeroNetwork:true}));`;
  execFileSync(node,['--input-type=module','-e',smoke,lib],{env,stdio:'inherit'});
  fs.writeFileSync(path.join(output,`installer-qa-${platform}.json`),JSON.stringify({schema:1,version,platform,offline:true,noSystemNodeNpmPython:true,repeatInstallPreservesData:true,apiFileConfigured:true,existingUpdaterRecognizesInstallation:true,nativeWindowsSetupExecuted:process.platform==='win32',macDmgWorkerExecuted:process.platform==='darwin',interactiveGuiTested:false},null,2)+'\n',{flag:'wx'});

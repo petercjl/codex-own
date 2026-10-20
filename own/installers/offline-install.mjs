@@ -58,7 +58,7 @@ export async function runOfflineInstall(root,{keyFile,verifyOnly=false,report=me
   await pipeline(fs.createReadStream(path.join(root,'desktop.tar.gz')),gunzip,fs.createWriteStream(archive,{flags:'wx',mode:0o600}));
   if(bytes!==asset.size||await hashFile(archive)!==asset.sha256)throw error('CHECKSUM_MISMATCH','桌面归档校验失败');
   const runtimeInstaller=(runtime,options)=>tools.ensureRuntime(runtime,{...options,localAssets:Object.fromEntries(Object.entries(info.runtimeFiles).map(([k,v])=>[k,path.join(root,v)]))});
-  const same=prior?.desktop?.identity===asset.sha256;
+  const same=prior?.desktop?.identity===asset.sha256&&fs.existsSync(p.target);
   const result=await manager.install({p,version:info.managerVersion,manifest,...(!same?{archive}:{}),runtimeInstaller});
   if(keyFile){report('正在导入本地 API 配置');await manager.configure(keyFile);}
   return {...result,offline:true,configured:!!keyFile};
