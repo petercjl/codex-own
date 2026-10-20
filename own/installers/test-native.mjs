@@ -5,7 +5,7 @@ const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'own-native-first-')),env={..
 const key=path.join(fixture,'api.txt');fs.writeFileSync(key,'sk-fixture-no-service-access',{flag:'wx',mode:0o600});
 let volume,payload,run;
 if(process.platform==='win32'){
- env.LOCALAPPDATA=path.join(fixture,'Local');env.APPDATA=path.join(fixture,'Roaming');env.PATH=process.env.SystemRoot+'\\System32;'+process.env.SystemRoot;
+ env.LOCALAPPDATA=path.join(fixture,'Local');env.APPDATA=path.join(fixture,'Roaming');env.PATH=process.env.SystemRoot+'\\System32;'+process.env.SystemRoot+'\\System32\\WindowsPowerShell\\v1.0;'+process.env.SystemRoot;
  const original=path.join(env.LOCALAPPDATA,'Programs','Codex','sentinel.txt');fs.mkdirSync(path.dirname(original),{recursive:true});fs.writeFileSync(original,'original-preserved',{flag:'wx'});
  const setup=path.join(output,`codex-own-${version}-windows-x64-setup.exe`);
  run=()=>execFileSync(setup,['/S','/APIKEYFILE='+key],{env,stdio:'inherit',windowsHide:true,timeout:600000});run();
