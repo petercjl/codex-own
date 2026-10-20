@@ -20,6 +20,7 @@ const upstream=http.createServer(async(req,res)=>{
   if(count===4)assert.equal(body.input.filter(x=>/call_output$/.test(x.type)).length,4);
   const output=n?[
    {type:'function_call',id:'fc_'+n,call_id:'exec_'+n,name:'exec_command',arguments:JSON.stringify({cmd:n===1?'printf "HISTORY_SHELL_OK\\n"':'cat proof.txt'})},
+   {type:'reasoning',id:'reason_'+n,summary:[],content:[{type:'reasoning_text',text:'Continue with the other tool while the shell is pending.'}]},
    {type:'custom_tool_call',id:'ct_'+n,call_id:'patch_'+n,name:'apply_patch',input:JSON.stringify({data:patch(n)})}
   ]:[{type:'message',id:'final',role:'assistant',content:[{type:'output_text',text:'HISTORY_RESUME_OK',annotations:[]}]}];
   res.writeHead(200,{'content-type':'text/event-stream'});const send=(type,data)=>res.write('event: '+type+'\ndata: '+JSON.stringify({type,...data})+'\n\n');
@@ -49,5 +50,5 @@ try{
  await initialize();await backend.call('thread/resume',{threadId:thread.thread.id,cwd:root,approvalPolicy:'never',sandbox:'workspace-write'});
  await backend.call('turn/start',{threadId:thread.thread.id,input:[{type:'text',text:'Continue after restart.',text_elements:[]}]});assert.equal((await backend.turn).status,'completed');if(fixtureError)throw fixtureError;
  assert.equal(count,4);assert.equal(fs.readFileSync(path.join(root,'proof.txt'),'utf8'),'中文恢复版\n');
- console.log(JSON.stringify({ok:true,realNativeTools:true,parallelRounds:2,interruptedAndResumed:true,backendRestart:true,patchCreateAndUpdate:true,realCredentialsUsed:false,profile:root}));
+ console.log(JSON.stringify({ok:true,realNativeTools:true,parallelRounds:2,reasoningBetweenCalls:true,interruptedAndResumed:true,backendRestart:true,patchCreateAndUpdate:true,realCredentialsUsed:false,profile:root}));
 }finally{clearTimeout(timer);if(backend)await backend.stop();await server.close();upstream.closeAllConnections();await new Promise(r=>upstream.close(r));}

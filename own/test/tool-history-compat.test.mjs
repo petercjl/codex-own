@@ -20,6 +20,18 @@ test('missing, duplicate, orphan and mismatched results are never fabricated or 
 test('serial, single and empty histories are unchanged',()=>{
  for(const input of [[],[call('a'),result('a')],[call('a'),result('a'),call('b'),result('b')]]){const source={input};assert.equal(compat.history(source),source);}
 });
+test('reasoning between outstanding calls preserves reasoning and pairs error results by ID',()=>{
+ const a=call('unsupported'),b=call('resources'),reasoning={type:'reasoning',encrypted_content:'opaque-model-state',summary:[{type:'summary_text',text:'Check resources next.'}]};
+ const oa={...result('unsupported'),output:'unsupported call: fixture_tool'},ob=result('resources');
+ const source={model:'deepseek-test',input:[a,reasoning,b,oa,ob]},before=JSON.stringify(source),next=bridge.normalizeBody(source);
+ assert.deepEqual(next.input,[a,oa,reasoning,b,ob]);assert.equal(next.input[2],reasoning);assert.equal(JSON.stringify(source),before);assert.equal(compat.history(next),next);
+});
+test('reasoning does not permit pairing across a user message or completing a missing result',()=>{
+ const reasoning={type:'reasoning',summary:[]},user={type:'message',role:'user',content:'stop'};
+ for(const input of [[call('a'),reasoning,call('b'),result('a')],[call('a'),reasoning,call('b'),user,result('a'),result('b')]]){
+  const source={input};assert.equal(compat.history(source),source);
+ }
+});
 test('DeepSeek bridge applies pairing and preserves unrelated provider requests',()=>{
  const source={model:'deepseek-v4.1-flash-1017',input:[call('a'),call('b'),result('a'),result('b')]};
  assert.deepEqual(bridge.normalizeBody(source).input,[source.input[0],source.input[2],source.input[1],source.input[3]]);

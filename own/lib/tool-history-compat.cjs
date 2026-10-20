@@ -11,12 +11,14 @@ function history(body){
  for(let i=0;i<body.input.length;){
   const start=i;
   if(!isCall(body.input[i])){input.push(body.input[i++]);continue;}
-  while(i<body.input.length&&(isCall(body.input[i])||isResult(body.input[i])))i++;
+  while(i<body.input.length&&(isCall(body.input[i])||isResult(body.input[i])||body.input[i]?.type==='reasoning'))i++;
   const block=body.input.slice(start,i),calls=block.filter(isCall),results=block.filter(isResult);
   const ids=new Set(calls.map(x=>x.call_id)),byId=new Map(results.map(x=>[x.call_id,x]));
-  const complete=calls.length>1&&ids.size===calls.length&&results.length===calls.length&&byId.size===results.length&&calls.every(x=>typeof x.call_id==='string'&&byId.get(x.call_id)?.type===outputs.get(x.type));
+  const complete=ids.size===calls.length&&results.length===calls.length&&byId.size===results.length&&calls.every(x=>typeof x.call_id==='string'&&byId.get(x.call_id)?.type===outputs.get(x.type));
   if(!complete){input.push(...block);continue;}
-  const paired=calls.flatMap(x=>[x,byId.get(x.call_id)]);
+  // A model can emit another reasoning item while earlier tools are pending.
+  // Keep those opaque items in order; move only results to their matching call.
+  const paired=block.flatMap(x=>isResult(x)?[]:isCall(x)?[x,byId.get(x.call_id)]:[x]);
   if(paired.some((x,n)=>x!==block[n]))changed=true;
   input.push(...paired);
  }

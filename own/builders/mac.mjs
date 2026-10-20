@@ -11,6 +11,7 @@ import {isolateShellImport} from './shell-environment.mjs';
 import {productModeChanges} from './product-mode.mjs';
 import {titleChanges} from './thread-titles.mjs';
 import {launcherScript} from './mac-launcher.mjs';
+import {macSigningArguments,withMacSigning} from './mac-signing.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const plist = require('plist');
@@ -22,6 +23,7 @@ if(process.env.OWN_DEVELOPMENT&&!development)throw Error('OWN_DEVELOPMENT must b
 const productName=development?'codex-own 开发版':'codex-own',scheme=development?'codex-own-dev':'codex-own';
 const source = process.env.OWN_PREPARED_APP; if (!source) throw Error('Prepared upstream app required');
 if (process.platform !== 'darwin' || process.arch !== 'arm64') throw Error('This build is verified for macOS ARM64 only');
+macSigningArguments(development);
 if (fs.existsSync(output)) throw Error(`Output already exists: ${output}. Choose a fresh output directory.`);
 for (const file of [source, path.join(root,'resources/own/codex-own.icns'), path.join(root,'resources/own/codex-own.png')]) fs.statSync(file);
 fs.mkdirSync(output, {recursive:true});
@@ -82,11 +84,13 @@ if(index<0||bytes.lastIndexOf(sentinel)!==index||bytes[index+32]!==1||bytes[inde
 crypto.createHash('sha256').update('Resources/app.asarSHA256'+hash).digest().copy(bytes,index+34);
 fs.writeFileSync(framework,bytes);
 // Resources is not a nested-code directory for codesign --deep. The copied
-// standalone CLI needs its own ad-hoc signature before sealing the parent app.
+// standalone CLI needs its own signature before sealing the parent app.
 const standaloneCli=path.join(resources,'codex');
-execFileSync('codesign',['--force','--sign','-',standaloneCli],{stdio:'inherit'});
+withMacSigning(development,signing=>{
+execFileSync('codesign',['--force',...signing,standaloneCli],{stdio:'inherit'});
 execFileSync('codesign',['--verify','--strict',standaloneCli],{stdio:'inherit'});
-execFileSync('codesign',['--force','--deep','--sign','-',app],{stdio:'inherit'});
+execFileSync('codesign',['--force','--deep',...signing,app],{stdio:'inherit'});
 execFileSync('codesign',['--verify','--deep','--strict',app],{stdio:'inherit'});
+});
 fs.writeFileSync(path.join(output,'build-manifest.json'),JSON.stringify({app,source,version:pkg.version,asarHeaderHash:hash,identity:info.CFBundleIdentifier,stateRoot:'~/Library/Application Support/codex-own-independent',created:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
 console.log(JSON.stringify({ok:true,app,version:pkg.version}));

@@ -69,6 +69,8 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = macOS ]; then APP="out/own-release-$OWN_VERSION-darwin-arm64.noindex/built/codex-own.app"; else APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"; fi
           node own/ci/test-official-compat.mjs "$APP"
+          node own/ci/test-patch-compat.mjs "$APP"
+          if [ "$RUNNER_OS" = macOS ]; then node own/ci/test-history-resume.mjs "$APP"; fi
       - name: Verify desktop workbench and Owl native device service
         if: ${{ !inputs.existing }}
         env:
