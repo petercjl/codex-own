@@ -48,7 +48,9 @@ export async function runOfflineInstall(root,{keyFile,verifyOnly=false,report=me
  for(const destination of [p.root,p.target,os.tmpdir()]){let existing=destination;while(!fs.existsSync(existing))existing=path.dirname(existing);const disk=fs.statfsSync(existing);if(disk.bavail*disk.bsize<10*1024**3)throw error('INSUFFICIENT_SPACE','安装需要至少 10 GB 可用磁盘空间，请清理空间后重试');}
  // Complete all checks before activation. The ordinary manager performs the
  // same backup, transaction, runtime probe and binding registration as npm.
- const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'codex-own-first-install-'));
+ // The existing extractor computes relative paths from the archive directory.
+ // Resolve macOS /var -> /private/var before passing a cross-directory archive.
+ const scratch=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'codex-own-first-install-'));
  try{
   const archive=path.join(scratch,'desktop.tar'),asset=manifest.platforms[platform];let bytes=0;
   const gunzip=createGunzip();gunzip.on('data',b=>{bytes+=b.length;if(bytes>asset.size)gunzip.destroy(error('CHECKSUM_MISMATCH','桌面归档超过预期大小'));});
