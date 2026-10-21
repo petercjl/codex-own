@@ -30,6 +30,8 @@ const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||null,ownSourceRef:run('git',['rev-parse','HEAD'],{encoding:'utf8',stdio:'pipe'}).trim(),updaterNodeSha256:await digestFile(process.execPath),toolchain:{node:process.version,platform:key,image:process.env.ImageVersion||null}};
 const existingIndex=process.argv.indexOf('--existing-app');
 const prepared=argument('--prepared-app');
+const upstreamApp=argument('--upstream-app');
+if(upstreamApp&&(!local||!development||!mac||prepared||existingIndex>=0))throw Error('Raw upstream input requires a local Mac development build without other input modes');
 if(existingIndex>=0){
  source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};
  if(process.argv.includes('--refresh-overlay')){
@@ -47,10 +49,11 @@ else if(prepared){
  source=path.join(built,development?'codex-own 开发版.app':'codex-own.app');
 }
 else{
- run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform]);
+ if(!upstreamApp)run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform]);
  const cache=path.join(os.tmpdir(),'codex-sync',mac?'arm64-extract':'win-extract');
  function findApp(dir,depth=0){if(depth>4)return null;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory()&&e.name.endsWith('.app'))return p;if(e.isDirectory()){const found=findApp(p,depth+1);if(found)return found;}}return null;}
- const original=mac?findApp(cache):path.join(cache,'app');if(!original)throw Error('Missing source application');
+ const original=upstreamApp||(mac?findApp(cache):path.join(cache,'app'));if(!original)throw Error('Missing source application');
+ if(upstreamApp)provenance.localUpstreamInput=upstreamApp;
  if(mac)run('codesign',['--verify','--deep','--strict',original]);
  provenance.originalProgramTree=await sourceTree(original);
  const sourceResources=path.join(original,mac?'Contents/Resources':'resources'),archive=path.join(sourceResources,'app.asar');

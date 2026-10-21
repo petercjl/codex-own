@@ -51,7 +51,7 @@ jobs:
         with: {path: candidate}
       - uses: actions/setup-node@v6
         with: {node-version: '24', package-manager-cache: false}
-      - name: Merge verified candidate and prepare release
+      - name: Merge verified candidate and prepare development validation
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_BASE: ${{ needs.prepare.outputs.base }}
@@ -62,6 +62,6 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_BASE"
           node own/ci/combine.mjs candidate "$OWN_VERSION"
           gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$OWN_PR/merge" -f sha="$EXPECTED_HEAD" -f merge_method=merge --jq 'if .merged then .sha else error(.message) end'
-          gh release create "own-v$OWN_VERSION" --target own-main --title "codex-own $OWN_VERSION" --notes 'Verified upstream candidate; npm publication pending.' --draft
+          gh release create "own-v$OWN_VERSION" --target own-main --title "codex-own $OWN_VERSION" --notes 'Verified upstream candidate. Awaiting codex-own-dev functional acceptance and user authorization before npm publication.' --draft
           find candidate -type f \( -name '*.tar.gz' -o -name 'manifest.json' \) -exec gh release upload "own-v$OWN_VERSION" {} +
-          gh workflow run own-release.yml --ref own-main -f release="$OWN_VERSION" -f tag=latest -f verified_run="$GITHUB_RUN_ID"
+          gh workflow run own-release.yml --ref own-main -f release="$OWN_VERSION" -f tag=latest -f verify_only=true

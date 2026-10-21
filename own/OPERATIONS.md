@@ -28,9 +28,11 @@ Package: @petercjl/codex-own, root own/. Canonical workflows live in the reposit
 
 own-sync.yml runs at 04:10 UTC (12:10 Asia/Shanghai). GitHub scheduling may be delayed. The desktop maintenance conversation observes runs; it must not duplicate the scheduled workflow or publish a second version. A dispatched/in-progress run is followed to completion.
 
-No upstream changes means no new publication. New upstream changes are merged in a candidate branch and represented by a PR. Conflicts or changes to own/ overlay, own workflow files or own resources stop the run. Tests/builds run before the PR is merged. The tested base/head must still match; a changed base stops the merge. Then own-release.yml re-verifies the artifacts and publishes through npm OIDC.
+No upstream changes means no new publication. New upstream changes are merged in a candidate branch and represented by a PR. Conflicts or changes to own/ overlay, own workflow files or own resources stop the run. Tests/builds run before the PR is merged. The tested base/head must still match; a changed base stops the merge. After merging, own-release.yml runs with verify_only=true. The draft and verification artifacts await local codex-own-dev functional acceptance and user authorization; the daily task does not publish npm automatically.
 
 ## Release
+
+First follow the repository AGENTS.md development-first workflow and own/DEVELOPMENT.md. Install the current source into codex-own-dev, retain the build report and source fingerprint, and verify the changed behavior. Product code changed after acceptance requires rebuilding and retesting. Publish only after the user confirms development acceptance and requests the formal release; retain the existing cross-platform QA gates. Formal app installation is separately authorized from development installation.
 
 Use the installed npm-release-kit from the own/ package root, with --workflow own-release.yml. Stable releases use latest, prereleases use next. Never use local npm publish for a substantive release. The only initial local publication is the separately authorized minimal bootstrap placeholder.
 
