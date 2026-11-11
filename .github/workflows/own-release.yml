@@ -5,6 +5,7 @@ on:
       release: {description: 'patch, minor, major or exact semver', type: string, default: patch, required: true}
       tag: {description: 'npm dist-tag', type: choice, options: [latest, next], default: latest, required: true}
       mode: {description: 'Automatic component plan; manager-only refuses unproven reuse', type: choice, options: [auto, manager-only, native, runtime], default: auto, required: true}
+      desktop_base: {description: 'Optional exact verified desktop version; rebuild the current own layer on its pinned shell', type: string, default: ''}
       verified_run: {description: 'Publication recovery only: passed QA run with unchanged component inputs', type: string, default: ''}
       repartition_payload: {description: 'Optional recovery: SHA-256 of one stalled desktop transport block; preserve verified archive bytes', type: string, default: ''}
       verify_only: {description: 'Run the planned platform gates without publishing or changing installed apps', type: boolean, default: false}
@@ -36,7 +37,7 @@ jobs:
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - id: plan
         name: Prove immutable component reuse and classify complete inputs
-        env: {GH_TOKEN: '${{ github.token }}', OWN_VERSION: '${{ steps.version.outputs.version }}', RELEASE_MODE: '${{ inputs.mode }}'}
+        env: {GH_TOKEN: '${{ github.token }}', OWN_VERSION: '${{ steps.version.outputs.version }}', RELEASE_MODE: '${{ inputs.mode }}', DESKTOP_BASE: '${{ inputs.desktop_base }}'}
         run: node own/ci/release-plan.mjs . "$OWN_VERSION" release-plan.json "$RELEASE_MODE"
       - uses: actions/upload-artifact@v7
         with: {name: release-plan, path: release-plan.json, retention-days: 3}

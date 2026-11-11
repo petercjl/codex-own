@@ -57,34 +57,6 @@ jobs:
           OWN_UPSTREAM_SHA: ${{ inputs.upstream }}
         run: |
           node own/build.mjs
-      - name: Verify Windows candidate installation
-        if: ${{ !inputs.existing && matrix.platform == 'win32-x64' }}
-        env:
-          OWN_VERSION: ${{ inputs.version }}
-        run: node own/ci/test-windows-install.mjs "out/own-release-$OWN_VERSION-win32-x64.noindex/codex-own-win32-x64.tar.gz" "out/own-release-$OWN_VERSION-win32-x64.noindex/manifest-win32-x64.json"
-      - name: Verify offline model turn and native archived deletion
-        if: ${{ !inputs.existing }}
-        env:
-          OWN_VERSION: ${{ inputs.version }}
-        run: |
-          APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"
-          node own/ci/test-official-compat.mjs "$APP"
-          node own/ci/test-patch-compat.mjs "$APP"
-      - name: Verify desktop workbench and Owl native device service
-        if: ${{ !inputs.existing }}
-        env:
-          OWN_VERSION: ${{ inputs.version }}
-          OWN_GUI_MANIFEST: out/own-release-${{ inputs.version }}-${{ matrix.platform }}.noindex/manifest-${{ matrix.platform }}.json
-        run: |
-          APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"
-          node own/ci/test-desktop-startup.mjs "$APP" out/gui-smoke
-      - uses: actions/upload-artifact@v7
-        if: ${{ always() && !inputs.existing }}
-        with:
-          name: gui-${{ matrix.platform }}
-          path: out/gui-smoke
-          if-no-files-found: warn
-          retention-days: 3
       - name: Verify prepared desktop artifacts
         if: ${{ inputs.existing }}
         env:
@@ -94,6 +66,32 @@ jobs:
           OWN_BASE_VERSION: ${{ inputs.base_version }}
         run: |
           node own/ci/verify-existing.mjs
+      - name: Verify Windows candidate installation
+        if: ${{ !inputs.existing && matrix.platform == 'win32-x64' }}
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+        run: node own/ci/test-windows-install.mjs "out/own-release-$OWN_VERSION-win32-x64.noindex/codex-own-win32-x64.tar.gz" "out/own-release-$OWN_VERSION-win32-x64.noindex/manifest-win32-x64.json"
+      - name: Verify offline model turn and native archived deletion
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ inputs.existing }}" = "true" ]; then APP="out/own-release-$OWN_VERSION-win32-x64.noindex/unpacked/app"; else APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"; fi
+          node own/ci/test-official-compat.mjs "$APP"
+          node own/ci/test-patch-compat.mjs "$APP"
+      - name: Verify desktop workbench and Owl native device service
+        env:
+          OWN_VERSION: ${{ inputs.version }}
+          OWN_GUI_MANIFEST: out/own-release-${{ inputs.version }}-${{ matrix.platform }}.noindex/manifest-${{ matrix.platform }}.json
+        run: |
+          if [ "${{ inputs.existing }}" = "true" ]; then APP="out/own-release-$OWN_VERSION-win32-x64.noindex/unpacked/app"; else APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"; fi
+          node own/ci/test-desktop-startup.mjs "$APP" out/gui-smoke
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gui-${{ matrix.platform }}
+          path: out/gui-smoke
+          if-no-files-found: warn
+          retention-days: 3
       - name: Verify canonical archive and local incremental reuse
         env:
           OWN_VERSION: ${{ inputs.version }}

@@ -2,7 +2,7 @@ import {releaseTargets} from './release-targets.mjs';
 import fs from'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';
 import{snapshot,changes}from'./artifact-inputs.mjs';import{identity,validateBinding}from'../lib/binding.mjs';
 import{verifyPackageProvenance}from'./npm-provenance.mjs';
-export function releasePlan({inputs,previous,managerVersion,mode='auto',provenanceVerified=false}){
+export function releasePlan({inputs,previous,managerVersion,mode='auto',provenanceVerified=false,desktopBase=''}){
  if(!['auto','manager-only','native','runtime'].includes(mode))throw Error('Invalid release mode');
  const changed=changes(previous?.inputs,inputs),reasons=[];let proof=false;
  try{validateBinding(previous?.manifest,{requireProof:true});proof=!!provenanceVerified;}catch(e){reasons.push(e.message);}
@@ -11,13 +11,16 @@ export function releasePlan({inputs,previous,managerVersion,mode='auto',provenan
  const runtimeChanged=targetsChanged||!previous?.inputs||inputs.runtime!==previous.inputs.runtime||inputs.unknown.length>0;
  // Release recipes, classifiers and verification code are themselves gated inputs.
  const releaseChanged=!previous?.inputs||inputs.release!==previous.inputs.release;
- const native=nativeChanged||!proof||releaseChanged||mode==='native';
+ const native=nativeChanged||!proof||releaseChanged||mode==='native'||!!desktopBase;
  const runtime=runtimeChanged||!proof||mode==='runtime';
  if(mode==='manager-only'&&(native||runtime))throw Object.assign(Error('Fast release refused: changed inputs, incompatible components or missing published proof'),{code:'REUSE_NOT_PROVEN'});
  const kind=native?'native':runtime?'runtime':'manager-only';
  const overlayFiles=['own/builders/updater.mjs','own/builders/upgrade-updater.mjs','own/builders/tool-gate.mjs','own/builders/runtime-isolation.mjs','own/builders/windows-icon.mjs','own/builders/update-menu.mjs'];
- const overlay=provenanceVerified&&inputs.upstream===previous?.inputs?.upstream&&!inputs.unknown.length&&changed.filter(c=>c.kind==='native').every(c=>c.file.startsWith('own/lib/')||c.file.startsWith('own/desktop/')||c.file.startsWith('own/runtime/')||overlayFiles.includes(c.file));
- return {schema:1,targets:releaseTargets,managerVersion,kind,nativeStrategy:overlay?'overlay':'upstream',baseVersion:overlay?previous.manifest.version:null,components:{desktop:native?'build':'reuse',runtimes:runtime?'build':'reuse'},inputs,changed,unknown:inputs.unknown,proof:{verified:proof,sourceVerified:!!provenanceVerified,registry:previous?.registry||null,desktop:previous?.manifest?.binding?.desktop||null,runtimes:previous?.manifest?.binding?.runtimes||null},reasons:[...reasons,...(nativeChanged?['native inputs changed']:[]),...(runtimeChanged?['runtime inputs changed']:[]),...(releaseChanged?['release recipes changed']:[])],gates:['windows-manager','packed-install-update-rollback',...(native?['windows-native']:['pinned-native-invocation']),...(runtime?['windows-runtime']:[])],planIdentity:identity({managerVersion,inputs,components:{native,runtime},previous:previous?.registry})};
+ const baselineFiles=[...overlayFiles,'own/build.mjs','own/builders/official-cli.mjs','scripts/sync-upstream.js','scripts/upstream-compat.js'];
+ const baselineSafe=proof&&!inputs.unknown.length&&changed.filter(c=>c.kind==='native').every(c=>c.file.startsWith('own/lib/')||c.file.startsWith('own/desktop/')||c.file.startsWith('own/runtime/')||c.file.startsWith('scripts/test/')||baselineFiles.includes(c.file))&&changed.filter(c=>c.kind==='semantic').every(c=>c.file.startsWith('own/'));
+ if(desktopBase&&(!/^\d+\.\d+\.\d+$/.test(desktopBase)||desktopBase!==previous?.manifest?.version||!baselineSafe))throw Error('Pinned desktop baseline requires verified publication and overlay-only program changes');
+ const overlay=!!desktopBase||provenanceVerified&&inputs.upstream===previous?.inputs?.upstream&&!inputs.unknown.length&&changed.filter(c=>c.kind==='native').every(c=>c.file.startsWith('own/lib/')||c.file.startsWith('own/desktop/')||c.file.startsWith('own/runtime/')||overlayFiles.includes(c.file));
+ return {schema:1,targets:releaseTargets,desktopBaseline:desktopBase?{version:desktopBase,identity:previous.manifest.binding.desktop.identity}:null,managerVersion,kind,nativeStrategy:overlay?'overlay':'upstream',baseVersion:overlay?previous.manifest.version:null,components:{desktop:native?'build':'reuse',runtimes:runtime?'build':'reuse'},inputs,changed,unknown:inputs.unknown,proof:{verified:proof,sourceVerified:!!provenanceVerified,registry:previous?.registry||null,desktop:previous?.manifest?.binding?.desktop||null,runtimes:previous?.manifest?.binding?.runtimes||null},reasons:[...reasons,...(nativeChanged?['native inputs changed']:[]),...(runtimeChanged?['runtime inputs changed']:[]),...(releaseChanged?['release recipes changed']:[])],gates:['windows-manager','packed-install-update-rollback',...(native?['windows-native']:['pinned-native-invocation']),...(runtime?['windows-runtime']:[])],planIdentity:identity({managerVersion,inputs,components:{native,runtime},previous:previous?.registry})};
 }
 export function verifyBuildRun(source,run,jobs,component,{recovered=false,platforms=releaseTargets}={}){
  if((run.conclusion!=='success'&&!recovered)||run.head_sha!==(source.triggerRef||source.ref)||run.path!==source.workflow||!['.github/workflows/own-release.yml','.github/workflows/own-sync.yml','.github/workflows/own-verify.yml'].includes(source.workflow))throw Error('Build provenance is not a successful source-pinned run');
@@ -55,7 +58,7 @@ export async function verifyPublished(previous,{fetcher=url=>fetch(url,{signal:A
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
  const [root,version,output,mode='auto']=process.argv.slice(2),file=path.join(root,'own/artifacts/current.json');const previous=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):null;let verified=false;let error;
  if(previous)try{verified=await verifyPublished(previous);if(previous.legacy)previous.inputs=snapshot(root,{ref:previous.source.ref});}catch(e){error=e.message;}
- const plan=releasePlan({inputs:snapshot(root),previous,managerVersion:version,mode,provenanceVerified:verified});if(error)plan.reasons.push(error);
+ const plan=releasePlan({inputs:snapshot(root),previous,managerVersion:version,mode,provenanceVerified:verified,desktopBase:process.env.DESKTOP_BASE||''});if(error)plan.reasons.push(error);
  fs.writeFileSync(output,JSON.stringify(plan,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({kind:plan.kind,components:plan.components,reasons:plan.reasons,planIdentity:plan.planIdentity}));
  if(process.env.GITHUB_OUTPUT)fs.appendFileSync(process.env.GITHUB_OUTPUT,`native=${plan.components.desktop==='build'}\nruntime=${plan.components.runtimes==='build'}\nkind=${plan.kind}\nbase_version=${plan.baseVersion||''}\n`);
 }
