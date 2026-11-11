@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
-const {findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,patchWindowsIntegrity,repackAsar,extractAsar,selectPlatforms}=require('../upstream-compat.js');
+const {selectWindowsX64Package,findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,patchWindowsIntegrity,repackAsar,extractAsar,selectPlatforms}=require('../upstream-compat.js');
 const {hasNativeArchiveDelete}=require('../patch-archive-native.js');
 const {copyrightPatches}=require('../patch-copyright-rule.js');
 const asar=require('@electron/asar');
@@ -54,4 +54,13 @@ test('copyright recognizes the native about HTML template and remains idempotent
 });
 test('platform selection rejects contradictory or unknown arguments',()=>{
  assert.deepEqual(selectPlatforms(['--platform','mac-arm64']),['mac-arm64']);assert.deepEqual(selectPlatforms(['--skip-mac']),['win']);assert.throws(()=>selectPlatforms(['--platform','win','--skip-win']));assert.throws(()=>selectPlatforms(['--platform','wrong']));
+});
+
+test('Microsoft Store selection pins newest x64 MSIX even when ARM64 is listed first',()=>{
+ const pkg=(version,arch,digest='one')=>({name:`OpenAI.Codex_${version}_${arch}__publisher.msix`,digest});
+ const arm=pkg('26.1106.6628.0','arm64'),x64=pkg('26.1106.6628.0','x64'),old=pkg('26.910.1.0','x64');
+ assert.equal(selectWindowsX64Package([arm,old,x64]),x64);
+ assert.equal(selectWindowsX64Package([x64,arm,old]),x64);
+ assert.throws(()=>selectWindowsX64Package([arm]),/No official Windows x64/);
+ assert.throws(()=>selectWindowsX64Package([x64,pkg('26.1106.6628.0','x64','other')]),/Ambiguous/);
 });

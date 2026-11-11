@@ -22,7 +22,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const {selectPlatforms,extractAsar,restoreMsixUnpackedPaths}=require('./upstream-compat');
+const {selectWindowsX64Package,selectPlatforms,extractAsar,restoreMsixUnpackedPaths}=require('./upstream-compat');
 const crypto=require('node:crypto');
 
 // TLS certs for MS delivery CDN
@@ -152,7 +152,7 @@ async function getWindowsVersion() {
   if (!info.categoryId) throw new Error("No CategoryID");
   const pkgs = await msstore.getFileList(cookie, info.categoryId, "Retail");
   if (pkgs.length === 0) throw new Error("No packages");
-  const pkg = pkgs[0];
+  const pkg = selectWindowsX64Package(pkgs);
   const url = await msstore.getDownloadUrl(pkg.updateID, pkg.revisionNumber, "Retail", pkg.digest);
   const verMatch = pkg.name.match(/_(\d+\.\d+\.\d+(?:\.\d+)?)_/);
   return { version: verMatch?.[1] || "unknown", url, packageName: pkg.name, size:Number(pkg.size),digest:pkg.digest };

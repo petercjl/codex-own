@@ -4,6 +4,16 @@ const MSIX_SCOPED_BINDINGS=new Set([
  'node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node',
  'node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node',
 ]);
+function selectWindowsX64Package(packages){
+ const candidates=packages.flatMap(pkg=>{
+  const match=/^OpenAI\.Codex_(\d+\.\d+\.\d+\.\d+)_x64__[^/\\]+\.msix$/i.exec(pkg.name||'');
+  return match?[{pkg,version:match[1].split('.').map(Number)}]:[];
+ }).sort((a,b)=>{for(let i=0;i<4;i++)if(a.version[i]!==b.version[i])return b.version[i]-a.version[i];return 0;});
+ if(!candidates.length)throw Error('No official Windows x64 MSIX package');
+ const best=candidates[0],peers=candidates.filter(c=>c.version.join('.')===best.version.join('.'));
+ if(peers.some(c=>c.pkg.name!==best.pkg.name||c.pkg.digest!==best.pkg.digest))throw Error('Ambiguous official Windows x64 MSIX packages');
+ return best.pkg;
+}
 function selectPlatforms(args){
  const all=['mac-arm64','mac-x64','win'],i=args.indexOf('--platform');
  if(i>=0&&!all.includes(args[i+1]))throw Error('Unknown --platform');
@@ -83,4 +93,4 @@ function patchMacFramework(app,headerHash){
  if(i<0||b.lastIndexOf(marker)!==i||b[i+32]!==1||b[i+33]!==1)throw Error('Unknown framework integrity contract');
  crypto.createHash('sha256').update('Resources/app.asarSHA256'+headerHash).digest().copy(b,i+34);fs.writeFileSync(file,b);
 }
-module.exports={selectPlatforms,findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,extractAsar,repackAsar,patchWindowsIntegrity,patchMacFramework};
+module.exports={selectWindowsX64Package,selectPlatforms,findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,extractAsar,repackAsar,patchWindowsIntegrity,patchMacFramework};
