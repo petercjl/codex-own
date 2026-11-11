@@ -22,6 +22,7 @@ test('managed runtime discovery builds a private child environment without mutat
  const before=structuredClone(inherited),env=toolEnv.environment(base,inherited);assert.deepEqual(inherited,before);
  assert.equal(toolEnv.active(base).node,node);assert.equal(env.NODE_OPTIONS,undefined);assert.equal(env.NODE_PATH,undefined);assert.equal(env.PYTHONPATH,undefined);assert.equal(env.VIRTUAL_ENV,undefined);assert.equal(env.OPENAI_API_KEY,inherited.OPENAI_API_KEY);
  assert.ok(env.NPM_CONFIG_PREFIX.startsWith(base));assert.ok(env.NPM_CONFIG_USERCONFIG.startsWith(base));assert.equal(env.PYTHONNOUSERSITE,'1');assert.equal(env.PIP_REQUIRE_VIRTUALENV,'true');assert.equal(env.PATH.includes('codex-runtimes'),false);assert.equal(env.PATH.includes('project-tools'),false);
+ if(win)assert.ok(env.PATH.split(';').includes(path.join('C:\\Windows','System32','WindowsPowerShell','v1.0')),'Trusted Windows PowerShell remains available in the private task environment');
  const receipt=path.join(base,'active.json');fs.copyFileSync(receipt,receipt+'.backup',fs.constants.COPYFILE_EXCL);fs.writeFileSync(receipt,JSON.stringify({schema:1,version:'../../original',platform:key}));assert.equal(runtimeDoctor(base).ok,false);
 });
 test('failed runtime installation releases shared lock and preserves active state',async t=>{

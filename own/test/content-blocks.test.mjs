@@ -8,6 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {canonicalTar,contentBlocks,writeCanonicalArchive,reuseInstalledBlocks,TRANSPORT} from '../lib/content-blocks.mjs';
 import {assembleNpmAsset,payloadURL,validateParts} from '../lib/npm-assets.mjs';
 import {tarExecutable,unpack} from '../lib/manager.mjs';
+import {extractChecked} from '../lib/extraction.mjs';
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 function temp(t){const d=fs.mkdtempSync(path.join(os.tmpdir(),'own-cdc-'));t.after(()=>fs.rmSync(d,{recursive:true,force:true}));return d;}
 async function bytes(stream){const b=[];for await(const x of stream)b.push(x);return Buffer.concat(b);}
@@ -23,6 +24,9 @@ test('canonical archive ignores host timestamps/order and preserves native conte
   const two=await bytes(canonicalTar(root,'codex-own.app'));assert.deepEqual(one,two);
   const archive=path.join(d,'app.tar');fs.writeFileSync(archive,one);const dest=path.join(d,'extract');unpack(archive,dest);
   assert.equal(fs.readFileSync(path.join(dest,'codex-own.app',long,'文件.txt'),'utf8'),'长路径 UTF-8');
+  const windowsDest=path.join(d,'windows-extract');
+  extractChecked(archive,windowsDest,{tar:'unused-native-tar',platform:'win32'});
+  assert.equal(fs.readFileSync(path.join(windowsDest,'codex-own.app',long,'文件.txt'),'utf8'),'长路径 UTF-8');
   if(process.platform!=='win32'){
     assert.equal(fs.statSync(path.join(dest,'codex-own.app','a')).mode&0o777,0o755);
     assert.equal(fs.readlinkSync(path.join(dest,'codex-own.app','link')),'a');

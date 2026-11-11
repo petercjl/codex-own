@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {x as extractTar} from 'tar';
 import {archiveInventory,validateArchiveName,extractedHash} from './archive-inventory.mjs';
 
 const error=(code,message,extra={})=>Object.assign(new Error(message),{code,...extra});
@@ -17,9 +18,18 @@ function inspectTree(root){
   else if(s.isDirectory())walk(f);else if(!s.isFile())throw error('UNSAFE_ARCHIVE','Unsupported archive file type');
  }}walk(root);
 }
-export function extractChecked(archive,dest,{tar,attempts=3,report=()=>{},inventory=archiveInventory,execute=execFileSync,delay=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
+export function extractChecked(archive,dest,{tar,attempts=3,report=()=>{},inventory=archiveInventory,platform=process.platform,execute,delay=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}){
  if(!Number.isInteger(attempts)||attempts<1||attempts>3)throw error('INVALID_ARGUMENT','Extraction attempts must be 1..3');
  const cwd=path.dirname(path.resolve(archive)),source=path.basename(archive),root=path.resolve(dest),target=path.relative(cwd,root);
+ // Windows bsdtar can reject UTF-8 PAX paths under the active ANSI locale.
+ // Use the bundled tar reader for TAR/gzip while retaining native ZIP support.
+ if(!execute)execute=(command,args,options)=>{
+  if(platform==='win32'){
+   const file=path.resolve(options.cwd,args[1]),fd=fs.openSync(file,'r'),magic=Buffer.alloc(4);try{fs.readSync(fd,magic,0,4,0);}finally{fs.closeSync(fd);}
+   if(!magic.equals(Buffer.from([0x50,0x4b,0x03,0x04])))return extractTar({file,cwd:path.resolve(options.cwd,args[3]),sync:true,strict:true,win32:true,preserveOwner:false},args.includes('--')?args.slice(args.indexOf('--')+1):[]);
+  }
+  return execFileSync(command,args,options);
+ };
  const entries=inventory(archive);for(const e of entries)validateArchiveName(e.name);const names=entries.map(e=>e.name);
  fs.mkdirSync(root);let missing=names,lastError;
  const absent=()=>entries.filter(e=>{try{const file=path.join(root,e.name),s=fs.lstatSync(file);if(e.type==='Directory')return !s.isDirectory();if(e.type==='SymbolicLink')return !s.isSymbolicLink()||e.link!==undefined&&fs.readlinkSync(file)!==e.link;if(!s.isFile())return true;return e.size!==undefined&&e.type!=='Link'&&s.size!==e.size||!!e.sha256&&extractedHash(file)!==e.sha256;}catch(e){if(['ENOENT','ENOTDIR','EPERM','EBUSY','EACCES'].includes(e.code))return true;throw e;}}).map(e=>e.name);

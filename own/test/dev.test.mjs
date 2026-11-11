@@ -9,7 +9,7 @@ import {replaceDevelopment, sourceInventory, assertDevelopment, matchesOfficialI
 
 test('development inputs pin an exact CLI and explicit shell without accepting ambiguous arguments', () => {
   const options = developmentOptions(['--cli-version', '0.167.1', '--upstream-app', '/Applications/ChatGPT.app', '--install', '--launch']);
-  assert.equal(options['--cli-version'], '0.167.1'); assert.equal(options['--upstream-app'], '/Applications/ChatGPT.app');
+  assert.equal(options['--cli-version'], '0.167.1'); assert.equal(options['--upstream-app'], path.resolve('/Applications/ChatGPT.app'));
   for (const args of [['--cli-version'], ['--cli-version', 'latest'], ['--install', '--install'], ['--launch'], ['--upstream-app', '--install'], ['--unexpected']])
     assert.throws(() => developmentOptions(args));
 });
@@ -63,7 +63,7 @@ test('source fingerprint detects edits, deletions and executable mode changes', 
   const source = path.join(root, 'source.mjs'); fs.writeFileSync(source, 'first');
   execFileSync('git', ['-C', root, 'add', 'source.mjs']);
   const initial = sourceInventory(root).sha256;
-  fs.chmodSync(source, 0o755); assert.notEqual(sourceInventory(root).sha256, initial);
+  if (process.platform !== 'win32') {fs.chmodSync(source, 0o755); assert.notEqual(sourceInventory(root).sha256, initial);}
   const mode = sourceInventory(root).sha256;
   fs.writeFileSync(source, 'second'); assert.notEqual(sourceInventory(root).sha256, mode);
   fs.unlinkSync(source); assert.equal(sourceInventory(root).files[0].missing, true);

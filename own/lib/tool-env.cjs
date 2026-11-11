@@ -31,7 +31,7 @@ function environment(base=runtimeRoot(),inherited=process.env,platform=process.p
  const key=Object.keys(env).find(k=>k.toUpperCase()==='PATH')||'PATH';
  // Trust platform tools, not an inherited Agent's bins or environment. A task
  // can still activate a project toolchain explicitly after this boundary.
- const allowed=win?[path.join(inherited.SystemRoot||'C:\\Windows','System32'),inherited.SystemRoot||'C:\\Windows',path.join(inherited.ProgramFiles||'C:\\Program Files','Git','cmd')]:['/usr/bin','/bin','/usr/sbin','/sbin','/usr/local/bin','/opt/homebrew/bin','/opt/homebrew/sbin'];
+ const allowed=win?[path.join(inherited.SystemRoot||'C:\\Windows','System32'),inherited.SystemRoot||'C:\\Windows',path.join(inherited.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0'),path.join(inherited.ProgramFiles||'C:\\Program Files','Git','cmd')]:['/usr/bin','/bin','/usr/sbin','/sbin','/usr/local/bin','/opt/homebrew/bin','/opt/homebrew/sbin'];
  const tail=[...new Set([...(env[key]||'').split(separator).filter(p=>allowed.includes(p)),...allowed])];
  for(const k of Object.keys(env))if(/^(PATH|NODE_PATH|NODE_OPTIONS|PYTHONHOME|PYTHONPATH|PYTHONUSERBASE|VIRTUAL_ENV|CONDA_.+|NPM_CONFIG_.+|PIP_.+|UV_.+|BUN_.+|CARGO_HOME|RUSTUP_HOME|GOPATH|GOMODCACHE|XDG_.+|CLAUDE_.+|ANTHROPIC_.+|SEALSEEK_.+|OPENCLAW_.+|GEMINI_.+|CURSOR_.+|CODEX_SKILLS_DIR)$/i.test(k))delete env[k];
  const root=path.dirname(base),home=path.join(root,'home');

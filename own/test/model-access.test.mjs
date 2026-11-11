@@ -36,7 +36,8 @@ test('SealWork-shaped JSON imports three providers without exposing remote crede
     assert.ok(!fs.readFileSync(path.join(p.core, 'config.toml'), 'utf8').includes(provider.options.apiKey));
     assert.ok(!JSON.stringify(catalogue).includes(provider.options.apiKey));
   }
-  assert.equal(fs.statSync(path.join(p.core, 'model-access.json')).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(p.core, 'model-access.json')).mode & 0o777, 0o600);
+  const stored=JSON.parse(fs.readFileSync(path.join(p.core,'model-access.json')));for(const [provider,entry] of Object.entries(accessFixture().provider)) assert.equal(stored.providers[provider].apiKey,entry.options.apiKey);
   assert.equal(fs.readFileSync(result.backups['config.toml'], 'utf8'), previous);
   const selected = await selectConfiguredModel('dashscope/deepseek-v4.1-flash', {p, isRunning: () => []});
   assert.equal(selected.selected, 'dashscope/deepseek-v4.1-flash'); assert.equal(configuredModels({p}).selected, selected.selected);
