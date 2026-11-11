@@ -5,7 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import net from 'node:net';
-import {replaceDevelopment, sourceInventory, assertDevelopment, matchesOfficialInput, backupProfile} from '../dev.mjs';
+import {replaceDevelopment, sourceInventory, assertDevelopment, matchesOfficialInput, backupProfile, developmentOptions} from '../dev.mjs';
+
+test('development inputs pin an exact CLI and explicit shell without accepting ambiguous arguments', () => {
+  const options = developmentOptions(['--cli-version', '0.167.1', '--upstream-app', '/Applications/ChatGPT.app', '--install', '--launch']);
+  assert.equal(options['--cli-version'], '0.167.1'); assert.equal(options['--upstream-app'], '/Applications/ChatGPT.app');
+  for (const args of [['--cli-version'], ['--cli-version', 'latest'], ['--install', '--install'], ['--launch'], ['--upstream-app', '--install'], ['--unexpected']])
+    assert.throws(() => developmentOptions(args));
+});
 
 test('daily upstream synchronization dispatches verification without automatic publication', () => {
   const workflow = fs.readFileSync(new URL('../../.github/workflows/own-sync.yml', import.meta.url), 'utf8');
@@ -34,6 +41,14 @@ test('failed validation restores the original and retains failed candidate evide
   assert.throws(() => replaceDevelopment({...paths, verify: () => {throw Error('signature mismatch');}}), /signature mismatch/);
   assert.equal(fs.readFileSync(path.join(paths.target, 'content'), 'utf8'), 'old');
   assert.equal(fs.readFileSync(path.join(paths.failed, 'content'), 'utf8'), 'new');
+});
+test('first installation validates the app and retains a failed candidate without creating an old backup', t => {
+  const paths = fixture(t); fs.rmSync(paths.target, {recursive: true});
+  const result = replaceDevelopment({...paths, verify: app => assert.equal(fs.readFileSync(path.join(app, 'content'), 'utf8'), 'new')});
+  assert.equal(result.firstInstallation, true); assert.equal(fs.existsSync(paths.backup), false);
+  fs.renameSync(paths.target, paths.candidate);
+  assert.throws(() => replaceDevelopment({...paths, verify: () => {throw Error('invalid candidate');}}), /invalid candidate/);
+  assert.equal(fs.existsSync(paths.target), false); assert.equal(fs.existsSync(paths.failed), true);
 });
 test('failure to move candidate restores original; existing backups are refused', t => {
   const paths = fixture(t); fs.renameSync(paths.candidate, paths.candidate + '.elsewhere');

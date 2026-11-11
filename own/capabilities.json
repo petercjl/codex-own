@@ -4,6 +4,8 @@
   "commands": [
     "install",
     "configure",
+    "models list",
+    "models select",
     "update check",
     "update install",
     "cleanup plan",
@@ -31,6 +33,29 @@
   "dataPolicy": "independent external directories; preserve credentials and conversations",
   "updatePolicy": "desktop checks npm latest at startup and every six hours; explicit download and restart/install; pinned verified build; backup before switch; CLI remains available for recovery",
   "authentication": "npm install does not grant model access; existing independent credentials remain local",
+  "modelConfiguration": {
+    "contract": 2,
+    "import": "configure --config-file <file> --yes; historical --api-key-file remains accepted",
+    "formats": [
+      "single legacy Bailian API key",
+      "SealWork-shaped JSON: model, provider, enabled_providers"
+    ],
+    "providerFields": [
+      "name",
+      "npm or wire_api",
+      "options.baseURL",
+      "options.apiKey",
+      "models"
+    ],
+    "protocols": [
+      "responses",
+      "anthropic"
+    ],
+    "routing": "all imported provider/model identities appear in the native model catalogue; an authenticated loopback router selects each provider's endpoint, credentials and protocol",
+    "credentials": "private core/model-access.json; no remote API keys in catalogue, native configuration or CLI results",
+    "selection": "native model picker per chat; models select --model provider/model --yes changes the default while the app is closed",
+    "compatibility": "multi-provider configuration requires both the new npm manager and a desktop containing model routing contract 2"
+  },
   "cleanupPolicy": {
     "contract": 1,
     "trigger": "owned main interface loaded and alive for 30 seconds; installed version and component identity must match",
@@ -72,28 +97,17 @@
     "diagnostics": "doctor.agentShell: discovered executables, fallback reason and desktopAdapterBundled"
   },
   "distribution": {
-    "runtimeHosts": [
-      "registry.npmjs.org"
+    "publishedPlatforms": [
+      "win32-x64"
     ],
-    "desktopAssets": "canonical-tar-cdc-v1; content-defined raw program blocks compressed and distributed as npm payload prereleases",
-    "cache": "SHA256-verified blocks; seed matching blocks from managed installed program; download missing content only",
-    "progress": "stderr; final result JSON on stdout",
-    "idleTimeoutSeconds": 30,
-    "downloadAttempts": 3,
-    "parallelDownloads": 4,
-    "incremental": {
-      "format": "canonical-tar-cdc-v1",
-      "rawBlockMinMiB": 16,
-      "rawBlockMaxMiB": 64,
-      "baseVersionRequired": false,
-      "firstInstall": "all required blocks",
-      "migration": "upgrade npm manager once for desktop builds older than 0.4.0",
-      "statistics": [
-        "reusedBlocks",
-        "downloadBytes",
-        "fullDownloadBytes"
-      ]
-    }
+    "localDevelopmentPlatforms": [
+      "darwin-arm64"
+    ],
+    "historicalPlatforms": [
+      "darwin-arm64",
+      "win32-x64"
+    ],
+    "macPolicy": "project-local development builds; preserve historical installations and artifacts"
   },
   "desktopUpdater": {
     "source": "https://registry.npmjs.org/@petercjl%2fcodex-own/latest",

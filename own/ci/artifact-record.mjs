@@ -1,11 +1,12 @@
-import fs from'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';import{identity,validateBinding}from'../lib/binding.mjs';
+import fs from'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';import{identity,validateBinding,manifestPlatforms}from'../lib/binding.mjs';
 export function bindArtifacts(manifest,plan,previous,source,runtimeComponents){
- const m=structuredClone(manifest),platforms=['darwin-arm64','win32-x64'];
+ const m=structuredClone(manifest);
  const trusted=plan.proof?plan.proof.sourceVerified===true:true;
  if(plan.components.desktop==='reuse'){m.version=previous.manifest.version;m.platforms=structuredClone(previous.manifest.platforms);m.provenance=structuredClone(previous.manifest.provenance);}
  if(plan.components.runtimes==='reuse')m.runtimes=structuredClone(previous.manifest.runtimes);
+ const platforms=manifestPlatforms(m);
  if(previous?.manifest.version===m.version&&identity(previous.manifest.platforms)!==identity(m.platforms))throw Error('Immutable desktop version cannot be replaced');
- if(previous?.manifest.runtimes?.version===m.runtimes.version&&identity(previous.manifest.runtimes)!==identity(m.runtimes))throw Error('Immutable runtime version changed; advance its revision');
+ if(previous?.manifest.runtimes?.version===m.runtimes.version&&identity(previous.manifest.runtimes)!==identity(m.runtimes)&&identity({...previous.manifest.runtimes,platforms:Object.fromEntries(platforms.map(p=>[p,previous.manifest.runtimes.platforms[p]]))})!==identity(m.runtimes))throw Error('Immutable runtime version changed; advance its revision');
  const desktop=plan.components.desktop==='reuse'?structuredClone(previous.manifest.binding.desktop):{artifactVersion:m.version,publishedIn:plan.managerVersion,identity:identity(m.platforms),inputFingerprint:identity({declared:plan.inputs.native,observed:m.provenance}),declaredFingerprint:plan.inputs.native,upstreamFingerprint:plan.inputs.upstream,source,updaterContract:2,verifiedPlatforms:platforms};
  if(plan.components.runtimes==='build')for(const platform of platforms){const proof=runtimeComponents?.[platform],assets=m.runtimes.platforms[platform];if(!proof||proof.node?.identity!==assets.node.sha256||proof.python?.identity!==assets.python.sha256||!/^[a-f0-9]{64}$/.test(proof.npm?.identity||''))throw Error('Verified Node/npm/Python component identities required');}
  let runtimes=plan.components.runtimes==='reuse'?structuredClone(previous.manifest.binding.runtimes):{artifactVersion:m.runtimes.version,publishedIn:plan.managerVersion,identity:identity(m.runtimes),inputFingerprint:identity({declared:plan.inputs.runtime,assets:m.runtimes}),declaredFingerprint:plan.inputs.runtime,source,contract:1,verifiedPlatforms:platforms,components:structuredClone(runtimeComponents)};

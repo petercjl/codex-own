@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version: {description: 'Exact public npm manager version, or latest', type: string, default: latest, required: true}
-      publish: {description: 'Publish both verified full installers', type: boolean, default: true}
+      publish: {description: 'Publish the verified Windows full installer', type: boolean, default: true}
   workflow_run:
     workflows: ['Publish codex-own npm']
     types: [completed]
@@ -39,7 +39,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: macos-15, platform: darwin-arm64}
           - {os: windows-latest, platform: win32-x64}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -57,15 +56,7 @@ jobs:
           $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
           if (-not (Test-Path $nsis)) { choco install nsis --yes --no-progress; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
           & $nsis /VERSION
-      - name: Import pinned macOS release signer
-        if: runner.os == 'macOS'
-        env:
-          OWN_MAC_RELEASE_P12_BASE64: ${{ secrets.OWN_MAC_RELEASE_P12_BASE64 }}
-          OWN_MAC_RELEASE_PASSWORD: ${{ secrets.OWN_MAC_RELEASE_PASSWORD }}
-        run: node own/ci/release-signing.mjs --ci-import
       - name: Build full installer from exact published components
-        env:
-          OWN_MAC_SIGNING_ROOT: ${{ runner.temp }}/codex-own-release-signing
         run: node own/installers/build.mjs '${{ needs.prepare.outputs.version }}' 'out/first-installer-${{ matrix.platform }}'
       - name: Verify offline first install repeat install and npm update adoption
         run: node own/installers/test-native.mjs 'out/first-installer-${{ matrix.platform }}' '${{ needs.prepare.outputs.version }}'
@@ -76,9 +67,6 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           compression-level: 0
-      - name: Remove ephemeral signing material
-        if: always() && runner.os == 'macOS'
-        run: node own/ci/release-signing.mjs --ci-cleanup
   publish:
     if: github.ref == 'refs/heads/own-main' && (github.event_name == 'workflow_run' || inputs.publish)
     needs: [prepare, build]
@@ -90,6 +78,6 @@ jobs:
         with: {node-version: '24.15.0', package-manager-cache: false}
       - uses: actions/download-artifact@v7
         with: {pattern: 'first-installer-*', path: out/first-installers}
-      - name: Publish both verified immutable first-install packages
+      - name: Publish the verified immutable Windows first-install package
         env: {GH_TOKEN: '${{ github.token }}', OWN_INSTALLER_VERSION: '${{ needs.prepare.outputs.version }}'}
         run: node own/installers/publish.mjs out/first-installers

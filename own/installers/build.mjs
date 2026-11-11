@@ -14,7 +14,7 @@ import {withMacSigning} from '../builders/mac-signing.mjs';
 
 const source=path.dirname(fileURLToPath(import.meta.url)),platform=process.platform+'-'+process.arch;
 const [version,destination]=process.argv.slice(2);
-if(!/^\d+\.\d+\.\d+$/.test(version||'')||!destination||!['darwin-arm64','win32-x64'].includes(platform))throw Error('Usage: build.mjs <exact-version> <new-output-directory> on macOS ARM64 or Windows x64');
+if(!/^\d+\.\d+\.\d+$/.test(version||'')||!destination||platform!=='win32-x64')throw Error('Usage: build.mjs <exact-version> <new-output-directory> on Windows x64');
 const output=path.resolve(destination);if(fs.existsSync(output))throw Error('Output already exists');fs.mkdirSync(output,{recursive:true});
 const work=fs.mkdtempSync(path.join(os.tmpdir(),'own-full-installer-build-'));
 function write(file,data,mode=0o644){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,data,{flag:'wx',mode});}

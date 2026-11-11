@@ -1,6 +1,7 @@
+import {releaseTargets,assertReleaseTargets} from './release-targets.mjs';
 // Verify the exact planned package/binding tuple before stable publication.
 import fs from'node:fs';import path from'node:path';import os from'node:os';import assert from'node:assert/strict';import{execFileSync}from'node:child_process';import{validateBinding}from'../lib/binding.mjs';import{validateManifest}from'../lib/manager.mjs';import{packResult}from'./npm-pack-result.mjs';
-const [planFile,manifestFile]=process.argv.slice(2),plan=JSON.parse(fs.readFileSync(planFile)),manifest=JSON.parse(fs.readFileSync(manifestFile));validateBinding(manifest,{managerVersion:plan.managerVersion,requireProof:true});for(const p of ['darwin-arm64','win32-x64'])validateManifest(manifest,p);
+const [planFile,manifestFile]=process.argv.slice(2),plan=JSON.parse(fs.readFileSync(planFile)),manifest=JSON.parse(fs.readFileSync(manifestFile));validateBinding(manifest,{managerVersion:plan.managerVersion,requireProof:true});assertReleaseTargets(manifest);for(const p of releaseTargets)validateManifest(manifest,p);
 const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-bound-package-'))),pkg=JSON.parse(fs.readFileSync('own/package.json')),dir=path.join(root,'source');fs.mkdirSync(dir);
 for(const f of pkg.files){const source=path.join('own',f);if(fs.existsSync(source))fs.cpSync(source,path.join(dir,f),{recursive:true,force:false,errorOnExist:true});}
 pkg.version=plan.managerVersion;pkg.ownDesktopManifest=manifest;fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify(pkg),{flag:'wx'});fs.writeFileSync(path.join(dir,'release.json'),JSON.stringify(manifest));

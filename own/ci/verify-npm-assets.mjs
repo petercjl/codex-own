@@ -1,3 +1,4 @@
+import {releaseTargets,assertReleaseTargets} from './release-targets.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -8,7 +9,8 @@ const manifest=JSON.parse(fs.readFileSync(process.argv[2]));
 const plan=process.argv[3]?JSON.parse(fs.readFileSync(process.argv[3])):null;
 const catalog='own/artifacts/current.json',previous=fs.existsSync(catalog)?JSON.parse(fs.readFileSync(catalog)).manifest:null;
 if(manifest.schema!==2)throw Error('npm asset manifest required');
-for(const platform of ['darwin-arm64','win32-x64']){
+assertReleaseTargets(manifest);
+for(const platform of releaseTargets){
   if(plan?.components.desktop==='reuse'){if(identity(manifest.platforms)!==identity(previous?.platforms))throw Error('Reused desktop differs from published binding');continue;}
   const asset=validateManifest(manifest,platform),dir=fs.mkdtempSync(path.join(os.tmpdir(),'own-registry-'));
   try{

@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
+import {prepareOfficialCli, validateCliVersion} from './builders/official-cli.mjs';
 
 const repository = path.resolve(import.meta.dirname, '..');
 const appName = 'codex-own 开发版.app';
@@ -78,6 +79,12 @@ export function replaceDevelopment({candidate, target, backup, failed, verify, r
   for (const destination of [backup, failed]) {
     if (fs.existsSync(destination)) throw Error('Recovery destination already exists: ' + destination);
   }
+  if (!fs.existsSync(target)) {
+    rename(candidate, target);
+    try { verify(target); }
+    catch (error) { rename(target, failed); throw error; }
+    return {firstInstallation: true};
+  }
   if (!fs.lstatSync(target).isDirectory() || fs.lstatSync(target).isSymbolicLink())
     throw Error('Expected an existing regular development app directory');
   rename(target, backup);
@@ -121,21 +128,38 @@ function processRows() {
 }
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+export function developmentOptions(args) {
+  const options = {};
+  for (let i = 0; i < args.length; i++) {
+    const key = args[i];
+    if (Object.hasOwn(options, key)) throw Error('Duplicate development option: ' + key);
+    if (['--install', '--launch'].includes(key)) options[key] = true;
+    else if (['--cli-version', '--upstream-app'].includes(key)) {
+      const value = args[++i];
+      if (!value || value.startsWith('--')) throw Error('Missing ' + key);
+      options[key] = key === '--cli-version' ? validateCliVersion(value) : path.resolve(value);
+    } else throw Error('Invalid arguments; use --help');
+  }
+  if (options['--launch'] && !options['--install']) throw Error('--launch requires --install');
+  return options;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
-    console.log('Usage: node own/dev.mjs [--install] [--launch]\nBuilds a frozen source snapshot, runs native/GUI checks, then optionally backs up and replaces the fixed development app. --launch requires --install. Reports are in out/dev-build-*.noindex.');
+    console.log('Usage: node own/dev.mjs [--install] [--launch] [--cli-version X.Y.Z] [--upstream-app APP]\nBuilds a frozen source snapshot, runs native/GUI checks, then optionally backs up and installs the fixed development app. Explicit upstream input must have the official OpenAI signature. --launch requires --install. Reports are in out/dev-build-*.noindex.');
     return;
   }
-  if (args.some(a => !['--install', '--launch'].includes(a)) || (args.includes('--launch') && !args.includes('--install')))
-    throw Error('Invalid arguments; use --help');
+  const options = developmentOptions(args), cliVersion = options['--cli-version'], upstreamOverride = options['--upstream-app'];
   if (process.platform !== 'darwin' || process.arch !== 'arm64') throw Error('Development lifecycle supports macOS ARM64');
   const install = args.includes('--install'), home = os.userInfo().homedir;
   const target = path.join('/Applications', appName);
   if (install) {
     // Existence, ownership and signature are checked before creating output.
-    assertDevelopment(target);
-    run('/usr/bin/codesign', ['--verify', '--deep', '--strict', target]);
+    if (fs.existsSync(target)) {
+      assertDevelopment(target);
+      run('/usr/bin/codesign', ['--verify', '--deep', '--strict', target]);
+    }
     const ancestors = new Set([process.pid]);
     const rows = processRows();
     for (let row = rows.find(r => r.pid === process.pid); row; row = rows.find(r => r.pid === row.parent)) {
@@ -179,6 +203,7 @@ async function main() {
     const snapshot = path.join(output, 'source');
     execute('snapshot', 'git', ['clone', '--shared', '--no-checkout', repository, snapshot]);
     run('git', ['checkout', '--detach', report.sourceRef], {cwd: snapshot});
+    const snapshotTracked = new Set(run('git', ['ls-files', '-z'], {cwd: snapshot}).split('\0').filter(Boolean));
     for (const item of inventory.files) {
       const dest = path.join(snapshot, item.name);
       if (fs.existsSync(dest)) fs.unlinkSync(dest);
@@ -187,6 +212,8 @@ async function main() {
       if (item.link) fs.symlinkSync(item.link, dest);
       else fs.copyFileSync(path.join(repository, item.name), dest, fs.constants.COPYFILE_EXCL);
     }
+    const added = inventory.files.filter(item => !item.missing && !snapshotTracked.has(item.name)).map(item => item.name);
+    if (added.length) run('git', ['add', '--intent-to-add', '--', ...added], {cwd: snapshot});
     if (sourceInventory(repository).sha256 !== inventory.sha256 || sourceInventory(snapshot).sha256 !== inventory.sha256)
       throw Error('Source changed while snapshotting; retry with a stable checkout');
     for (const name of ['node_modules', 'own/node_modules']) {
@@ -199,26 +226,28 @@ async function main() {
     const needle = "automaticUpdates:false,sourceRef:";
     if (original.split(needle).length !== 2) throw Error('Unknown development marker contract');
     fs.writeFileSync(builder, original.replace(needle, `automaticUpdates:false,sourceFingerprint:${JSON.stringify(inventory.sha256)},sourceRef:`));
-    execute('unit', runtime.node, ['--test', '--test-concurrency=2', 'test/dev.test.mjs', 'test/instance-isolation.test.mjs', 'test/mac-signing.test.mjs'], path.join(snapshot, 'own'));
+    execute('unit', runtime.node, ['--test', '--test-concurrency=2', 'test/dev.test.mjs', 'test/official-cli.test.mjs', 'test/instance-isolation.test.mjs', 'test/mac-signing.test.mjs', 'test/model-access.test.mjs', 'test/model-router.test.mjs', 'test/model-configuration.test.mjs', 'test/updater-dependency.test.mjs'], path.join(snapshot, 'own'));
     const build = path.join(output, 'candidate');
+    if (cliVersion) report.officialCli = await prepareOfficialCli(cliVersion, path.join(output, 'official-cli'), {cacheRoot: path.join(outputRoot, 'official-cli-cache')});
     execute('official-version', runtime.node, ['scripts/sync-upstream.js', '--check-only', '--platform', 'mac-arm64'], snapshot);
     const check = fs.readFileSync(path.join(output, 'official-version.log'), 'utf8');
-    const inputs = ['/Applications/ChatGPT.app', '/Applications/Codex.app'];
+    const inputs = upstreamOverride ? [upstreamOverride] : ['/Applications/ChatGPT.app', '/Applications/Codex.app'];
     let upstream;
     for (const input of inputs) {
       if (!fs.existsSync(path.join(input, 'Contents/Info.plist'))) continue;
       const info = require('plist').parse(fs.readFileSync(path.join(input, 'Contents/Info.plist'), 'utf8'));
-      if (!matchesOfficialInput(info, check)) continue;
+      if (!upstreamOverride && !matchesOfficialInput(info, check)) continue;
       try {
         run('/usr/bin/codesign', ['--verify', '--deep', '--strict', input]);
         // Require OpenAI's signed, designated identity, rather than a renamed fork.
         run('/usr/bin/codesign', ['--verify', '-R', '=anchor apple generic and identifier "com.openai.codex" and certificate leaf[subject.OU] = "2DC432GLL2"', input]);
-      } catch { continue; }
+      } catch (error) { if (upstreamOverride) throw Error('Explicit upstream input must have a valid official OpenAI signature'); continue; }
       upstream = input;
-      report.upstreamInput = {path: input, version: info.CFBundleShortVersionString, build: info.CFBundleVersion, originalSignatureVerified: true};
+      report.upstreamInput = {path: input, version: info.CFBundleShortVersionString, build: info.CFBundleVersion, originalSignatureVerified: true, explicitlySelected: Boolean(upstreamOverride), matchesCurrentOfficial: matchesOfficialInput(info, check)};
       break;
     }
-    execute('build', runtime.node, ['own/build.mjs', '--local-only', '--development', '--output', build, ...(upstream ? ['--upstream-app', upstream] : [])], snapshot);
+    if (upstreamOverride && !upstream) throw Error('Explicit official upstream application is unavailable');
+    execute('build', runtime.node, ['own/build.mjs', '--local-only', '--development', '--output', build, ...(upstream ? ['--upstream-app', upstream] : []), ...(report.officialCli ? ['--official-cli', report.officialCli.destination] : [])], snapshot);
     const result = JSON.parse(fs.readFileSync(path.join(build, 'local-build.json')));
     const candidate = result.app;
     assertDevelopment(candidate, {expectedFingerprint: inventory.sha256});
@@ -239,7 +268,7 @@ async function main() {
       // Refuse surviving backends instead of replacing binaries beneath them.
       const remaining = processRows().filter(r => r.command.startsWith(target + '/') && !r.command.includes('browser_crashpad_handler'));
       if (remaining.length) throw Error('Development child processes remain; installation deferred, PIDs: ' + remaining.map(r => r.pid).join(','));
-      assertDevelopment(target);
+      if (fs.existsSync(target)) assertDevelopment(target);
       const data = path.join(home, '.codex-own-dev/Library/Application Support/codex-own-independent');
       if (fs.existsSync(data)) {
         report.dataBackup = path.join(output, 'profile-backup');
@@ -247,13 +276,16 @@ async function main() {
         console.error('[codex-own-dev] Backing up the profile (transient sockets are recorded separately)');
         report.profileBackup = backupProfile(data, report.dataBackup);
       }
-      report.appBackup = path.join(output, 'previous-development.bundle');
       const lsregister = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
       execute('unregister-candidate', lsregister, ['-u', candidate]);
-      replaceDevelopment({candidate, target, backup: report.appBackup, failed: path.join(output, 'failed-development.bundle'), verify: app => {
+      const verify = app => {
         assertDevelopment(app, {expectedFingerprint: inventory.sha256});
         run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
-      }});
+      };
+      const backup = path.join(output, 'previous-development.bundle');
+      const first = replaceDevelopment({candidate, target, backup, failed: path.join(output, 'failed-development.bundle'), verify});
+      if (first?.firstInstallation) report.firstInstallation = true;
+      else report.appBackup = backup;
       report.installed = true;
       execute('register', lsregister, ['-f', target]);
       if (args.includes('--launch')) {

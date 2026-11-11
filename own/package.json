@@ -39,6 +39,7 @@
     "resedit": "3.0.2"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "adm-zip": "0.6.1",
     "smol-toml": "1.9.1",
     "tar": "7.5.22",

@@ -6,6 +6,10 @@ export const identity=value=>crypto.createHash('sha256').update(canonical(value=
 const hash=v=>/^[a-f0-9]{64}$/.test(v||'');
 const semver=v=>/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(v||'');
 const bad=message=>{throw Object.assign(Error(message),{code:'INCOMPATIBLE_BINDING'});};
+export function manifestPlatforms(m){
+ const p=Object.keys(m.platforms||{}).sort(),r=Object.keys(m.runtimes?.platforms||{}).sort();
+ if(!p.length||p.some(k=>!['darwin-arm64','win32-x64'].includes(k))||p.join(',')!==r.join(','))bad('Desktop/runtime platform sets differ');return p;
+}
 export function validateBinding(m,{managerVersion,requireProof=false}={}){
  const b=m.binding;if(!b){if(requireProof)bad('Missing component binding');return null;}
  if(b.schema!==1||b.managerContract!==MANAGER_CONTRACT||!semver(b.managerVersion)||(managerVersion&&b.managerVersion!==managerVersion))bad('Unsupported manager binding');
@@ -14,10 +18,11 @@ export function validateBinding(m,{managerVersion,requireProof=false}={}){
  for(const component of [b.desktop,b.runtimes,...(b.managerSource?[{source:b.managerSource}]:[])]){
   const s=component.source;for(const record of [s,...(s?.publication?[s.publication]:[])])if(!record||record.repository!=='petercjl/codex-own'||!/^[a-f0-9]{40}$/.test(record.ref||'')||!/^\d+$/.test(String(record.run||''))||!record.workflow?.startsWith('.github/workflows/')||(record.triggerRef&&!/^[a-f0-9]{40}$/.test(record.triggerRef)))bad('Missing original build provenance');
  }
- if(requireProof&&(b.desktop.updaterContract!==UPDATER_CONTRACT||b.desktop.verifiedPlatforms?.join(',')!=='darwin-arm64,win32-x64'||b.runtimes.verifiedPlatforms?.join(',')!=='darwin-arm64,win32-x64'))bad('A verified bridge desktop and both runtime platforms are required for ordinary reuse');
+ const platforms=manifestPlatforms(m);
+ if(requireProof&&(b.desktop.updaterContract!==UPDATER_CONTRACT||b.desktop.verifiedPlatforms?.join(',')!==platforms.join(',')||b.runtimes.verifiedPlatforms?.join(',')!==platforms.join(',')))bad('Verified desktop and runtime proofs are required for every manifest platform');
  if(requireProof&&(!semver(b.desktop.publishedIn)||!semver(b.runtimes.publishedIn)||!b.managerSource))bad('Missing original publication binding');
- if(requireProof)for(const platform of ['darwin-arm64','win32-x64']){const a=m.platforms[platform],probe=a?.probe;if(!probe||!hash(probe.sha256)||!Number.isSafeInteger(probe.offset)||!Number.isSafeInteger(probe.size)||probe.offset<0||probe.size<1||probe.offset+probe.size>a.size)bad('Missing pinned native invocation proof');}
- if(requireProof)for(const platform of ['darwin-arm64','win32-x64']){const c=b.runtimes.components?.[platform],a=m.runtimes.platforms[platform];if(!c||c.node?.identity!==a.node.sha256||c.python?.identity!==a.python.sha256||!hash(c.npm?.identity)||!semver(c.npm.version))bad('Missing independent Node/npm/Python identities');}
+ if(requireProof)for(const platform of platforms){const a=m.platforms[platform],probe=a?.probe;if(!probe||!hash(probe.sha256)||!Number.isSafeInteger(probe.offset)||!Number.isSafeInteger(probe.size)||probe.offset<0||probe.size<1||probe.offset+probe.size>a.size)bad('Missing pinned native invocation proof');}
+ if(requireProof)for(const platform of platforms){const c=b.runtimes.components?.[platform],a=m.runtimes.platforms[platform];if(!c||c.node?.identity!==a.node.sha256||c.python?.identity!==a.python.sha256||!hash(c.npm?.identity)||!semver(c.npm.version))bad('Missing independent Node/npm/Python identities');}
  return b;
 }
 export function packageManifest(p,version){

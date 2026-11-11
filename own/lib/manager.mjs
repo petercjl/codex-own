@@ -10,6 +10,7 @@ import {reuseInstalledBlocks} from './content-blocks.mjs';
 import {ensureRuntime,validateRuntime,restoreRuntimeSelection} from './tool-runtime.mjs';
 import {validateBinding,packageManifest,sameDesktop,identity as bindingHash} from './binding.mjs';
 import {deepseekConfiguration} from './model-configuration.mjs';
+import {parseModelAccess, modelCatalogue, importedConfiguration, readModelAccess, publicModelInventory, importedProvider} from './model-access.mjs';
 import windowsAgentShell from './windows-agent-shell.cjs';
 import {extractChecked} from './extraction.mjs';
 import {copyNewDirectory,removeTemporary,removeNewTreeSync} from './file-operations.mjs';
@@ -126,7 +127,7 @@ export function recordBinding(p,m){
  if(fs.existsSync(f))fs.copyFileSync(f,f+'.backup-'+crypto.randomUUID(),fs.constants.COPYFILE_EXCL);
  const next=f+'.new-'+crypto.randomUUID();exclusive(next,{schema:1,manifest:m});fs.renameSync(next,f);
 }
-export async function configure(keyFile,{p=paths(),isRunning=running}={}){if(!keyFile)fail('KEY_FILE_REQUIRED','Provide --api-key-file');const key=fs.readFileSync(keyFile,'utf8').trim();if(!/^sk-[A-Za-z0-9_-]{10,}$/.test(key))fail('INVALID_KEY_FILE','Expected a single API key');return locked(p,async()=>{if(isRunning(p).length)fail('APP_RUNNING','Quit codex-own first');rejectLinks(p.core);fs.mkdirSync(p.core,{recursive:true,mode:0o700});fs.chmodSync(p.core,0o700);
+export async function configure(keyFile,{p=paths(),isRunning=running}={}){if(!keyFile)fail('KEY_FILE_REQUIRED','Provide --config-file or --api-key-file');const key=fs.readFileSync(keyFile,'utf8').replace(/^\uFEFF/,'').trim();if(key.startsWith('{'))return configureAccess(parseModelAccess(key),{p,isRunning});if(!/^sk-[A-Za-z0-9_-]{10,}$/.test(key))fail('INVALID_KEY_FILE','Expected a JSON model configuration or a single legacy API key');return locked(p,async()=>{if(isRunning(p).length)fail('APP_RUNNING','Quit codex-own first');rejectLinks(p.core);fs.mkdirSync(p.core,{recursive:true,mode:0o700});fs.chmodSync(p.core,0o700);
  const models=path.join(p.core,'models.json'),config=path.join(p.core,'config.toml');rejectLinks(config);rejectLinks(models);
  const previous=fs.existsSync(config)?fs.readFileSync(config,'utf8'):null,updated=deepseekConfiguration(previous,models);let configBackup=null;
  if(previous!==null&&previous!==updated){const metadata=fs.statSync(config);if(!metadata.isFile())fail('CONFIG_INVALID','Configuration must be a regular file');configBackup=config+'.backup-'+crypto.randomUUID();fs.copyFileSync(config,configBackup,fs.constants.COPYFILE_EXCL);fs.chmodSync(configBackup,0o600);if(fs.statSync(configBackup).size!==metadata.size||fs.readFileSync(configBackup,'utf8')!==previous)fail('BACKUP_FAILED','Configuration backup could not be verified');}
@@ -135,6 +136,35 @@ export async function configure(keyFile,{p=paths(),isRunning=running}={}){if(!ke
  if(!fs.existsSync(models))fs.copyFileSync(path.join(packageRoot,'defaults','models.json'),models,fs.constants.COPYFILE_EXCL);
  if(previous!==updated){const next=config+'.new-'+crypto.randomUUID();fs.writeFileSync(next,updated,{flag:'wx',mode:0o600});fs.renameSync(next,config);if(fs.readFileSync(config,'utf8')!==updated)fail('VERIFY_FAILED','Model configuration did not match the requested provider');}
  return {ok:true,configured:true,backup,configBackup,configPreserved:previous===updated,settingsPreserved:true,modelProvider:'dashscope_deepseek'};});}
+
+// Validate every input and save recoverable copies before committing this set.
+// Credentials remain in the private model-access file; CLI receipts are redacted.
+async function configureAccess(access,{p,isRunning}){return locked(p,async()=>{
+ if(isRunning(p).length)fail('APP_RUNNING','Quit codex-own before configuring model access');
+ if(fs.existsSync(p.target)){
+  const bundle=path.join(p.target,process.platform==='darwin'?'Contents/Resources/own-updater':'resources/own-updater');
+  if(!fs.existsSync(path.join(bundle,'lib/model-router.cjs'))||!fs.existsSync(path.join(bundle,'node_modules/@anthropic-ai/sdk/package.json')))fail('MODEL_ROUTING_UNAVAILABLE','Update the desktop to model routing contract 2 before importing a multi-provider configuration');
+ }
+ rejectLinks(p.core);fs.mkdirSync(p.core,{recursive:true,mode:0o700});fs.chmodSync(p.core,0o700);
+ const config=path.join(p.core,'config.toml'),previous=fs.existsSync(config)?fs.readFileSync(config,'utf8'):'';
+ const updated=importedConfiguration(previous,access,p.core),catalog=modelCatalogue(access,read(path.join(packageRoot,'defaults/models.json')));
+ const files=new Map([
+  ['model-access.json',JSON.stringify(access,null,2)+'\n'],['imported-models.json',JSON.stringify(catalog,null,2)+'\n'],
+  ['auth.json',JSON.stringify({auth_mode:'apikey',OPENAI_API_KEY:'sk-codex-own-local-routing-only'})+'\n'],['config.toml',updated]
+ ]),transaction=crypto.randomUUID(),backups={},staged=[],committed=[];
+ for(const name of files.keys()){const file=path.join(p.core,name);rejectLinks(file);if(fs.existsSync(file)&&!fs.lstatSync(file).isFile())fail('CONFIG_INVALID','Model configuration targets must be regular files');}
+ if(process.platform==='win32'){const sid=execFileSync('powershell.exe',['-NoProfile','-Command','[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value'],{encoding:'utf8'}).trim();execFileSync('icacls.exe',[p.core,'/inheritance:r','/grant:r',`*${sid}:(OI)(CI)F`],{stdio:'pipe'});}
+ try{
+  for(const [name,content] of files){const file=path.join(p.core,name);if(fs.existsSync(file)){const backup=file+'.backup-'+transaction;fs.copyFileSync(file,backup,fs.constants.COPYFILE_EXCL);fs.chmodSync(backup,0o600);if(hash(fs.readFileSync(file))!==hash(fs.readFileSync(backup)))fail('BACKUP_FAILED','Could not verify a model configuration backup');backups[name]=backup;}
+   const temp=file+'.new-'+transaction;fs.writeFileSync(temp,content,{flag:'wx',mode:0o600});staged.push({file,temp,content,name});}
+  for(const item of staged){fs.renameSync(item.temp,item.file);committed.push(item);if(fs.readFileSync(item.file,'utf8')!==item.content)fail('VERIFY_FAILED','Model configuration verification failed');}
+ }catch(error){for(const item of committed.reverse()){if(backups[item.name]){const restored=item.file+'.restore-'+transaction;fs.copyFileSync(backups[item.name],restored,fs.constants.COPYFILE_EXCL);fs.renameSync(restored,item.file);}else fs.unlinkSync(item.file);}throw error;}
+ finally{for(const item of staged)if(fs.existsSync(item.temp))fs.unlinkSync(item.temp);}
+ return {ok:true,configured:true,modelProvider:importedProvider,...publicModelInventory(access),backups,settingsPreserved:true,restartRequired:true};
+});}
+
+export function configuredModels({p=paths()}={}){const access=readModelAccess(p.core);if(!access)fail('MODEL_ACCESS_MISSING','Import a JSON model configuration first');return {ok:true,...publicModelInventory(access)};}
+export async function selectConfiguredModel(model,{p=paths(),isRunning=running}={}){const access=readModelAccess(p.core);if(!access)fail('MODEL_ACCESS_MISSING','Import a JSON model configuration first');if(!publicModelInventory(access).models.some(m=>m.id===model))fail('MODEL_NOT_CONFIGURED','Choose an exact model ID from models list');access.model=model;return configureAccess(access,{p,isRunning});}
 export async function install({version,adopt=false,archive,manifest,expectedCurrent,p=paths(),runtimeInstaller=ensureRuntime,identify=appIdentity,isRunning=running}={}) {
   if(!['darwin-arm64','win32-x64'].includes(p.platform))fail('UNSUPPORTED_PLATFORM',p.platform);
   progress('准备安装：检查版本、平台与独立目录');

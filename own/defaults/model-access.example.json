@@ -1,0 +1,23 @@
+{
+  "model": "gateway-deepseek/deepseek-flash",
+  "provider": {
+    "gateway-claude": {
+      "name": "Gateway Claude",
+      "npm": "@ai-sdk/anthropic",
+      "options": {"baseURL": "https://gateway.example/v1", "apiKey": "REPLACE_GATEWAY_API_KEY"},
+      "models": {"claude-opus-5-5": {"name": "Claude Opus 5.5", "reasoning": true, "limit": {"context": 1000000, "output": 128000}, "options": {"thinking": {"type": "adaptive"}}, "modalities": {"input": ["text", "image"]}}}
+    },
+    "gateway-deepseek": {
+      "name": "Gateway DeepSeek",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {"baseURL": "https://gateway.example/v1", "apiKey": "REPLACE_GATEWAY_API_KEY"},
+      "models": {"deepseek-flash": {"name": "DeepSeek Flash", "reasoning": true, "limit": {"context": 1000000, "output": 32768}, "modalities": {"input": ["text", "image"]}}}
+    },
+    "dashscope": {
+      "name": "Bailian DeepSeek",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {"baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1", "apiKey": "REPLACE_BAILIAN_API_KEY"},
+      "models": {"deepseek-v4.1-flash": {"name": "DeepSeek V4.1 Flash", "limit": {"context": 1048576, "output": 32768}, "modalities": {"input": ["text", "image"]}}}
+    }
+  }
+}

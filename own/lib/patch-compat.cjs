@@ -49,8 +49,8 @@ function eventAdapter(){
   return [event];
  };
 }
-function eventStream({maxEventBytes=64*1024*1024}={}){
- const adapt=eventAdapter();let pending=Buffer.alloc(0);
+function eventStream({maxEventBytes=64*1024*1024,adaptEvent=event=>[event]}={}){
+ const patch=eventAdapter(),adapt=event=>patch(event).flatMap(adaptEvent);let pending=Buffer.alloc(0);
  return new Transform({transform(chunk,_encoding,done){
   try{
    pending=Buffer.concat([pending,chunk]);let match;

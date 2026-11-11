@@ -11,6 +11,7 @@ import {canonicalize} from './ci/canonicalize.mjs';
 import {sourceTree} from './ci/source-tree.mjs';
 import {exposeVendorResolver,withSystemTar} from './builders/upstream-resolver.mjs';
 import {nativeVersion} from './builders/native-version.mjs';
+import {officialLayout} from './builders/official-cli.mjs';
 import {verifyMacReleaseSignature} from './builders/mac-signing.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {missingUnpacked}=require('../scripts/upstream-compat.js');
@@ -20,6 +21,7 @@ if(!mac&&key!=='win32-x64')throw Error('Unsupported build platform '+key);
 const platform=mac?'mac-arm64':'win',version=process.env.OWN_VERSION||JSON.parse(fs.readFileSync(path.join(root,'own/package.json'))).version;
 if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version))throw Error('Invalid version');
 const local=process.argv.includes('--local-only'),development=process.argv.includes('--development');
+if(mac&&!development)throw Error('macOS builds are local development only; use own/dev.mjs');
 if(development&&(!local||!mac))throw Error('Development builds require macOS and --local-only');
 if(development)process.env.OWN_DEVELOPMENT='1';
 if(process.env.OWN_DEVELOPMENT&&!local)throw Error('Development identity cannot enter the release pipeline');
@@ -31,6 +33,8 @@ let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||null,ownSour
 const existingIndex=process.argv.indexOf('--existing-app');
 const prepared=argument('--prepared-app');
 const upstreamApp=argument('--upstream-app');
+const officialCli=argument('--official-cli');
+if(officialCli&&(!local||!development||!mac||prepared||existingIndex>=0))throw Error('Official CLI override requires a local Mac development build from upstream');
 if(upstreamApp&&(!local||!development||!mac||prepared||existingIndex>=0))throw Error('Raw upstream input requires a local Mac development build without other input modes');
 if(existingIndex>=0){
  source=path.resolve(process.argv[existingIndex+1]);provenance={...provenance,kind:'adopted-verified-local-build'};
@@ -78,7 +82,17 @@ else{
  const vendor=cliSource==='rebuild'?withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()):null,cli=path.join(resources,mac?'codex':'codex.exe');
  if(cliSource==='rebuild'&&!vendor)throw Error('Selected Rebuild CLI unavailable');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
- if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.missingUnpackedBindings=missing;
+ if(officialCli){
+  const receipt=JSON.parse(fs.readFileSync(path.join(officialCli,'receipt.json'))),native=officialLayout(path.join(officialCli,'package/vendor/aarch64-apple-darwin'),receipt.version);
+  if(receipt.provider!=='openai'||await digestFile(native)!==receipt.binarySha256)throw Error('Official CLI receipt mismatch');
+  // Keep the full vendor tree so adjacent code-mode/executor resources follow
+  // the official binary layout. Only the copied application is changed.
+  const dest=path.join(resources,'own-official-cli');if(fs.existsSync(dest))throw Error('Official vendor destination exists');
+  fs.cpSync(path.join(officialCli,'package/vendor/aarch64-apple-darwin'),dest,{recursive:true,errorOnExist:true,force:false});
+  fs.unlinkSync(cli);fs.symlinkSync('own-official-cli/bin/codex',cli);
+  provenance.officialCli=receipt;
+ }
+ if(mac)fs.chmodSync(cli,0o755);provenance.cliSource=officialCli?'openai-npm':vendor?'upstream-resolved-vendor':'upstream-bundled';provenance.cliSha256=await digestFile(cli);provenance.missingUnpackedBindings=missing;
  if(!mac)provenance.msixPathRestorations=JSON.parse(fs.readFileSync(path.join(root,'src',platform,'msix-path-restorations.json')));
  const built=path.join(output,'built');run(process.execPath,[`own/builders/${mac?'mac':'windows'}.mjs`,built],{env:{...process.env,OWN_PREPARED_APP:source}});source=path.join(built,mac?(development?'codex-own 开发版.app':'codex-own.app'):'app');
 }

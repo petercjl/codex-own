@@ -1,6 +1,20 @@
 # codex-own
 
-独立桌面应用的 npm 安装与更新工具。支持 Mac ARM64 和 Windows x64。管理工具和桌面资源均从 npm 下载。
+独立桌面应用的 npm 安装与更新工具。正式分发目标为 Windows x64，管理工具、Windows 桌面及配套运行时从 npm 获取。Mac ARM64 维护项目本地开发版，历史 Mac 版本与数据继续保留。开发入口及验收规则见 DEVELOPMENT.md。
+
+## 多服务模型配置
+
+新版模型配置合同 2 支持在同一个 JSON 文件中提供多组服务地址、API Key 和模型列表，结构兼容 SealWork 的 `model`、`provider`、`options.baseURL`、`options.apiKey`、`models` 字段。Claude 的 Messages 接口通过本地适配层连接 Codex；OpenAI-compatible 服务使用 Responses。模型选择器展示各服务的模型，并为每次请求选择对应凭据。旧的一行百炼 Key 文件继续可用。
+
+配置文件由管理员提供，凭据保存在每台电脑自己的独立数据目录。请先安装包含该合同的 npm 管理器和桌面程序；仅升级管理器不足以给旧桌面增加模型路由能力。公共示例见 `defaults/model-access.example.json`，真实 Key 单独提供。
+
+可直接发给当前 Agent：
+
+> 请使用 @petercjl/codex-own 导入所附模型配置文件，保留已有配置和对话，并验证默认模型的回复与工具调用。
+
+> 请用 codex-own 列出已配置的模型，并把默认模型切换为【填写所需模型】。
+
+开发者入口：`configure --config-file FILE --yes` 导入，历史 `--api-key-file` 参数兼容两种文件；`models list` 只读查看；`models select --model provider/model --yes` 在应用关闭时更改默认模型。JSON 中的默认模型决定首次选中项，同一次对话也可在应用中选择其他已配置模型。
 
 ## 独立 Node、npm 和 Python
 
@@ -65,68 +79,6 @@ Windows 桌面在启动 Agent 会话时自动检测并验证系统安装的 Git 
 0.3.x 首次迁移：先退出 codex-own，使用下文对应系统的终端命令更新 npm 管理工具，再执行桌面更新。升级后的管理工具即可从现有程序复用内容。之后直接使用应用内“更新”菜单，随 App 交付的更新组件会自动执行相同的增量下载。
 
 本地扫描只读取程序目录，密钥、配置和对话继续保存在独立数据目录。下载结束后在本地重建完整归档、核对 SHA256，再备份并切换程序。请继续预留完整安装和备份的磁盘空间。
-
-## 在 Mac 上通过 Terminal 安装和更新
-
-适用于 Apple 芯片 Mac（ARM64）。从 Node.js 官网安装 LTS 版本（要求 Node.js 22 或以上，包含 npm），重新打开 Terminal。建议预留 10 GB 空间，用于下载、解压和备份。
-
-[Node.js 官方下载](https://nodejs.org/en/download)
-
-安装验收只需完成前三步。无需 Agent、API Key 或模型登录。
-
-第一步：检查环境并安装 npm 管理工具。以下工具安装在当前用户的 ~/.local。逐段执行，每一步成功后再继续。
-
-```bash
-node --version
-npm --version
-npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
-```
-
-第二步：安装桌面程序。管理工具按当前平台从 npm 下载资源分片，依次显示下载进度、校验、解压和安装阶段。
-
-```bash
-"$HOME/.local/bin/codex-own" install --yes
-```
-
-若已有手动安装的 codex-own，请先退出应用，将第二步命令替换为以下命令，备份后接管原安装。
-
-```bash
-"$HOME/.local/bin/codex-own" install --adopt --yes
-```
-
-第三步：检查安装结果。安装结果应显示 ok: true、downloadSource: registry.npmjs.org；doctor 中 installed 有版本且 lock 为 false，version 显示管理工具和桌面版本。应用位于 /Applications/codex-own.app。
-
-```bash
-"$HOME/.local/bin/codex-own" doctor
-"$HOME/.local/bin/codex-own" version
-```
-
-**API Key 文件路径必须改为你实际下载的位置，不能直接复制占位路径。** 配置前先保存任务；命令会关闭 codex-own，完成配置后从 Mac“应用程序”打开 codex-own。
-
-```bash
-apiKeyFile="【填写 API Key 文件的实际完整路径】"
-if [ -f "$apiKeyFile" ]; then
-    ownPattern='^/Applications/codex-own[.]app/Contents/'
-    pkill -TERM -f "$ownPattern" || true
-    for i in {1..10}; do
-        pgrep -f "$ownPattern" >/dev/null || break
-        sleep 1
-    done
-    pkill -KILL -f "$ownPattern" || true
-    "$HOME/.local/bin/codex-own" configure --api-key-file "$apiKeyFile" --yes &&
-    "$HOME/.local/bin/codex-own" doctor
-else
-    printf '%s\n' "请先填写 apiKeyFile，确认文件路径和文件名正确。"
-fi
-```
-
-以后更新：先退出 codex-own，再更新 npm 管理工具和桌面程序。配置与对话保存在 ~/Library/Application Support/codex-own-independent。
-
-```bash
-npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
-"$HOME/.local/bin/codex-own" update check
-"$HOME/.local/bin/codex-own" update install --yes
-```
 
 ## 在 Windows 上通过 PowerShell 安装和测试
 
@@ -215,3 +167,67 @@ Mac 使用 "$HOME/.local/bin/codex-own" doctor --json、repair plan 和 repair r
 > 请检查 codex-own 的安装环境和失败残留，使用 @petercjl/codex-own 的恢复计划诊断，保留配置与对话。
 
 > 请通过 @petercjl/codex-own 修复已确认可清理的安装残留，然后重试安装。
+
+## 附录：Mac 历史安装与配置记录
+
+此附录保留历史分发记录；当前 Mac 使用项目开发构建。以下 @latest 安装命令属于历史流程，后续 Windows 正式包不包含 Mac 资源。
+
+适用于 Apple 芯片 Mac（ARM64）。从 Node.js 官网安装 LTS 版本（要求 Node.js 22 或以上，包含 npm），重新打开 Terminal。建议预留 10 GB 空间，用于下载、解压和备份。
+
+[Node.js 官方下载](https://nodejs.org/en/download)
+
+安装验收只需完成前三步。无需 Agent、API Key 或模型登录。
+
+第一步：检查环境并安装 npm 管理工具。以下工具安装在当前用户的 ~/.local。逐段执行，每一步成功后再继续。
+
+```bash
+node --version
+npm --version
+npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
+```
+
+第二步：安装桌面程序。管理工具按当前平台从 npm 下载资源分片，依次显示下载进度、校验、解压和安装阶段。
+
+```bash
+"$HOME/.local/bin/codex-own" install --yes
+```
+
+若已有手动安装的 codex-own，请先退出应用，将第二步命令替换为以下命令，备份后接管原安装。
+
+```bash
+"$HOME/.local/bin/codex-own" install --adopt --yes
+```
+
+第三步：检查安装结果。安装结果应显示 ok: true、downloadSource: registry.npmjs.org；doctor 中 installed 有版本且 lock 为 false，version 显示管理工具和桌面版本。应用位于 /Applications/codex-own.app。
+
+```bash
+"$HOME/.local/bin/codex-own" doctor
+"$HOME/.local/bin/codex-own" version
+```
+
+**API Key 文件路径必须改为你实际下载的位置，不能直接复制占位路径。** 配置前先保存任务；命令会关闭 codex-own，完成配置后从 Mac“应用程序”打开 codex-own。
+
+```bash
+apiKeyFile="【填写 API Key 文件的实际完整路径】"
+if [ -f "$apiKeyFile" ]; then
+    ownPattern='^/Applications/codex-own[.]app/Contents/'
+    pkill -TERM -f "$ownPattern" || true
+    for i in {1..10}; do
+        pgrep -f "$ownPattern" >/dev/null || break
+        sleep 1
+    done
+    pkill -KILL -f "$ownPattern" || true
+    "$HOME/.local/bin/codex-own" configure --api-key-file "$apiKeyFile" --yes &&
+    "$HOME/.local/bin/codex-own" doctor
+else
+    printf '%s\n' "请先填写 apiKeyFile，确认文件路径和文件名正确。"
+fi
+```
+
+以后更新：先退出 codex-own，再更新 npm 管理工具和桌面程序。配置与对话保存在 ~/Library/Application Support/codex-own-independent。
+
+```bash
+npm install --global --prefix "$HOME/.local" @petercjl/codex-own@latest
+"$HOME/.local/bin/codex-own" update check
+"$HOME/.local/bin/codex-own" update install --yes
+```

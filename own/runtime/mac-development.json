@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "version": "node24.22.0-python3.12.15-r1",
+  "platforms": {
+    "darwin-arm64": {
+      "node": {
+        "size": 53049576,
+        "entry": "node-v24.22.0-darwin-arm64",
+        "parts": [
+          {
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h949aea7a152b116e84670a7b771614bcea487f587a581e0d1a120928e9ab0221.tgz",
+            "size": 33554432,
+            "sha256": "949aea7a152b116e84670a7b771614bcea487f587a581e0d1a120928e9ab0221",
+            "archiveSize": 33512749,
+            "archiveSha256": "5f3bbf063aa3d82e32ba0499e46123822d7148542101aee2d019929190c196c2"
+          },
+          {
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h4cac86c2c3bad12d3402c7cd52ce002dcf222ebb3db964d1cbc5042b433aab59.tgz",
+            "size": 19495144,
+            "sha256": "4cac86c2c3bad12d3402c7cd52ce002dcf222ebb3db964d1cbc5042b433aab59",
+            "archiveSize": 19133414,
+            "archiveSha256": "643fb96788aef65d2a7adb81e1df6e55d963364b34837e152167282843818172"
+          }
+        ],
+        "format": "tar.gz",
+        "sha256": "6a9724d9b50a5f22b4816cded441b5a8d9ddae546191a5e5b7efa5a5e2ee26d5"
+      },
+      "python": {
+        "size": 25180390,
+        "entry": "python",
+        "parts": [
+          {
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440.tgz",
+            "size": 25180390,
+            "sha256": "ba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440",
+            "archiveSize": 25107923,
+            "archiveSha256": "503f5667f2d6fa6950438764f0ac29e413e3080bfcfe83b295b6c74c2c15163e"
+          }
+        ],
+        "format": "tar.gz",
+        "sha256": "ba32036ad8f4c434d97a1ee7feef8b7edc0fac16777639b97e39c74a108e4440"
+      }
+    }
+  }
+}

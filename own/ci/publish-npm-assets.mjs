@@ -1,3 +1,4 @@
+import {releaseTargets,assertReleaseTargets} from './release-targets.mjs';
 // Only runs in the authorized GitHub-hosted OIDC release job. Payload prereleases
 // share the manager's package identity and never change the public latest tag.
 import fs from 'node:fs';
@@ -28,7 +29,7 @@ function find(root,name){for(const e of fs.readdirSync(root,{withFileTypes:true}
 const pending=[],jobs=[],seen=new Map(),publication=[],plans=[];
 const runtimeFile=path.join(dir,'runtime-input.json');
 if(fs.existsSync(runtimeFile))manifest.runtimes=JSON.parse(fs.readFileSync(runtimeFile));
-if(!manifest.platforms?.['darwin-arm64']||!manifest.platforms?.['win32-x64'])throw Error('Both verified desktop platforms are required');
+assertReleaseTargets(manifest);
 function readBlock(archive,block){
   const bytes=Buffer.alloc(block.size),handle=fs.openSync(archive,'r');let filled=0;
   try{while(filled<bytes.length){const n=fs.readSync(handle,bytes,filled,bytes.length-filled,block.offset+filled);if(!n)throw Error('Unexpected EOF');filled+=n;}}

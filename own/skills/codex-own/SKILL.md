@@ -7,7 +7,7 @@ description: Install, update, launch and diagnose the independent codex-own desk
 
 Input: the requested install, update, diagnosis or recovery action, existing installation state, optional supplied API key file, and user authorization. Output: manager, desktop and tool-runtime versions/identities, verified installation paths, backup evidence and unresolved errors. Package installation alone does not configure model access.
 
-Use the installed `codex-own` CLI. Resolve its current bundled instructions with `codex-own skill source --json`; probe `version`, `capabilities` and `doctor`. Requires Node.js 22+, tar, a supported desktop OS and access to registry.npmjs.org. Install the latest manager from npm; it downloads only the current platform’s desktop payloads from npm. Internal payload prereleases are data, not CLI entry points. macOS ARM64 and Windows x64 are implementation targets; a diagnostic result does not prove Windows GUI compatibility.
+Use the installed `codex-own` CLI. Resolve its current bundled instructions with `codex-own skill source --json`; probe `version`, `capabilities` and `doctor`. Requires Node.js 22+, tar, a supported desktop OS and access to registry.npmjs.org. Install the latest manager from npm; it downloads only the current platform’s desktop payloads from npm. Internal payload prereleases are data, not CLI entry points. New npm desktop releases target Windows x64. macOS ARM64 is retained for project-local development and historical installations; inspect the selected release manifest before any installation and do not assume npm latest contains Mac assets. A diagnostic result does not prove Windows GUI compatibility.
 
 ## Main line
 
@@ -17,6 +17,12 @@ Use the installed `codex-own` CLI. Resolve its current bundled instructions with
 4. Read `doctor` and `version`, retain the returned backup locations, then use `codex-own launch` when requested. Verify startup separately from installer success.
 
 For installation-only acceptance, verify doctor, version, target and shortcut without configuring credentials or launching the GUI unless requested. Progress goes to stderr; final results remain JSON on stdout.
+
+## Model configuration (contract 2)
+
+With authorization to configure model access, first close only the selected codex-own instance and run `configure --config-file FILE --yes`. The file may contain a single legacy Bailian key or JSON using `model: "provider/model"` and `provider[id].options.{baseURL,apiKey}` plus `provider[id].models`. `npm: "@ai-sdk/anthropic"` selects Messages adaptation; OpenAI-compatible providers use Responses. Optional `enabled_providers` limits the imported set. The historical `--api-key-file` option accepts both formats. Validate the full file before mutation; retain returned backups and existing preferences. Never echo or package the supplied credentials.
+
+JSON imports require a desktop with the bundled model router and Anthropic adapter, as well as a compatible npm manager. Do not import JSON into an older desktop merely because the manager accepts it. After restarting, the native model picker lists every configured provider/model. `models list` returns a redacted inventory; `models select --model provider/model --yes` changes the default while the app is closed. Verify the requested model with a real reply and tool call; imports alone do not prove endpoint access. On MODEL_ACCESS_INVALID, preserve the current files and report the invalid field category without values; on MODEL_NOT_CONFIGURED, read the inventory and honor the caller's model choice. Return to main-line verification after configuration.
 
 Desktop builds with the bundled npm updater check stable latest 15 seconds after startup and every six hours. The user-facing menu is 更新 → 检查 codex-own 更新…. Download runs while the app remains usable; 重启并安装 asks the user to end active tasks, then an independent helper waits for exit, backs up and replaces the app. The helper uses bundled Node and npm payloads, so daily in-app updates do not require updating global npm tooling. Inspect the installed app's own updater version separately from the global CLI version. Retain CLI step 3 for older builds and recovery. Prepared, verified downloads survive restarts; offline checks preserve the current installation. Install logs and unique result records live under the independent manager directory; never delete locks to bypass a failed update.
 
@@ -28,7 +34,7 @@ For a cleanup request, inspect `codex-own cleanup plan` first. With authorizatio
 
 ## Private tool runtime (contract 1)
 
-Desktop installations from 0.5.0 include a separately versioned Node/npm/Python toolchain. The manager's release manifest pins verified npm payloads for macOS ARM64 and Windows x64. Install/update ensures these tools before switching the app. Runtime bytes retain upstream licenses and contain no user configuration. The initial npm manager bootstrap still requires existing Node.js 22+; ordinary app updates use the bundled updater.
+Desktop installations from 0.5.0 include a separately versioned Node/npm/Python toolchain. The manager's release manifest pins the exact platform payloads. Current publication policy includes Windows x64 only; historical manifests may contain both platforms. Mac development uses the repository's separately retained development runtime source. Install/update ensures these tools before switching the app. Runtime bytes retain upstream licenses and contain no user configuration. The initial npm manager bootstrap still requires existing Node.js 22+; ordinary app updates use the bundled updater.
 
 When migrating through a 0.4.x in-app updater, the new desktop's async startup gate downloads and verifies its pinned tools from npm before loading the desktop backend. A progress window supports cancellation and retry; no system Node/npm/Python is required for this migration. Inspect unique `logs/runtime-bootstrap-*.log` files if preparation fails. An installed valid runtime allows offline startup without a registry check.
 

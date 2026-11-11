@@ -1,3 +1,4 @@
+import {releaseTargets} from './release-targets.mjs';
 import fs from'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';
 import{snapshot,changes}from'./artifact-inputs.mjs';import{identity,validateBinding}from'../lib/binding.mjs';
 import{verifyPackageProvenance}from'./npm-provenance.mjs';
@@ -5,8 +6,9 @@ export function releasePlan({inputs,previous,managerVersion,mode='auto',provenan
  if(!['auto','manager-only','native','runtime'].includes(mode))throw Error('Invalid release mode');
  const changed=changes(previous?.inputs,inputs),reasons=[];let proof=false;
  try{validateBinding(previous?.manifest,{requireProof:true});proof=!!provenanceVerified;}catch(e){reasons.push(e.message);}
- const nativeChanged=!previous?.inputs||inputs.native!==previous.inputs.native||inputs.unknown.length>0;
- const runtimeChanged=!previous?.inputs||inputs.runtime!==previous.inputs.runtime||inputs.unknown.length>0;
+ const targetsChanged=Object.keys(previous?.manifest?.platforms||{}).sort().join(',')!==releaseTargets.join(',')||Object.keys(previous?.manifest?.runtimes?.platforms||{}).sort().join(',')!==releaseTargets.join(',');
+ const nativeChanged=targetsChanged||!previous?.inputs||inputs.native!==previous.inputs.native||inputs.unknown.length>0;
+ const runtimeChanged=targetsChanged||!previous?.inputs||inputs.runtime!==previous.inputs.runtime||inputs.unknown.length>0;
  // Release recipes, classifiers and verification code are themselves gated inputs.
  const releaseChanged=!previous?.inputs||inputs.release!==previous.inputs.release;
  const native=nativeChanged||!proof||releaseChanged||mode==='native';
@@ -15,11 +17,11 @@ export function releasePlan({inputs,previous,managerVersion,mode='auto',provenan
  const kind=native?'native':runtime?'runtime':'manager-only';
  const overlayFiles=['own/builders/updater.mjs','own/builders/upgrade-updater.mjs','own/builders/tool-gate.mjs','own/builders/runtime-isolation.mjs','own/builders/windows-icon.mjs','own/builders/update-menu.mjs'];
  const overlay=provenanceVerified&&inputs.upstream===previous?.inputs?.upstream&&!inputs.unknown.length&&changed.filter(c=>c.kind==='native').every(c=>c.file.startsWith('own/lib/')||c.file.startsWith('own/desktop/')||c.file.startsWith('own/runtime/')||overlayFiles.includes(c.file));
- return {schema:1,managerVersion,kind,nativeStrategy:overlay?'overlay':'upstream',baseVersion:overlay?previous.manifest.version:null,components:{desktop:native?'build':'reuse',runtimes:runtime?'build':'reuse'},inputs,changed,unknown:inputs.unknown,proof:{verified:proof,sourceVerified:!!provenanceVerified,registry:previous?.registry||null,desktop:previous?.manifest?.binding?.desktop||null,runtimes:previous?.manifest?.binding?.runtimes||null},reasons:[...reasons,...(nativeChanged?['native inputs changed']:[]),...(runtimeChanged?['runtime inputs changed']:[]),...(releaseChanged?['release recipes changed']:[])],gates:['macos-manager','windows-manager','packed-install-update-rollback',...(native?['macos-native','windows-native']:['pinned-native-invocation']),...(runtime?['macos-runtime','windows-runtime']:[])],planIdentity:identity({managerVersion,inputs,components:{native,runtime},previous:previous?.registry})};
+ return {schema:1,targets:releaseTargets,managerVersion,kind,nativeStrategy:overlay?'overlay':'upstream',baseVersion:overlay?previous.manifest.version:null,components:{desktop:native?'build':'reuse',runtimes:runtime?'build':'reuse'},inputs,changed,unknown:inputs.unknown,proof:{verified:proof,sourceVerified:!!provenanceVerified,registry:previous?.registry||null,desktop:previous?.manifest?.binding?.desktop||null,runtimes:previous?.manifest?.binding?.runtimes||null},reasons:[...reasons,...(nativeChanged?['native inputs changed']:[]),...(runtimeChanged?['runtime inputs changed']:[]),...(releaseChanged?['release recipes changed']:[])],gates:['windows-manager','packed-install-update-rollback',...(native?['windows-native']:['pinned-native-invocation']),...(runtime?['windows-runtime']:[])],planIdentity:identity({managerVersion,inputs,components:{native,runtime},previous:previous?.registry})};
 }
-export function verifyBuildRun(source,run,jobs,component,{recovered=false}={}){
+export function verifyBuildRun(source,run,jobs,component,{recovered=false,platforms=releaseTargets}={}){
  if((run.conclusion!=='success'&&!recovered)||run.head_sha!==(source.triggerRef||source.ref)||run.path!==source.workflow||!['.github/workflows/own-release.yml','.github/workflows/own-sync.yml','.github/workflows/own-verify.yml'].includes(source.workflow))throw Error('Build provenance is not a successful source-pinned run');
- for(const platform of ['darwin-arm64','win32-x64']){
+ for(const platform of platforms){
   const matches=jobs.filter(j=>j.conclusion==='success'&&j.name.includes(platform)&&j.steps?.some(s=>s.conclusion==='success'&&s.name===(component==='desktop'?'Verify canonical archive and local incremental reuse':'Verify independent Node npm Python on target OS')));
   if(!matches.length)throw Error('Missing successful '+component+' QA for '+platform);
  }
@@ -46,7 +48,7 @@ export async function verifyPublished(previous,{fetcher=url=>fetch(url,{signal:A
   const {execFileSync}=await import('node:child_process');const read=loadRun||((id)=>{const url=`repos/petercjl/codex-own/actions/runs/${id}`;return{run:JSON.parse(execFileSync('gh',['api',url],{encoding:'utf8'})),jobs:JSON.parse(execFileSync('gh',['api',url+'/jobs?per_page=100'],{encoding:'utf8',maxBuffer:8*1048576})).jobs};});
   const {run,jobs}=await read(component.source.run);
   if(component.source.publication){const publication=await read(component.source.publication.run);if(publication.run.conclusion!=='success'||publication.run.head_sha!==component.source.publication.ref||publication.run.path!=='.github/workflows/own-release.yml')throw Error('Publication recovery not successfully released');}
-  verifyBuildRun(component.source,run,jobs,component.kind,{recovered:!!component.source.publication});
+  verifyBuildRun(component.source,run,jobs,component.kind,{recovered:!!component.source.publication,platforms:component.verifiedPlatforms||Object.keys(component.kind==='desktop'?previous.manifest.platforms:previous.manifest.runtimes.platforms)});
  }
  return true;
 }
