@@ -1,10 +1,14 @@
 import {releaseTargets} from '../ci/release-targets.mjs';
+import {resolveInstallerRecovery} from './recovery.mjs';
 import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';import {hashFile} from './offline-install.mjs';
 if(process.env.GITHUB_ACTIONS!=='true'||process.env.GITHUB_REF!=='refs/heads/own-main'||process.env.GITHUB_REPOSITORY!=='petercjl/codex-own')throw Error('Installer publication requires the trusted own-main workflow');
 const root=path.resolve(process.argv[2]),version=process.env.OWN_INSTALLER_VERSION,repo='petercjl/codex-own';if(!/^\d+\.\d+\.\d+$/.test(version||''))throw Error('Exact version required');
+const sourceRun=process.env.OWN_INSTALLER_SOURCE_RUN||process.env.GITHUB_RUN_ID,sourceRef=process.env.OWN_INSTALLER_SOURCE_REF||process.env.GITHUB_SHA;
+if(sourceRun!==process.env.GITHUB_RUN_ID){const proof=resolveInstallerRecovery(sourceRun);if(proof.sourceRef!==sourceRef)throw Error('Installer source ref mismatch');}
+else if(sourceRef!==process.env.GITHUB_SHA)throw Error('Installer source ref mismatch');
 const files=[];for(const platform of releaseTargets){
  const dir=path.join(root,'first-installer-'+platform),recordFile=path.join(dir,'installer-'+platform+'.json'),qaFile=path.join(dir,'installer-qa-'+platform+'.json'),record=JSON.parse(fs.readFileSync(recordFile)),qa=JSON.parse(fs.readFileSync(qaFile));
- if(record.version!==version||record.platform!==platform||record.sourceRun!==process.env.GITHUB_RUN_ID||record.sourceRef!==process.env.GITHUB_SHA||qa.version!==version||qa.platform!==platform||!qa.offline||!qa.repeatInstallPreservesData||!qa.existingUpdaterRecognizesInstallation)throw Error('Installer QA/provenance mismatch');
+ if(record.version!==version||record.platform!==platform||record.sourceRun!==sourceRun||record.sourceRef!==sourceRef||qa.version!==version||qa.platform!==platform||!qa.offline||!qa.repeatInstallPreservesData||!qa.existingUpdaterRecognizesInstallation||!qa.nativeWindowsSetupExecuted||!qa.noSystemNodeNpmPython||!qa.apiFileConfigured)throw Error('Installer QA/provenance mismatch');
  const file=path.join(dir,record.artifact);if(path.dirname(file)!==dir||fs.statSync(file).size!==record.size||await hashFile(file)!==record.sha256)throw Error('Installer checksum mismatch');
  files.push(file,recordFile,qaFile,path.join(dir,'SHA256-'+platform+'.txt'));
 }
