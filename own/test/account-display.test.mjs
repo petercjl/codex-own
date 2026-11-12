@@ -8,7 +8,7 @@ test('account display exposes identity only and recognizes the exact application
 });
 test('fresh and older preloads gain one account display without duplicating the existing product bridge',()=>{
  const source='contextBridge.exposeInMainWorld("fixture",{});',fresh=patchProductModePreload(source);assert.equal(patchProductModePreload(fresh),fresh);
- const bridge=policyPreload.slice(0,policyPreload.indexOf(';(()=>{\n'));const upgraded=patchProductModePreload(bridge+source);assert.equal(upgraded,fresh);assert.equal(upgraded.split('codexOwnProductPolicy",').length-1,1);
+ const boundary=policyPreload.search(/;\(\(\)=>\{\r?\n/);assert.ok(boundary>0);const bridge=policyPreload.slice(0,boundary);const upgraded=patchProductModePreload(bridge+source);assert.equal(upgraded,fresh);assert.equal(upgraded.split('codexOwnProductPolicy",').length-1,1);
 });
 test('Windows account placement follows the native rail as it mounts and keeps the settings action',()=>{
  const source=fs.readFileSync(new URL('../desktop/account-display-preload.js',import.meta.url),'utf8'),body=source.slice(source.indexOf(' function place(){'),source.indexOf(' function render('));
