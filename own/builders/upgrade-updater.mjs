@@ -23,6 +23,13 @@ export function migrateOverlaySource(source){
  if(!source.includes('/* codex-own:api-'))return source;
  return source.replaceAll(old,old.replace('const ','var '));
 }
+export function upgradedPreloadChanges(asar,archive,{priorChanges=new Map(),separator=path.sep}={}){
+ const file='.vite/build/preload.js';
+ // ASAR extraction uses the host separator, while the staged patch map uses '/'.
+ const before=(priorChanges.get(file)||asar.extractFile(archive,file.replaceAll('/',separator))).toString();
+ const after=patchProductModePreload(before);
+ return after===before?new Map():new Map([[file,Buffer.from(after)]]);
+}
 export async function upgradeUpdater(app,{version,node}={}){
  const mac=process.platform==='darwin';
  const resources=path.join(app,mac?'Contents/Resources':'resources'),archive=path.join(resources,'app.asar');
@@ -36,8 +43,7 @@ export async function upgradeUpdater(app,{version,node}={}){
   const before=menuChanges.get(file)?.toString()||asar.extractFile(archive,file.replaceAll('/',path.sep)).toString(),after=migrateOverlaySource(before);
   if(after!==before)menuChanges.set(file,Buffer.from(after));
  }
- const preloadFile='.vite/build/preload.js',preloadBefore=(menuChanges.get(preloadFile)||asar.extractFile(archive,preloadFile)).toString(),preloadAfter=patchProductModePreload(preloadBefore);
- if(preloadAfter!==preloadBefore)menuChanges.set(preloadFile,Buffer.from(preloadAfter));
+ for(const [file,bytes]of upgradedPreloadChanges(asar,archive,{priorChanges:menuChanges}))menuChanges.set(file,bytes);
  const payloadOptimization=mac?null:optimizeWindowsPayload(app);
  if(!mac)for(const [name,data]of nativeWindowsChanges(asar,archive,{priorChanges:menuChanges}))menuChanges.set(name,data);
  const entry=JSON.parse(asar.extractFile(archive,'package.json')).main,entrySource=asar.extractFile(archive,entry.replaceAll('/',path.sep)).toString();
