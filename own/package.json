@@ -50,7 +50,7 @@
   "ownDesktopManifest": {
     "schema": 2,
     "repository": "petercjl/codex-own",
-    "version": "0.6.11",
+    "version": "0.6.12",
     "platforms": {
       "win32-x64": {
         "entry": "app",
@@ -62,8 +62,8 @@
           "version": "codex-cli 0.167.0-alpha.4.1"
         },
         "transport": "canonical-tar-cdc-v1",
-        "size": 1937126912,
-        "sha256": "7bcc493c1c94b12f8b4d53ebcb6e3db7f3e5079808a8413c8a6a1f58be8c7b85",
+        "size": 1938030592,
+        "sha256": "704d11b6d17f6671808330ceebf65be2b1010d0daab18239a1551b2992718d5c",
         "parts": [
           {
             "sha256": "fd5becb4ee09a9b72f26cfeef80b3b662703c116dd526931da25a838868fd8fd",
@@ -423,11 +423,11 @@
             "archiveSha256": "8995b3520ffe2a110e371d350a3d74ef6061b28a78283c136c7d0436f082cb31"
           },
           {
-            "sha256": "2dde52c668c011d9b64b820809c196376bbc8024e18ac2b1c8eb11770759af4f",
-            "size": 23903836,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h2dde52c668c011d9b64b820809c196376bbc8024e18ac2b1c8eb11770759af4f.tgz",
-            "archiveSize": 8145644,
-            "archiveSha256": "a8c05eeb5781cf254d20f12fed602e79efaa8437d44766781549dd233957bd3d"
+            "sha256": "396a2a8549a6e02874ff1c583f30bf2a82a9913494d2ef9ed0a1cbe55831ce27",
+            "size": 24807516,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h396a2a8549a6e02874ff1c583f30bf2a82a9913494d2ef9ed0a1cbe55831ce27.tgz",
+            "archiveSize": 8332671,
+            "archiveSha256": "ea0169c1d88476644730b94d3cb112eef6a05401522a5f9d69f02019f624c8c2"
           },
           {
             "sha256": "55f2f328ee74939a767834a8ecac7ec984d405685910c61e6df426fd4d173146",
@@ -470,7 +470,7 @@
     "provenance": {
       "win32-x64": {
         "upstreamCommit": null,
-        "ownSourceRef": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
+        "ownSourceRef": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
         "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
         "toolchain": {
           "node": "v24.15.0",
@@ -556,26 +556,26 @@
     },
     "binding": {
       "schema": 1,
-      "managerVersion": "0.6.11",
+      "managerVersion": "0.6.12",
       "managerSource": {
         "repository": "petercjl/codex-own",
-        "ref": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
-        "run": "43206773135",
+        "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+        "run": "43246580025",
         "workflow": ".github/workflows/own-release.yml"
       },
       "managerContract": 2,
-      "releasePolicyFingerprint": "665e5565f39d1e674f59c64b55000646e36bc0ffd0db9df5c8c50223f1a793ab",
+      "releasePolicyFingerprint": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
       "desktop": {
-        "artifactVersion": "0.6.11",
-        "publishedIn": "0.6.11",
-        "identity": "e96712c4c1250648ef2140bef1b73a1e47eb83e96409d989823b40b3c1f6c37f",
-        "inputFingerprint": "90e1088203f25b8fd3a4ad4ebdb67344bc2de62352aedcca82fa43407497eba9",
-        "declaredFingerprint": "33cf97740e65b3638a7b1485a288b63fb06e25e904e3b79ddaafda5ecb1cf72a",
-        "upstreamFingerprint": "ec5ddaac2b0bdbd3b0762d31dfdee489b0206019a827162262e6398786d76953",
+        "artifactVersion": "0.6.12",
+        "publishedIn": "0.6.12",
+        "identity": "df95460907458e6d49b9c7863d1852f6fa128c637c1f9fb15793d543113ca2eb",
+        "inputFingerprint": "6bebf96698c386d00821544e344a3e42c33f02af64ba06f8eaab4bbd120d3cdc",
+        "declaredFingerprint": "3db99d0d505be78cd336b5e7d2c28b09bf1dfbf2cc67e39e44c1aaec40fc9cd7",
+        "upstreamFingerprint": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
         "source": {
           "repository": "petercjl/codex-own",
-          "ref": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
-          "run": "43206773135",
+          "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+          "run": "43246580025",
           "workflow": ".github/workflows/own-release.yml"
         },
         "updaterContract": 2,
@@ -643,13 +643,13 @@
           }
         },
         "validation": {
-          "publishedIn": "0.6.11",
-          "inputFingerprint": "95008ae9bfce862eabd89589e04e26e06b99eabc6630b4420c4cd4463d123ecb",
-          "declaredFingerprint": "ef7491c2f1f13ba8eea792974582d84cbc49c8a61afd33e510b857b509396bdd",
+          "publishedIn": "0.6.12",
+          "inputFingerprint": "0394ba12d82795aa6ad60109fa6335bc224944bc9717c1eb514e25ef16bcae09",
+          "declaredFingerprint": "81338f447b406bc0d274f748557b32bfe2959925ab301b57fc5c5bea6656b53c",
           "source": {
             "repository": "petercjl/codex-own",
-            "ref": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
-            "run": "43206773135",
+            "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+            "run": "43246580025",
             "workflow": ".github/workflows/own-release.yml"
           }
         }
