@@ -53,7 +53,8 @@
     ".gitignore",
     ".npmignore",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "own/TUDA-INTEGRATION-HANDOFF.md"
   ],
   "generated": [
     "own/release.json",

@@ -33,6 +33,7 @@
   "license": "MIT",
   "devDependencies": {
     "@electron/asar": "4.0.1",
+    "@petercjl/tuda": "0.1.1",
     "acorn": "8.15.0",
     "pe-library": "1.0.1",
     "plist": "3.1.0",

@@ -233,7 +233,7 @@ async function main() {
     const needle = "automaticUpdates:false,sourceRef:";
     if (original.split(needle).length !== 2) throw Error('Unknown development marker contract');
     fs.writeFileSync(builder, original.replace(needle, `automaticUpdates:false,sourceFingerprint:${JSON.stringify(inventory.sha256)},sourceRef:`));
-    execute('unit', runtime.node, ['--test', '--test-concurrency=2', 'test/dev.test.mjs', 'test/official-cli.test.mjs', 'test/instance-isolation.test.mjs', 'test/mac-signing.test.mjs', 'test/model-access.test.mjs', 'test/model-router.test.mjs', 'test/model-configuration.test.mjs', 'test/updater-dependency.test.mjs'], path.join(snapshot, 'own'));
+    execute('unit', runtime.node, ['--test', '--test-concurrency=2', 'test/dev.test.mjs', 'test/official-cli.test.mjs', 'test/instance-isolation.test.mjs', 'test/mac-signing.test.mjs', 'test/model-access.test.mjs', 'test/model-router.test.mjs', 'test/model-configuration.test.mjs', 'test/updater-dependency.test.mjs', 'test/tuda-plugin.test.mjs', 'test/tuda-package.test.mjs', 'test/tuda-connection.test.mjs', 'test/desktop-control.test.mjs'], path.join(snapshot, 'own'));
     const build = path.join(output, 'candidate');
     if (cliVersion) report.officialCli = await prepareOfficialCli(cliVersion, path.join(output, 'official-cli'), {cacheRoot: path.join(outputRoot, 'official-cli-cache')});
     execute('official-version', runtime.node, ['scripts/sync-upstream.js', '--check-only', '--platform', 'mac-arm64'], snapshot);

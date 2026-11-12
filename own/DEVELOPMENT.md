@@ -2,7 +2,7 @@
 
 ## 日常开发与正式发布
 
-默认顺序为：修改源码 → 在 Mac 构建并安装开发版 → 自动验证和实际功能测试 → 用户确认 → Windows 原生构建与验收 → 明确授权后通过 npm 发布 Windows 正式版。
+默认顺序为：修改源码 → 在 Mac 构建并安装开发版 → 自动验证和实际功能测试 → 用户确认并授权发布 → Windows 自动构建与基础检查 → 发布 npm → Windows 安装后抽查。peter-new 人工测试按需安排。
 
 正式发布目标为 `win32-x64`，包括 Windows 桌面和配套 Node/npm/Python 运行时。Mac 只维护本机开发版；历史 Mac 制品保留。CI 构建、清单合并、验收证明、npm 内容块及发布前打包检查使用一致的 Windows 目标，历史双平台绑定仍按其原始平台集合验证。Mac 开发运行时使用 `own/runtime/mac-development.json` 中保留的独立来源，不依赖后续 Windows 正式包包含 Mac 资源。
 
@@ -10,7 +10,7 @@
 
 开发版配置、凭据及对话保留在独立目录，替换应用前创建恢复备份。正式版与原版 Codex 保持各自的安装和数据，只有用户明确要求时才更新正式版。
 
-用户确认测试通过并要求发布后，通过现有 npm-release-kit / GitHub Actions OIDC 流程发布，继续执行 Windows 原生发布检查。每日上游同步保留自动检查、验证和无冲突合并，后续只运行 `verify_only` 发布前检查，等待开发版实测后再正式发布。
+用户确认测试通过并要求发布后，通过现有 npm-release-kit / GitHub Actions OIDC 流程发布，执行 Windows 自动构建和基础检查，发布后核对准确版本与渠道。日常更新通过 npm；完整离线安装包和 NAS 交付仅在用户明确要求时手动执行。每日上游同步保留自动检查、验证和无冲突合并，后续只运行 `verify_only` 发布前检查，等待开发版实测后再正式发布。
 
 ## 构建入口
 
@@ -39,3 +39,7 @@ node own/dev.mjs --install --launch
 开发版继续使用 `~/.codex-own-dev/Library/Application Support/codex-own-independent`，固定 Bundle ID 为 `local.codex-own.development`。配置、认证与对话保持原位，npm 自动更新处于关闭状态。
 
 结果入口为本次目录中的 `result.json`，其中包含旧 App 和数据备份路径。签名证书与密钥由既有本机开发签名配置管理。脚本不执行发布；正式版发布由仓库现有流程管理。
+
+## Tuda 独立软件边界
+
+Tuda 与 codex-own 分别安装、版本管理和发布。codex-own 仅打包经过摘要和能力合同核验的 Tuda board-only 插件/CLI/MCP 连接组件；通过已运行的独立 Tuda 本地协议连接，宿主退出保留 Tuda。开发入口验证连接包，打包检查拒绝 Tuda 桌面树。独立软件与插件更新分别处理；真实桌面版本、协议和授权隔离核对通过后再交接员工身份。Dev 联调复用现有实例与明确 userDataPath。当前合同、生产端缺口及验收边界见 `own/TUDA-INTEGRATION-HANDOFF.md`（从 own 目录访问时为 `TUDA-INTEGRATION-HANDOFF.md`）。

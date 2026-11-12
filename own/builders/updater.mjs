@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
+import {bundleTuda} from './tuda-plugin.mjs';
 const require=createRequire(import.meta.url);
 const {resolveBundledNode}=require('../lib/bundled-node.cjs');
 const root=path.resolve(import.meta.dirname,'..');
@@ -61,6 +62,7 @@ export function bundleUpdater(resources,{version=process.env.OWN_VERSION||JSON.p
   fs.mkdirSync(dest,{recursive:true});
   for(const folder of ['desktop','lib','defaults'])fs.cpSync(path.join(root,folder),path.join(dest,folder),{recursive:true,force:false,errorOnExist:true});
   const dependencies=copyRuntimeDependencies(['undici','smol-toml','tar','adm-zip','@anthropic-ai/sdk','@petercjl/toapiscli'],require,dest);
+  const tuda=bundleTuda(dest,{copyDependencies:copyRuntimeDependencies});
   if(sharedRuntime)fs.writeFileSync(path.join(dest,'node-runtime.json'),JSON.stringify({schema:1,source:'application-cua-node',binary:'../cua_node/bin/'+(process.platform==='win32'?'node.exe':'node'),version:actual.version}),{flag:'wx'});
   else{fs.copyFileSync(node,path.join(dest,process.platform==='win32'?'node.exe':'node'),fs.constants.COPYFILE_EXCL);if(process.platform==='darwin')fs.chmodSync(path.join(dest,'node'),0o755);}
   fs.writeFileSync(path.join(dest,'package.json'),JSON.stringify({name:'@petercjl/codex-own',version,type:'module'}),{flag:'wx'});
@@ -70,13 +72,16 @@ export function bundleUpdater(resources,{version=process.env.OWN_VERSION||JSON.p
   fs.writeFileSync(path.join(dest,'release.json'),JSON.stringify({schema:2,repository:'petercjl/codex-own',version,runtimes}),{flag:'wx'});
   const toolRuntimeVersion=runtimes.version;
   fs.writeFileSync(path.join(dest,'desktop-version.json'),JSON.stringify({schema:1,version,updaterContract:2,runtimeContract:1,toolRuntimeVersion,source:'https://registry.npmjs.org/@petercjl%2fcodex-own/latest'}),{flag:'wx'});
-  return {dest,version,nodeVersion:actual.version,sharedRuntime,dependencies};
+  return {dest,version,nodeVersion:actual.version,sharedRuntime,dependencies,tuda};
 }
 export function verifyUpdater(resources){
   const dest=path.join(resources,'own-updater'),meta=JSON.parse(fs.readFileSync(path.join(dest,'desktop-version.json')));
   fs.statSync(path.join(dest,'desktop/product-mode.cjs'));
   fs.statSync(path.join(dest,'lib/ui-locale.cjs'));
   fs.statSync(path.join(dest,'lib/image-provider.cjs'));
+  for(const file of ['desktop/tuda-host.cjs','lib/tuda-plugin.cjs','lib/tuda-package.mjs','lib/tuda-connection.mjs','lib/tuda-contract.cjs','defaults/tuda-inputs.json'])fs.statSync(path.join(dest,file));
+  const scan=dir=>{for(const name of fs.readdirSync(dir)){const file=path.join(dir,name);if(/\.app$|^Tuda\.exe$|^tuda-desktop$/i.test(name))throw Error('Tuda desktop found in connector bundle');if(fs.lstatSync(file).isDirectory())scan(file);}};scan(dest);
+  if(!require('../lib/tuda-plugin.cjs').registration(dest,path.join(dest,'verification-core')))throw Error('Bundled Tuda registration missing');
   if(meta.schema!==1||meta.updaterContract!==2||meta.runtimeContract!==1||!/^\d+\.\d+\.\d+$/.test(meta.version)||meta.source!=='https://registry.npmjs.org/@petercjl%2fcodex-own/latest')throw Error('Invalid own update source or component contract');
   for(const f of ['defaults/company-auth.json','desktop/account-display-preload.js','desktop/account.cjs','desktop/account.html','desktop/account-ui.js','desktop/account-preload.cjs','lib/managed-login.mjs','lib/bundled-image.cjs','node_modules/@petercjl/toapiscli/bin/toapiscli.mjs','node_modules/@petercjl/toapiscli/skills/toapiscli/SKILL.md','node_modules/@petercjl/toapiscli/skills/toapiscli/.runtime/dist/cli.mjs','desktop/thread-titles.cjs','lib/api-input-compat.cjs','lib/subagent-bridge.cjs','lib/subagent-bridge-runner.cjs','desktop/controller.cjs','desktop/preload.cjs','desktop/update.html','desktop/update-ui.js','desktop/worker.mjs','desktop/bootstrap-tools.mjs','desktop/tool-bootstrap.cjs','lib/app-update.mjs','lib/cleanup.mjs','lib/manager.mjs','lib/model-configuration.mjs','lib/windows-agent-shell.cjs','lib/tool-runtime.mjs','lib/tool-env.cjs','lib/archive-inventory.mjs','node_modules/tar/package.json','node_modules/adm-zip/package.json','node_modules/undici/package.json','node_modules/smol-toml/package.json','lib/bundled-node.cjs'])fs.statSync(path.join(dest,f));
   const node=resolveBundledNode(dest);fs.statSync(node);

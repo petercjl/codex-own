@@ -47,6 +47,7 @@ function install({cli,core,processApi=childProcess}={}){
  const original=processApi.spawn;
  processApi.spawn=function(file,args,options){
   if(!serverInvocation(file,args,cli))return original.apply(this,arguments);
+  args=require('./tuda-plugin.cjs').argumentsFor(args,path.resolve(__dirname,'..'),core);
   const tools=require('./tool-env.cjs');
   const backendEnv=tools.environment(path.join(core,'..','runtimes'),options?.env||process.env);
   if(backendEnv)options={...options,env:backendEnv};
@@ -60,7 +61,7 @@ function install({cli,core,processApi=childProcess}={}){
   const baseActive=enabled(baseline);
   const invocation=baseActive?require('./subagent-bridge.cjs').invocation({cli:file,args,options,core,config:baseline}):null;
   const child=invocation?original.call(this,invocation.file,invocation.args,invocation.options):original.call(this,file,args,options);
-  if(!baseActive||!child.stdin)return child;
+  if(!baseActive||!child.stdin)return require('./desktop-control.cjs').attach(child,core);
   const active=message=>{
    const c=message?.params?.config;
    if(c&&c.model_provider!==undefined&&c.model_provider!==baseline.model_provider)return false;
@@ -72,7 +73,7 @@ function install({cli,core,processApi=childProcess}={}){
   const target=child.stdin,stream=inputStream({active,adapt:(message,on)=>{const next=request(message,on);return shell?shell.request(next,shellHook.selection,shell.readInstructions(core)):next;}});
   stream.on('error',error=>{child.emit('error',error);target.destroy();child.kill();});
   target.on('error',error=>stream.destroy(error));child.once('exit',()=>{stream.destroy();target.destroy();});
-  stream.pipe(target);child.stdin=stream;return child;
+  stream.pipe(target);child.stdin=stream;return require('./desktop-control.cjs').attach(child,core);
  };
  return processApi[HOOK]={restore(){processApi.spawn=original;delete processApi[HOOK];}};
 }

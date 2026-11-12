@@ -6,7 +6,13 @@ const {pathToFileURL}=require('node:url');
 const {resolveBundledNode,materializeBundledNode}=require('../lib/bundled-node.cjs');
 const CHANNEL='codex-own:update';
 module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},root){
+  require('./tuda-host.cjs').install({app,dialog},root);
   const identity=require('../lib/instance.cjs').identity(process.resourcesPath);
+  if(identity.channel==='development'){
+    const control=require('../lib/desktop-control.cjs').start(root);
+    control.listening.catch(e=>console.error('codex-own control:',e.code||'START_FAILED'));
+    app.once('will-quit',()=>{control.close().catch(()=>{});});
+  }
   if(!identity.automaticUpdates){
     app.setAboutPanelOptions({applicationName:identity.name});
     app.on('browser-window-created',(_event,window)=>{
