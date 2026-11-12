@@ -3,7 +3,7 @@
   "manifest": {
     "schema": 2,
     "repository": "petercjl/codex-own",
-    "version": "0.6.11",
+    "version": "0.6.12",
     "platforms": {
       "win32-x64": {
         "entry": "app",
@@ -15,8 +15,8 @@
           "version": "codex-cli 0.167.0-alpha.4.1"
         },
         "transport": "canonical-tar-cdc-v1",
-        "size": 1937126912,
-        "sha256": "7bcc493c1c94b12f8b4d53ebcb6e3db7f3e5079808a8413c8a6a1f58be8c7b85",
+        "size": 1938030592,
+        "sha256": "704d11b6d17f6671808330ceebf65be2b1010d0daab18239a1551b2992718d5c",
         "parts": [
           {
             "sha256": "fd5becb4ee09a9b72f26cfeef80b3b662703c116dd526931da25a838868fd8fd",
@@ -376,11 +376,11 @@
             "archiveSha256": "8995b3520ffe2a110e371d350a3d74ef6061b28a78283c136c7d0436f082cb31"
           },
           {
-            "sha256": "2dde52c668c011d9b64b820809c196376bbc8024e18ac2b1c8eb11770759af4f",
-            "size": 23903836,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h2dde52c668c011d9b64b820809c196376bbc8024e18ac2b1c8eb11770759af4f.tgz",
-            "archiveSize": 8145644,
-            "archiveSha256": "a8c05eeb5781cf254d20f12fed602e79efaa8437d44766781549dd233957bd3d"
+            "sha256": "396a2a8549a6e02874ff1c583f30bf2a82a9913494d2ef9ed0a1cbe55831ce27",
+            "size": 24807516,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h396a2a8549a6e02874ff1c583f30bf2a82a9913494d2ef9ed0a1cbe55831ce27.tgz",
+            "archiveSize": 8332671,
+            "archiveSha256": "ea0169c1d88476644730b94d3cb112eef6a05401522a5f9d69f02019f624c8c2"
           },
           {
             "sha256": "55f2f328ee74939a767834a8ecac7ec984d405685910c61e6df426fd4d173146",
@@ -423,7 +423,7 @@
     "provenance": {
       "win32-x64": {
         "upstreamCommit": null,
-        "ownSourceRef": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
+        "ownSourceRef": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
         "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
         "toolchain": {
           "node": "v24.15.0",
@@ -509,26 +509,26 @@
     },
     "binding": {
       "schema": 1,
-      "managerVersion": "0.6.11",
+      "managerVersion": "0.6.12",
       "managerSource": {
         "repository": "petercjl/codex-own",
-        "ref": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
-        "run": "43206773135",
+        "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+        "run": "43246580025",
         "workflow": ".github/workflows/own-release.yml"
       },
       "managerContract": 2,
-      "releasePolicyFingerprint": "665e5565f39d1e674f59c64b55000646e36bc0ffd0db9df5c8c50223f1a793ab",
+      "releasePolicyFingerprint": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
       "desktop": {
-        "artifactVersion": "0.6.11",
-        "publishedIn": "0.6.11",
-        "identity": "e96712c4c1250648ef2140bef1b73a1e47eb83e96409d989823b40b3c1f6c37f",
-        "inputFingerprint": "90e1088203f25b8fd3a4ad4ebdb67344bc2de62352aedcca82fa43407497eba9",
-        "declaredFingerprint": "33cf97740e65b3638a7b1485a288b63fb06e25e904e3b79ddaafda5ecb1cf72a",
-        "upstreamFingerprint": "ec5ddaac2b0bdbd3b0762d31dfdee489b0206019a827162262e6398786d76953",
+        "artifactVersion": "0.6.12",
+        "publishedIn": "0.6.12",
+        "identity": "df95460907458e6d49b9c7863d1852f6fa128c637c1f9fb15793d543113ca2eb",
+        "inputFingerprint": "6bebf96698c386d00821544e344a3e42c33f02af64ba06f8eaab4bbd120d3cdc",
+        "declaredFingerprint": "3db99d0d505be78cd336b5e7d2c28b09bf1dfbf2cc67e39e44c1aaec40fc9cd7",
+        "upstreamFingerprint": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
         "source": {
           "repository": "petercjl/codex-own",
-          "ref": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
-          "run": "43206773135",
+          "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+          "run": "43246580025",
           "workflow": ".github/workflows/own-release.yml"
         },
         "updaterContract": 2,
@@ -596,13 +596,13 @@
           }
         },
         "validation": {
-          "publishedIn": "0.6.11",
-          "inputFingerprint": "95008ae9bfce862eabd89589e04e26e06b99eabc6630b4420c4cd4463d123ecb",
-          "declaredFingerprint": "ef7491c2f1f13ba8eea792974582d84cbc49c8a61afd33e510b857b509396bdd",
+          "publishedIn": "0.6.12",
+          "inputFingerprint": "0394ba12d82795aa6ad60109fa6335bc224944bc9717c1eb514e25ef16bcae09",
+          "declaredFingerprint": "81338f447b406bc0d274f748557b32bfe2959925ab301b57fc5c5bea6656b53c",
           "source": {
             "repository": "petercjl/codex-own",
-            "ref": "0a7ff253992d07a0fc46976b44ee622222e90f3a",
-            "run": "43206773135",
+            "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+            "run": "43246580025",
             "workflow": ".github/workflows/own-release.yml"
           }
         }
@@ -622,7 +622,7 @@
       },
       ".github/workflows/own-installers.yml": {
         "kind": "release",
-        "sha256": "d5de14fd584f54b98999d05addaa355dad0678457a5a65a31b1dc16582a21bf3"
+        "sha256": "be596e5bb66cabc45f5049546e18faa5c10770f7d686b4caf0bcf01cade84c3d"
       },
       ".github/workflows/own-release.yml": {
         "kind": "release",
@@ -646,7 +646,7 @@
       },
       "AGENTS.md": {
         "kind": "release",
-        "sha256": "095c93b4216774127f2bcf025791b2d31551eab94367db256bcf1e0c227f5d36"
+        "sha256": "f2487184e32f89dbad31ee33ece692fe695c8d57e88045f381bd8405f2452893"
       },
       "README.md": {
         "kind": "release",
@@ -670,7 +670,7 @@
       },
       "own/DEVELOPMENT.md": {
         "kind": "release",
-        "sha256": "c5d75edd7bf70c9bc4634f0f60dbd4ee20a008eb5b0ad8a3f4c5d8f2e3edb648"
+        "sha256": "d0c621c29bb26d32d3b4a23a6f2b9c239235ea621f6873bf2b3041b226445153"
       },
       "own/LICENSE": {
         "kind": "manager",
@@ -683,6 +683,10 @@
       "own/README.md": {
         "kind": "manager",
         "sha256": "64d112a59a25b1f2ef4e63240edaca25c52d3f921dad3420d85992a84aefcb86"
+      },
+      "own/TUDA-INTEGRATION-HANDOFF.md": {
+        "kind": "release",
+        "sha256": "e5fcdf86a8ed5d8759e9ad766e442d7f91ccfc6f71285f36941888c7c621b3bc"
       },
       "own/bin/codex-own.mjs": {
         "kind": "manager",
@@ -764,13 +768,17 @@
         "kind": "native",
         "sha256": "fbe34739bf60046fae45b4727b18bbd5ff100feb4e5afaaa87a17af5e2d307fc"
       },
+      "own/builders/tuda-plugin.mjs": {
+        "kind": "native",
+        "sha256": "831d18d35b5b1122e46ae04741619506e8f58b9ce648e82c17f7052ee1a8c1d5"
+      },
       "own/builders/update-menu.mjs": {
         "kind": "native",
         "sha256": "a94fc0313d731ac1f2d53748a1594d1eaa6977ad79b3090fe68b8797b311c0e6"
       },
       "own/builders/updater.mjs": {
         "kind": "native",
-        "sha256": "2393cb89b6fcde8da14451e17fcaf1c951a7a99f362945086e35997f42065204"
+        "sha256": "9e1fe28e976d543ee85d06b3ab217286dd38a1c6efe2b1fb6a1475ad2dbe5dd8"
       },
       "own/builders/upgrade-updater.mjs": {
         "kind": "native",
@@ -838,7 +846,7 @@
       },
       "own/ci/lifecycle-policy.json": {
         "kind": "release",
-        "sha256": "857d43d728cc16f1b8362be5e71dd9e4432ff61eb7b0616ae2269d1f680d07e2"
+        "sha256": "5820e82d300d84247a10817d1886ae78a1d9afdbda90caebd08bbd3d3632c41e"
       },
       "own/ci/manager-qa.mjs": {
         "kind": "release",
@@ -940,6 +948,10 @@
         "kind": "release",
         "sha256": "de48307d5fad5f336ae81b91ca284b1c274c39503f685749b32bbf7cf87a1022"
       },
+      "own/ci/test-tuda-models.mjs": {
+        "kind": "release",
+        "sha256": "e4f60b1129ab98e96262978d0db9b4bcac8a8f431c37a616d3d1642f8d06e566"
+      },
       "own/ci/test-windows-install.mjs": {
         "kind": "release",
         "sha256": "6a6d744275cf03293ebf0a476c3f49cee135ec8fcaadeb01a36bdc3253dddd1e"
@@ -992,6 +1004,10 @@
         "kind": "manager",
         "sha256": "acc3c8745e3252785a4b3aa753948a9bd64aeb461674bcc9fac7268c3de51cae"
       },
+      "own/defaults/tuda-inputs.json": {
+        "kind": "manager",
+        "sha256": "199acc1ffcfda9cff77fe80016302d9c8c0b9ed6bdce973753b66f40a291887e"
+      },
       "own/desktop/account-display-preload.js": {
         "kind": "native",
         "sha256": "7174ecabdf81535cd25c5b0918f8e03d6062af623aef88baa801b793b4ba32ef"
@@ -1018,7 +1034,7 @@
       },
       "own/desktop/controller.cjs": {
         "kind": "native",
-        "sha256": "2477a42efa7a608b5c81d9de308c26c092327b71bba6e1a25d2e8667098c60d7"
+        "sha256": "7c6158e2b8ee38da80222adc405869945b45b92f0c8d1226f7ac77c7ad6ee4a8"
       },
       "own/desktop/image-settings-component.js": {
         "kind": "native",
@@ -1040,6 +1056,14 @@
         "kind": "native",
         "sha256": "5e72a533a1af4dad198dd57575b5fce0d296d87f416f10cfedd5be620e022500"
       },
+      "own/desktop/tuda-host.cjs": {
+        "kind": "native",
+        "sha256": "bcf1395e602797ed8c669bb6007d750bb67d981d3c7f354267a5828635e039a8"
+      },
+      "own/desktop/tuda-mcp.mjs": {
+        "kind": "native",
+        "sha256": "5c6017f0960212b51040572f3852a798ee90747d011f04887dae32b00643338b"
+      },
       "own/desktop/update-ui.js": {
         "kind": "native",
         "sha256": "3d7569356e6ed5b0018a1f3888252c0480a7ff2844d18ad1ee3c77677d443576"
@@ -1058,7 +1082,7 @@
       },
       "own/dev.mjs": {
         "kind": "release",
-        "sha256": "cef2a56c54e2b6a38a5ba35220d07a1e5a1d29beb3b69e33c363589f6b163f18"
+        "sha256": "a2d11413b1515c4a711db820fdc9db24f17cee1c76640471c00353537ad33d4b"
       },
       "own/installers/FIRST-INSTALL.md": {
         "kind": "release",
@@ -1118,7 +1142,7 @@
       },
       "own/lib/api-input-compat.cjs": {
         "kind": "native",
-        "sha256": "7bad1846c4519c1225e51a60dddaea078420b327231d5b2028bc2394969c09cc"
+        "sha256": "3244b4f30d36bde3fe3263a5ab1e7198fb950d17587e095d9d84002c9e75eefc"
       },
       "own/lib/app-update.mjs": {
         "kind": "native",
@@ -1151,6 +1175,10 @@
       "own/lib/content-blocks.mjs": {
         "kind": "native",
         "sha256": "9e374ef9361cf14f866d1630245df727b745211941f5b0b97f4405562123023e"
+      },
+      "own/lib/desktop-control.cjs": {
+        "kind": "native",
+        "sha256": "b327ab6cc8da86bdf8e36cf976ebe1b1dc8f467001191bd416ac22a639b403f9"
       },
       "own/lib/extraction.mjs": {
         "kind": "native",
@@ -1228,6 +1256,22 @@
         "kind": "native",
         "sha256": "aab3cb06be27a2168436c92473c43067e82075a87304840af3347dc938a1ba10"
       },
+      "own/lib/tuda-connection.mjs": {
+        "kind": "native",
+        "sha256": "9416a7968ea9b6ffee9954ecbdb854f39ee2a9a66026136e8cc564d0d21d999c"
+      },
+      "own/lib/tuda-contract.cjs": {
+        "kind": "native",
+        "sha256": "696b457b74532d577db72031025bad0c3f661638594460e4d9f4a1b991bbce7c"
+      },
+      "own/lib/tuda-package.mjs": {
+        "kind": "native",
+        "sha256": "3de6a46a8e3d7c325846f0ef3d13d4969c788b961395debb46d1d4f37631ae0e"
+      },
+      "own/lib/tuda-plugin.cjs": {
+        "kind": "native",
+        "sha256": "530244d6f770d2e77d4fc0414b3e6b20498e9f93ebe661f16cfd2dffcd1948bc"
+      },
       "own/lib/ui-locale.cjs": {
         "kind": "native",
         "sha256": "974ed46874dd70d4a1e7fd06347dcb023cbf955ff9e25499281e924e5352ec4e"
@@ -1238,11 +1282,11 @@
       },
       "own/package-lock.json": {
         "kind": "semantic",
-        "sha256": "711125a4963f62a286e69f7ebcdf0f69fa2d401f7cad53c9db2be25e20c5f758"
+        "sha256": "c4c1b1d6808fd65f226c18ecdecdff56d122833d11185801a881b2de555e6836"
       },
       "own/package.json": {
         "kind": "semantic",
-        "sha256": "82d27ee752856025c1bad74187a68420cba549a29ca59b5ab3df074b3c2ae840"
+        "sha256": "819dc7b6ea1a814651f204ec3b3187f69d73cc851032859848310bc2d722dfcb"
       },
       "own/runtime/mac-development.json": {
         "kind": "runtime",
@@ -1320,6 +1364,10 @@
         "kind": "manager",
         "sha256": "b280669f0a9bb36441f00aeca3b32be17260bf084bbb452d0401193e82cc3417"
       },
+      "own/test/desktop-control.test.mjs": {
+        "kind": "manager",
+        "sha256": "f11ad926c60318faff2008cbfe43eb4b2e7993ad4ed0442a99efbd70aec4b30f"
+      },
       "own/test/dev.test.mjs": {
         "kind": "manager",
         "sha256": "5ef8b9b836b778093e51efd18f37fe97adfc3eb45b990f923b7c6e3adacec7a2"
@@ -1327,6 +1375,10 @@
       "own/test/first-installers.test.mjs": {
         "kind": "manager",
         "sha256": "a0f0501e5eb39da096df90cdadc091597bff685fadf88528595c27bb6fe29bbe"
+      },
+      "own/test/fixtures/tuda-capabilities.json": {
+        "kind": "manager",
+        "sha256": "6553917a661322c56056da8b380168d149a53173badd1b4ca093facc062d0cfc"
       },
       "own/test/i18n.test.mjs": {
         "kind": "manager",
@@ -1480,13 +1532,25 @@
         "kind": "manager",
         "sha256": "5aa9caf460e4d0ce194b9db70916e8ba1e00fb4da50b45b466fc205795d6d979"
       },
+      "own/test/tuda-connection.test.mjs": {
+        "kind": "manager",
+        "sha256": "1d2fdcc29f3a40ff4193d9652c5844636477e47e6dd1e561af48f22b7dc2a0e2"
+      },
+      "own/test/tuda-package.test.mjs": {
+        "kind": "manager",
+        "sha256": "7f45418f664f52a38088b70edbfa6e9314b39631f96cea6e1ec0f76c38845b1b"
+      },
+      "own/test/tuda-plugin.test.mjs": {
+        "kind": "manager",
+        "sha256": "fe3e61d81795542c7db5fb3097cacde0c0902bba38d58b9d66e9e16720b98bdf"
+      },
       "own/test/update-menu.test.mjs": {
         "kind": "manager",
         "sha256": "184825d6f6f8e0b959e240b3d530d33fa306801f32145eb0d5210e9cfaf3a72d"
       },
       "own/test/update-ui.test.mjs": {
         "kind": "manager",
-        "sha256": "1254e9d5dcb9405de339daa50226b8ac9e7d0abdacfe65d4136773dd76699d65"
+        "sha256": "70bf8ea47c6754a703370e7747a50130a6c4ab3aed870d39ded57634b65b8d74"
       },
       "own/test/updater-dependency.test.mjs": {
         "kind": "manager",
@@ -1681,15 +1745,15 @@
         "sha256": "27699310c7ef6845c7dff004bc74280d7c7ff623c0d484f3c0280402a296b600"
       }
     },
-    "native": "33cf97740e65b3638a7b1485a288b63fb06e25e904e3b79ddaafda5ecb1cf72a",
-    "runtime": "ef7491c2f1f13ba8eea792974582d84cbc49c8a61afd33e510b857b509396bdd",
-    "release": "665e5565f39d1e674f59c64b55000646e36bc0ffd0db9df5c8c50223f1a793ab",
-    "upstream": "ec5ddaac2b0bdbd3b0762d31dfdee489b0206019a827162262e6398786d76953",
+    "native": "3db99d0d505be78cd336b5e7d2c28b09bf1dfbf2cc67e39e44c1aaec40fc9cd7",
+    "runtime": "81338f447b406bc0d274f748557b32bfe2959925ab301b57fc5c5bea6656b53c",
+    "release": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
+    "upstream": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
     "unknown": []
   },
   "registry": {
-    "version": "0.6.11",
-    "integrity": "sha512-dtoAlQVGAZ7Q7Bt9vaT/KixppX3Ez2PGozTG2vHzEIGpsT61SPvPLme3AVF1WKnr4S8hBZNUGyn3ihVoYxrIWg==",
-    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.11.tgz"
+    "version": "0.6.12",
+    "integrity": "sha512-RuFtRKIorDeF1xuPKVlsjokoVRzLnKUIumAA4TFamSJiq4M0lfOImqIftTdfBJ7JCGfuTi+vjX0JbAifuc9Qvg==",
+    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.12.tgz"
   }
 }
