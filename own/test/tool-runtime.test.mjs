@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {validateRuntime,toolEnv,runtimeDoctor,installRuntime} from '../lib/tool-runtime.mjs';
+import {validateRuntime,toolEnv,runtimeDoctor,installRuntime,ensureRuntime} from '../lib/tool-runtime.mjs';
+import crypto from 'node:crypto';
+import {c as pack} from 'tar';
 import {payloadURL} from '../lib/npm-assets.mjs';
 import {isolateRuntimeSource} from '../builders/runtime-isolation.mjs';
 const version='node24.22.0-python3.12.15-r1',key=`${process.platform}-${process.arch}`;
@@ -34,4 +36,21 @@ test('failed runtime installation releases shared lock and preserves active stat
 test('upstream cache defaults and optional runtime downloader are isolated while suffix directories are preserved',()=>{
  const s='var a=p.default.join(o.default.homedir(),`.cache`,`codex-runtimes`,`language-servers`);async function x(e){let m=await fetchManifest();return {desiredBundleVersion:m}}async function y(){log("primary_runtime_bundle_install_started");}';
  const patched=isolateRuntimeSource(s);assert.ok(patched.includes('CODEX_OWN_LEGACY_RUNTIME_ROOT'));assert.ok(patched.includes('`language-servers`'));assert.equal(patched.includes('`.cache`,`codex-runtimes`'),false);assert.ok(patched.includes('status:"unsupported"'));assert.ok(patched.includes('codex-own tools are managed through npm'));assert.equal(isolateRuntimeSource(patched),patched);
+});
+test('preparing new immutable tools and reusing them preserves running tools until explicit activation',async t=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-tools-prepare-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const base=path.join(root,'runtimes'),old=path.join(base,'versions',version),nextVersion='node24.22.0-python3.12.15-r2',win=process.platform==='win32',p={root,manager:path.join(root,'manager'),platform:key};
+ const paths={node:[win?'node/node.exe':'node/bin/node',win?'node/node_modules/npm/bin/npm-cli.js':'node/lib/node_modules/npm/bin/npm-cli.js'],python:[win?'python/python.exe':'python/bin/python3']};
+ const write=(file,bytes)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,bytes,{flag:'wx'});};
+ for(const name of Object.values(paths).flat())write(path.join(old,name),'retained-running-tool');
+ write(path.join(base,'active.json'),JSON.stringify({schema:1,version,platform:key}));const before=fs.readFileSync(path.join(base,'active.json'));
+ const assets={},localAssets={};for(const name of ['node','python']){
+  const entry=name+'-fixture',source=path.join(root,'source',entry);for(const relative of paths[name])write(path.join(source,...relative.split('/').slice(1)),'verified-candidate-tool');
+  const archive=path.join(root,name+'.tar.gz');await pack({gzip:true,file:archive,cwd:path.dirname(source)},[entry]);const bytes=fs.readFileSync(archive),sha=crypto.createHash('sha256').update(bytes).digest('hex');
+  assets[name]={entry,format:'tar.gz',size:bytes.length,sha256:sha,parts:[{size:bytes.length,sha256:sha,archiveSize:bytes.length,archiveSha256:sha,url:payloadURL(sha)}]};localAssets[name]=archive;
+ }
+ const manifest={schema:1,version:nextVersion,platforms:{[key]:assets}},probe=(_base,{version:selected}={})=>({ok:true,version:selected,node:{version:'v24.22.0'},python:{version:'Python 3.12.15'}});
+ const prepared=await ensureRuntime(manifest,{p,localAssets,activate:false,probe});assert.equal(prepared.prepared,true);assert.equal(fs.existsSync(path.join(base,'versions',nextVersion,'codex-own-runtime.json')),true);assert.deepEqual(fs.readFileSync(path.join(base,'active.json')),before);assert.equal(toolEnv.active(base).version,version);
+ assert.equal((await ensureRuntime(manifest,{p,activate:false,probe})).prepared,true);assert.deepEqual(fs.readFileSync(path.join(base,'active.json')),before);
+ assert.equal((await ensureRuntime(manifest,{p,probe})).reactivated,true);assert.equal(toolEnv.active(base).version,nextVersion);assert.equal(toolEnv.active(base).previous,version);
 });

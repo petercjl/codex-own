@@ -7,17 +7,18 @@ import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {StringDecoder} from 'node:string_decoder';
 import {pathToFileURL} from 'node:url';
-function setup(t,platform=process.platform){
+function setup(t,platform=process.platform,{holdDownload=false,notificationsSupported=true}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'own-ui-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  fs.mkdirSync(path.join(root,'own-updater'));fs.writeFileSync(path.join(root,'own-updater','desktop-version.json'),'{"version":"0.2.2"}');
- let handler,menu,window,reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true},quits=0,chunks=[];const spawns=[],timers=[],events={},messages=[],states=[],windows=[],styles=new Map();let styleId=0;
+ let handler,menu,window,reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true},quits=0,chunks=[];const spawns=[],timers=[],events={},messages=[],states=[],windows=[],styles=new Map(),notifications=[],priorities=[],confirmations=[],replies=new Map();let styleId=0,releaseDownload;
  class Menu{constructor(){this.items=[];}append(x){this.items.push(x);}getMenuItemById(id){return this.items.find(i=>i.id===id);}}Menu.setApplicationMenu=m=>{menu=m;};Menu.getApplicationMenu=()=>menu;
- class Window extends EventEmitter{static getAllWindows(){return windows;}constructor(options){super();this.options=options;this.url='about:blank';this.destroyed=false;this.crashed=false;this.loading=false;this.webContents=new EventEmitter();Object.assign(this.webContents,{mainFrame:{},getURL:()=>this.url,isDestroyed:()=>this.destroyed,isCrashed:()=>this.crashed,isLoadingMainFrame:()=>this.loading,insertCSS:async css=>{const key=String(++styleId);styles.set(key,css);return key;},removeInsertedCSS:async key=>{styles.delete(key);},setWindowOpenHandler:()=>{},send:(_channel,state)=>{states.push({...state});}});windows.push(this);window=this;events['browser-window-created']?.({},this);}isDestroyed(){return this.destroyed;}loadFile(f){this.file=f;}show(){}focus(){}}
- const electron={app:{whenReady:()=>Promise.resolve(),on:(n,fn)=>{events[n]=fn;},quit:()=>{quits++;}},BrowserWindow:Window,Menu,MenuItem:class{constructor(opts){Object.assign(this,opts)}},ipcMain:{handle:(_c,h)=>{handler=h;}},dialog:{}};
+ class Window extends EventEmitter{static getAllWindows(){return windows;}constructor(options){super();this.options=options;this.url='about:blank';this.destroyed=false;this.crashed=false;this.loading=false;this.focusCount=0;this.webContents=new EventEmitter();Object.assign(this.webContents,{mainFrame:{},getURL:()=>this.url,isDestroyed:()=>this.destroyed,isCrashed:()=>this.crashed,isLoadingMainFrame:()=>this.loading,insertCSS:async css=>{const key=String(++styleId);styles.set(key,css);return key;},removeInsertedCSS:async key=>{styles.delete(key);},setWindowOpenHandler:()=>{},send:(_channel,state)=>{states.push({...state});}});windows.push(this);window=this;events['browser-window-created']?.({},this);}isDestroyed(){return this.destroyed;}loadFile(f){this.file=f;}show(){}focus(){this.focusCount++;}}
+ class Notification extends EventEmitter{static isSupported(){return notificationsSupported;}constructor(options){super();this.options=options;}show(){notifications.push(this);}}
+ const electron={app:{whenReady:()=>Promise.resolve(),on:(n,fn)=>{events[n]=fn;},quit:()=>{quits++;}},BrowserWindow:Window,Notification,Menu,MenuItem:class{constructor(opts){Object.assign(this,opts)}},ipcMain:{handle:(_c,h)=>{handler=h;}},dialog:{showMessageBox:async(_window,options)=>{confirmations.push(options);return {response:0};}}};
  const module={exports:{}};
- vm.runInNewContext(fs.readFileSync(new URL('../desktop/controller.cjs',import.meta.url),'utf8'),{module,URL,process:{platform,resourcesPath:root,env:{OPENAI_API_KEY:'fixture',NODE_OPTIONS:'--bad',PATH:'path'}},setTimeout:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},setInterval:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},require:n=>({'./tuda-host.cjs':{install(){}},'../lib/bundled-node.cjs':{resolveBundledNode:(bundle,platform=process.platform)=>path.join(bundle,platform==='win32'?'node.exe':'node'),materializeBundledNode:(_bundle,dest)=>path.join(dest,process.platform==='win32'?'node.exe':'node')},'../lib/instance.cjs':{identity:()=>({automaticUpdates:true})},'node:fs':fs,'node:path':path,'node:url':{pathToFileURL},'node:string_decoder':{StringDecoder},'node:child_process':{spawn:(exe,args,opts)=>{spawns.push({exe,args,opts});const c=new EventEmitter();c.stdout=new EventEmitter();c.stderr=new EventEmitter();c.unref=()=>{};c.connected=true;c.send=(m,fn)=>{messages.push(m);fn();};queueMicrotask(()=>{for(const b of chunks)c.stdout.emit('data',b);c.stdout.emit('data',Buffer.from(JSON.stringify({result:reply})+'\n'));c.emit('exit',0);});return c;}}}[n])});
+ vm.runInNewContext(fs.readFileSync(new URL('../desktop/controller.cjs',import.meta.url),'utf8'),{module,URL,process:{platform,resourcesPath:root,env:{OPENAI_API_KEY:'fixture',NODE_OPTIONS:'--bad',PATH:'path'}},setTimeout:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},setInterval:(fn,ms)=>{timers.push({fn,ms});return{unref(){}}},require:n=>({'./tuda-host.cjs':{install(){}},'../lib/bundled-node.cjs':{resolveBundledNode:(bundle,platform=process.platform)=>path.join(bundle,platform==='win32'?'node.exe':'node'),materializeBundledNode:(_bundle,dest)=>path.join(dest,process.platform==='win32'?'node.exe':'node')},'../lib/instance.cjs':{identity:()=>({automaticUpdates:true})},'node:fs':fs,'node:path':path,'node:os':{constants:{priority:{PRIORITY_BELOW_NORMAL:10}},setPriority:(pid,priority)=>priorities.push({pid,priority})},'node:url':{pathToFileURL},'node:string_decoder':{StringDecoder},'node:child_process':{spawn:(exe,args,opts)=>{spawns.push({exe,args,opts});const c=new EventEmitter();c.pid=1000+spawns.length;c.stdout=new EventEmitter();c.stderr=new EventEmitter();c.unref=()=>{};c.connected=true;c.send=(m,fn)=>{messages.push(m);fn();};const finish=()=>{let result=replies.has(args[1])?replies.get(args[1]):reply;if(args[1]==='download'&&result.updateAvailable&&!result.receipt)result={...result,receipt:'fixture'};for(const b of chunks)c.stdout.emit('data',b);c.stdout.emit('data',Buffer.from(JSON.stringify(result instanceof Error?{error:{code:result.code||'DOWNLOAD_FAILED'}}:{result})+'\n'));c.emit('exit',result instanceof Error?1:0);};if(holdDownload&&args[1]==='download')releaseDownload=()=>queueMicrotask(finish);else queueMicrotask(finish);return c;}}}[n])});
  const controller=module.exports.start(electron,root);
- return {controller,electron,spawns,timers,events,messages,states,styles,set chunks(v){chunks=v;},get quits(){return quits;},get menu(){return menu;},get window(){return window;},get handler(){return handler;},set reply(v){reply=v;}};
+ return {controller,electron,spawns,timers,events,messages,states,styles,notifications,priorities,confirmations,windows,replies,releaseDownload:()=>releaseDownload(),set chunks(v){chunks=v;},get quits(){return quits;},get menu(){return menu;},get window(){return window;},get handler(){return handler;},set reply(v){reply=v;}};
 }
 test('only a loaded healthy primary renderer arms cleanup; success remains visible during later update checks',async t=>{
  const a=setup(t);await Promise.resolve();const w=new a.electron.BrowserWindow({});w.url='app://-/index.html?initialRoute=%2F';
@@ -63,44 +64,59 @@ test('cleanup summary reports reclaimed space without disabling available update
  assert.match(get('cleanup').textContent,/1\.0 MiB/);assert.equal(get('download').hidden,false);
  render({...s,cleanup:{ok:false}});assert.match(get('cleanup').textContent,/自动清理暂未完成/);assert.equal(get('download').hidden,false);
 });
-test('automatic checks mark the Mac menu and retain the notice across upstream menu rebuilds',async t=>{
- const a=setup(t,'darwin');await Promise.resolve();assert.equal(a.menu.getMenuItemById('codex-own-updates').label,'更新');
- a.timers[0].fn();await new Promise(r=>setImmediate(r));assert.equal(a.menu.getMenuItemById('codex-own-updates').label,'更新 ↓');
- const fresh=new a.electron.Menu();a.electron.Menu.setApplicationMenu(fresh);assert.equal(fresh.getMenuItemById('codex-own-updates').label,'更新 ↓');
- a.reply={ok:true,current:'0.2.2',updateAvailable:false};await a.controller.action('check');assert.equal(fresh.getMenuItemById('codex-own-updates').label,'更新');assert.equal(a.styles.size,0);
+test('automatic preparation marks the Mac menu and preserves ready state across menu rebuilds',async t=>{
+ const a=setup(t,'darwin');await Promise.resolve();a.timers[0].fn();await new Promise(r=>setImmediate(r));
+ assert.equal(a.controller.getState().phase,'ready');assert.equal(a.menu.getMenuItemById('codex-own-updates').label,'更新 ✓');assert.equal(a.windows.length,0);assert.equal(a.notifications.length,1);
+ const fresh=new a.electron.Menu();a.electron.Menu.setApplicationMenu(fresh);assert.equal(fresh.getMenuItemById('codex-own-updates').label,'更新 ✓');
+ const count=a.spawns.length;await a.controller.action('check');await a.controller.action('download');assert.equal(a.spawns.length,count);assert.equal(a.styles.size,0);
 });
-test('Windows custom title bar retains one download or ready badge through reload and repeated checks',async t=>{
- const a=setup(t,'win32');await Promise.resolve();const main=new a.electron.BrowserWindow({});
- await a.controller.action('check');await new Promise(r=>setImmediate(r));assert.match([...a.styles.values()].join(''),/content: " ↓"/);
+test('Windows ready badge survives renderer reload without opening an update window',async t=>{
+ const a=setup(t,'win32');await Promise.resolve();const main=new a.electron.BrowserWindow({});await a.controller.action('check');await new Promise(r=>setImmediate(r));
+ assert.equal(a.windows.length,1);assert.equal(main.focusCount,0);assert.match([...a.styles.values()].join(''),/content: " ✓"/);
  main.webContents.emit('did-finish-load');main.webContents.emit('did-finish-load');await new Promise(r=>setImmediate(r));assert.equal(a.styles.size,1);
- a.reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true,receipt:'fixture'};await a.controller.action('download');await new Promise(r=>setImmediate(r));
- assert.equal(a.menu.getMenuItemById('codex-own-updates').label,'更新 ✓');assert.equal(a.styles.size,2);assert.ok([...a.styles.values()].every(css=>css.includes('content: " ✓"')));
  const count=a.spawns.length;await a.controller.action('check');assert.equal(a.spawns.length,count);
 });
 test('desktop menu survives upstream rebuilds; startup and interval checks use bundled runtime',async t=>{
  const a=setup(t);await Promise.resolve();assert.ok(a.menu.getMenuItemById('codex-own-updates'));
  const fresh=new a.electron.Menu();a.electron.Menu.setApplicationMenu(fresh);a.electron.Menu.setApplicationMenu(fresh);assert.equal(fresh.items.length,1);
  assert.deepEqual(a.timers.map(x=>x.ms),[15000,21600000]);
- await a.controller.action('check');assert.equal(a.controller.getState().phase,'available');assert.ok(a.window.file.endsWith('update.html'));
+ await a.controller.action('check',true);assert.equal(a.controller.getState().phase,'ready');assert.ok(a.window.file.endsWith('update.html'));
  assert.ok(a.spawns[0].exe.includes('own-updater'));assert.equal(a.spawns[0].opts.env.OPENAI_API_KEY,undefined);assert.equal(a.spawns[0].opts.env.NODE_OPTIONS,undefined);
  assert.equal(a.window.options.webPreferences.sandbox,true);assert.equal(a.window.options.webPreferences.nodeIntegration,false);
 });
 test('normal quit cancels a download cooperatively and waits for lock cleanup',async t=>{
- const a=setup(t);const pending=a.controller.action('download');let prevented=false;
+ const a=setup(t,process.platform,{holdDownload:true});const pending=a.controller.action('download');let prevented=false;
  a.events['before-quit']({preventDefault:()=>{prevented=true;}});assert.equal(prevented,true);assert.equal(a.messages[0].cancel,true);assert.equal(a.quits,0);
- await pending;assert.equal(a.quits,1);
+ a.replies.set('download',Object.assign(Error('cancelled'),{code:'CANCELLED'}));a.releaseDownload();await pending;assert.equal(a.quits,1);assert.equal(a.notifications.length,0);
 });
 test('download progress preserves Chinese characters across pipe byte boundaries',async t=>{
- const a=setup(t);await a.controller.action('check');
+ const a=setup(t);
  const bytes=Buffer.from(JSON.stringify({progress:'正在下载更新'})+'\n'),cut=bytes.indexOf(Buffer.from('正'))+1;
- a.chunks=[bytes.subarray(0,cut),bytes.subarray(cut)];await a.controller.action('download');
+ a.chunks=[bytes.subarray(0,cut),bytes.subarray(cut)];await a.controller.action('download',true);
  assert.ok(a.states.some(s=>s.message==='正在下载更新'));
 });
 test('only the dedicated update window can download; ready state remains available without network',async t=>{
- const a=setup(t);await a.controller.action('check');
+ const a=setup(t);await a.controller.action('check',true);
  assert.throws(()=>a.handler({sender:{},senderFrame:{}},'download'),/Forbidden/);
  assert.throws(()=>a.handler({sender:a.window.webContents,senderFrame:{}},'download'),/Forbidden/);
  a.reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true,receipt:'fixture'};
  await a.handler({sender:a.window.webContents,senderFrame:a.window.webContents.mainFrame},'download');assert.equal(a.controller.getState().phase,'ready');
  const count=a.spawns.length;await a.controller.action('check');assert.equal(a.spawns.length,count);
+});
+
+test('background preparation yields to work, deduplicates checks and never installs or steals focus',async t=>{
+ const a=setup(t,'win32',{holdDownload:true});await Promise.resolve();const pending=a.controller.action('check');await new Promise(r=>setImmediate(r));
+ assert.equal(a.controller.getState().phase,'downloading');assert.deepEqual(a.spawns.map(s=>s.args[1]),['check','download']);assert(a.priorities.every(p=>p.priority===10));assert.equal(a.priorities.length,2);
+ let continued=false;await new Promise(r=>setImmediate(()=>{continued=true;r();}));assert(continued);
+ await a.controller.action('check');await a.controller.action('install');assert.equal(a.spawns.length,2);assert.equal(a.confirmations.length,0);assert.equal(a.notifications.length,0);assert.equal(a.windows.length,0);assert.equal(a.quits,0);
+ a.releaseDownload();await pending;assert.equal(a.controller.getState().phase,'ready');assert.equal(a.notifications.length,1);assert.equal(a.windows.length,0);assert.equal(a.quits,0);assert.equal(a.confirmations.length,0);
+ a.notifications[0].emit('click');assert(a.window.file.endsWith('update.html'));await a.controller.action('install');assert.equal(a.confirmations.length,1);assert.equal(a.quits,0);assert(!a.spawns.some(s=>s.args[1]==='apply'));
+});
+test('failed automatic download stays quiet and a later check retries using the normal preparation path',async t=>{
+ const a=setup(t);a.replies.set('download',Object.assign(Error('offline'),{code:'DOWNLOAD_FAILED'}));await a.controller.action('check');assert.equal(a.controller.getState().phase,'error');assert.equal(a.windows.length,0);assert.equal(a.notifications.length,0);assert.equal(a.quits,0);
+ a.replies.delete('download');await a.controller.action('check');assert.equal(a.controller.getState().phase,'ready');assert.equal(a.notifications.length,1);assert.equal(a.windows.length,0);
+});
+test('restored preparation skips downloads and repeated notifications; unsupported notifications retain the ready badge',async t=>{
+ const a=setup(t);a.reply={ok:true,current:'0.2.2',available:'0.2.3',updateAvailable:true,receipt:'saved-receipt'};await a.controller.action('check');assert.equal(a.controller.getState().phase,'ready');assert.equal(a.spawns.length,1);assert.equal(a.notifications.length,0);assert.equal(a.windows.length,0);
+ const b=setup(t,'win32',{notificationsSupported:false});await b.controller.action('check');assert.equal(b.controller.getState().phase,'ready');assert.equal(b.notifications.length,0);assert.equal(b.windows.length,0);assert.equal(b.menu.getMenuItemById('codex-own-updates').label,'更新 ✓');
 });

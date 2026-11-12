@@ -1,11 +1,12 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path');
 const {spawn}=require('node:child_process');
+const os=require('node:os');
 const {StringDecoder}=require('node:string_decoder');
 const {pathToFileURL}=require('node:url');
 const {resolveBundledNode,materializeBundledNode}=require('../lib/bundled-node.cjs');
 const CHANNEL='codex-own:update';
-module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},root){
+module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog,Notification},root){
   require('./tuda-host.cjs').install({app,dialog},root);
   const identity=require('../lib/instance.cjs').identity(process.resourcesPath);
   if(identity.channel==='development'){
@@ -23,7 +24,7 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   }
   const bundle=path.join(process.resourcesPath,'own-updater');
   const meta=JSON.parse(fs.readFileSync(path.join(bundle,'desktop-version.json'),'utf8'));
-  let state={phase:'idle',current:meta.version,updateAvailable:false},window=null,busy=false,receipt=null,announced=null,downloadWorker=null,quitRequested=false,cleanupPromise=null,cleanupScheduled=false,cleanupDone=false,cleanupAttempts=0;
+  let state={phase:'idle',current:meta.version,updateAvailable:false},window=null,busy=false,receipt=null,announced=null,readyNotification=null,downloadWorker=null,quitRequested=false,cleanupPromise=null,cleanupScheduled=false,cleanupDone=false,cleanupAttempts=0;
   const loadGenerations=new WeakMap();
   const loadedWindows=new WeakSet();
   const env={...process.env};for(const k of Object.keys(env))if(/^(NODE_OPTIONS|NODE_PATH|ELECTRON_|CODEX_|OPENAI_|CHATGPT_)/.test(k))delete env[k];
@@ -53,6 +54,8 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   function run(action){return new Promise((resolve,reject)=>{
     const child=spawn(resolveBundledNode(bundle),[path.join(bundle,'desktop','worker.mjs'),action,meta.version],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
     if(action==='download')downloadWorker=child;
+    // Preparation and cached-receipt verification yield CPU to agent work.
+    try{if(child.pid)os.setPriority(child.pid,os.constants.priority.PRIORITY_BELOW_NORMAL);}catch{}
     let output='',error,result,settled=false;const decoder=new StringDecoder('utf8');
     child.stdout.on('data',b=>{output+=decoder.write(b);for(;;){const i=output.indexOf('\n');if(i<0)break;const line=output.slice(0,i);output=output.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}
       if(m.progress)emit({message:m.progress});if(m.error)error=m.error;if(m.result)result=m.result;
@@ -89,8 +92,22 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
     window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',e=>e.preventDefault());
     window.loadFile(path.join(bundle,'desktop','update.html'));window.on('closed',()=>{window=null;});
   }
+  function notifyReady(){
+    const version=state.managerAvailable||state.available;
+    if(quitRequested||!receipt||announced===version)return;
+    announced=version;
+    // A menu badge remains available even when system notifications are disabled.
+    // Only a user's notification click opens/focuses the updater window.
+    try{
+      if(Notification?.isSupported()){
+        readyNotification=new Notification({title:'codex-own 更新已准备好',body:`${version} 已下载并校验，完成当前任务后可重启安装。`,silent:true});
+        readyNotification.on('click',show);readyNotification.show();
+      }
+    }catch{}
+  }
   async function action(kind,manual=false){
     if(kind==='state')return state;
+    if(manual&&['check','download'].includes(kind))show();
     if(cleanupPromise)await cleanupPromise;
     if(busy)return state;
     if(kind==='install'){
@@ -114,14 +131,19 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
       return state;
     }
     if(!['check','download'].includes(kind))return state;
-    if(kind==='check'&&receipt){if(manual)show();return state;}
+    if(receipt)return state;
     busy=true;emit({phase:kind==='check'?'checking':'downloading',message:''});
     try{
-      const result=await run(kind);
+      let result=await run(kind);
+      const restored=kind==='check'&&!!result.receipt;
+      if(kind==='check'&&result.updateAvailable&&!result.receipt){
+        emit({...result,phase:'downloading',message:'正在后台下载并准备更新，可以继续当前任务。'});
+        result=await run('download');
+      }
       if(result.receipt)receipt=result.receipt;
       emit({...result,phase:receipt?'ready':result.updateAvailable?'available':'current',message:''});
-      if(manual||(result.updateAvailable&&announced!==result.available)){announced=result.available;show();}
-    }catch(e){emit({phase:'error',message:errors[e.code]||'无法完成更新，请检查网络连接后重试。'});if(manual)show();}
+      if(receipt&&!restored)notifyReady();
+    }catch(e){emit({phase:'error',message:errors[e.code]||'无法完成更新，请检查网络连接后重试。'});}
     finally{busy=false;if(quitRequested){quitRequested=false;app.quit();}}
     return state;
   }
@@ -134,7 +156,7 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   });
   const original=Menu.setApplicationMenu.bind(Menu);
   Menu.setApplicationMenu=menu=>{
-    if(menu&&!menu.getMenuItemById('codex-own-updates'))menu.append(new MenuItem({id:'codex-own-updates',label:menuLabel(),submenu:[{label:'检查 codex-own 更新…',click:()=>{show();void action('check',true);}}]}));
+    if(menu&&!menu.getMenuItemById('codex-own-updates'))menu.append(new MenuItem({id:'codex-own-updates',label:menuLabel(),submenu:[{label:'检查 codex-own 更新…',click:()=>{void action('check',true);}}]}));
     const item=menu?.getMenuItemById('codex-own-updates');if(item)item.label=menuLabel();
     return original(menu);
   };

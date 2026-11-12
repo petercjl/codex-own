@@ -29,16 +29,17 @@ export function runtimeDoctor(base=toolEnv.runtimeRoot(),{version}={}){
 }
 // Lock is shared with app installation. Updates keep immutable versions, so an
 // already running app continues using its old tools until it restarts.
-export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,report=()=>{},localAssets,signal}={}){
+export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,report=()=>{},localAssets,signal,activate=true,concurrency=4,probe=runtimeDoctor}={}){
  const assets=validateRuntime(m,p.platform),base=path.join(p.root,'runtimes');rejectLinks(base);fs.mkdirSync(base,{recursive:true,mode:0o700});
  const previous=toolEnv.active(base),target=path.join(base,'versions',m.version);rejectLinks(target);
- if(previous?.version===m.version){const receipt=path.join(target,'codex-own-runtime.json');const stored=fs.existsSync(receipt)?JSON.parse(fs.readFileSync(receipt)):null;if(!stored||stored.version!==m.version||stored.platform!==p.platform||['node','python'].some(n=>stored.assets?.[n]!==assets[n].sha256))fail('RUNTIME_VERSION_EXISTS','Immutable active runtime differs from requested binding');const d=runtimeDoctor(base);if(!d.ok)fail(d.code,d.message||'Invalid private runtime');return {...d,unchanged:true};}
+ if(previous?.version===m.version){const receipt=path.join(target,'codex-own-runtime.json');const stored=fs.existsSync(receipt)?JSON.parse(fs.readFileSync(receipt)):null;if(!stored||stored.version!==m.version||stored.platform!==p.platform||['node','python'].some(n=>stored.assets?.[n]!==assets[n].sha256))fail('RUNTIME_VERSION_EXISTS','Immutable active runtime differs from requested binding');const d=probe(base);if(!d.ok)fail(d.code,d.message||'Invalid private runtime');return {...d,unchanged:true};}
  if(fs.existsSync(target)){
   const receipt=path.join(target,'codex-own-runtime.json');
   if(!fs.existsSync(receipt))fail('RUNTIME_VERSION_EXISTS','Existing runtime has no verified receipt');
   const old=JSON.parse(fs.readFileSync(receipt));
   if(old.version!==m.version||old.platform!==p.platform||['node','python'].some(n=>old.assets?.[n]!==assets[n].sha256))fail('RUNTIME_VERSION_EXISTS','Immutable runtime identity differs from binding');
-  const d=runtimeDoctor(base,{version:m.version});if(!d.ok)fail(d.code,d.message);
+  const d=probe(base,{version:m.version});if(!d.ok)fail(d.code,d.message);
+  if(!activate)return {...d,prepared:true};
   writeActive(base,{schema:1,version:m.version,platform:p.platform,previous:previous?.version||null,installedAt:new Date().toISOString()});
   return {...d,reactivated:true};
  }
@@ -48,7 +49,7 @@ export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,repor
   for(const name of ['node','python']){
    const a=assets[name],archive=path.join(stage,name+'.'+a.format);report(`安装独立 ${name} 运行时`);
    if(localAssets?.[name]){if(fs.statSync(localAssets[name]).size!==a.size||await digestFile(localAssets[name])!==a.sha256)fail('CHECKSUM_MISMATCH','Local runtime checksum mismatch');fs.copyFileSync(localAssets[name],archive,fs.constants.COPYFILE_EXCL);}
-   else await assemble(a,archive,path.join(base,'npm-assets'),tarExecutable(),{report,signal});
+   else await assemble(a,archive,path.join(base,'npm-assets'),tarExecutable(),{report,signal,concurrency});
    const extracted=path.join(stage,name+'-unpacked');unpack(archive,extracted);
    if(fs.readdirSync(extracted).some(n=>n!==a.entry))fail('UNSAFE_ARCHIVE','Unexpected runtime archive root');
    fs.renameSync(path.join(extracted,a.entry),path.join(candidate,name));
@@ -68,14 +69,14 @@ export async function ensureRuntime(m,{p=paths(),assemble=assembleNpmAsset,repor
   // and only then atomically switch the small active receipt.
   copyNewDirectory(candidate,target,{onCreate:()=>{created=true;}});
   if(process.platform==='darwin'){const shell=path.join(target,'shell');fs.mkdirSync(shell);for(const [name,body]of Object.entries(toolEnv.shellFiles(base,m.version)))fs.writeFileSync(path.join(shell,name),body,{flag:'wx',mode:0o600});}
-  const tested=runtimeDoctor(base,{version:m.version});if(!tested.ok)fail('RUNTIME_PROBE_FAILED',tested.message||'Tool verification failed');
+  const tested=probe(base,{version:m.version});if(!tested.ok)fail('RUNTIME_PROBE_FAILED',tested.message||'Tool verification failed');
   const expected=m.version.match(/^node([0-9.]+)-python([0-9.]+)-/);
   if(tested.node.version!=='v'+expected[1]||tested.python.version!=='Python '+expected[2])fail('RUNTIME_VERSION_MISMATCH','Runtime executable versions do not match manifest');
   if(signal?.aborted)fail('CANCELLED','Runtime installation cancelled');
   exclusive(path.join(target,'codex-own-runtime.json'),{schema:1,version:m.version,platform:p.platform,assets:{node:assets.node.sha256,python:assets.python.sha256},verified:tested});
-  writeActive(base,{schema:1,version:m.version,platform:p.platform,previous:previous?.version||null,installedAt:new Date().toISOString()});
+  if(activate)writeActive(base,{schema:1,version:m.version,platform:p.platform,previous:previous?.version||null,installedAt:new Date().toISOString()});
   committed=true;
-  return tested;
+  return activate?tested:{...tested,prepared:true};
  }finally{for(const f of [stage,...(created&&!committed?[target]:[])])await removeTemporary(f,{report});}
 }
 export async function installRuntime(m,options={}){const p=options.p||paths();return locked(p,async()=>{const result=await ensureRuntime(m,{...options,p});if(options.selection){const base=path.join(p.root,'runtimes'),active=JSON.parse(fs.readFileSync(path.join(base,'active.json')));writeActive(base,{...active,selection:options.selection,selectedForDesktop:state(p)?.version||null});}return result;});}

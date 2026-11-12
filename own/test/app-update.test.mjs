@@ -37,6 +37,11 @@ test('tampered download never becomes ready and releases lock',async t=>{
  const a=fixture(t);await assert.rejects(prepareUpdate('0.2.2',{...a.opts,assemble:async(_a,d)=>fs.writeFileSync(d,'bad')}),{code:'CHECKSUM_MISMATCH'});
  assert.deepEqual(fs.readdirSync(path.join(a.p.manager,'prepared')),[]);assert.equal(fs.existsSync(path.join(a.p.manager,'operation.lock')),false);
 });
+test('background preparation limits transfers and asks the tool installer to stage without activation',async t=>{
+ const a=fixture(t),active=path.join(a.p.root,'runtimes/active.json');fs.mkdirSync(path.dirname(active));fs.writeFileSync(active,'retained active tools',{flag:'wx'});const before=fs.readFileSync(active),asset={...a.m.platforms[a.p.platform],entry:'tools',format:'tar.gz'};a.m.runtimes={schema:1,version:'node24.22.0-python3.12.15-r2',platforms:{[a.p.platform]:{node:asset,python:asset}}};let staged=false;
+ const r=await prepareUpdate('0.2.2',{...a.opts,concurrency:2,assemble:async(_asset,dest,_cache,_tar,options)=>{assert.equal(options.concurrency,2);fs.writeFileSync(dest,a.bytes,{flag:'wx'});},runtimePreparer:async(m,options)=>{assert.equal(m,a.m.runtimes);assert.equal(options.activate,false);assert.equal(options.concurrency,2);staged=true;}});
+ assert(staged);assert.equal(readPrepared(r.receipt,a.p).version,'0.2.3');assert.deepEqual(fs.readFileSync(active),before);assert.equal(JSON.parse(fs.readFileSync(path.join(a.p.manager,'state.json'))).version,'0.2.2');
+});
 test('ready update survives restart and rejects a modified cached archive',async t=>{
  const a=fixture(t),r=await prepareUpdate('0.2.2',a.opts);
  assert.equal((await restorePrepared('0.2.2',a.p)).receipt,r.receipt);assert.equal(await restorePrepared('0.2.3',a.p),null);

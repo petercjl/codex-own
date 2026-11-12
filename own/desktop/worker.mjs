@@ -12,7 +12,7 @@ process.on('message',message=>{if(message?.cancel===true)cancellation.abort();})
 try {
   if(action==='check')send({result:await restorePrepared(current)||await checkUpdate(current)});
   else if(action==='cleanup')send({result:await cleanupAfterHealthyStartup(current)});
-  else if(action==='download')send({result:await prepareUpdate(current,{signal:cancellation.signal,report:message=>send({progress:message})})});
+  else if(action==='download')send({result:await prepareUpdate(current,{concurrency:2,signal:cancellation.signal,report:message=>send({progress:message})})});
   else if(action==='apply'){
     readPrepared(receipt);
     const resultFile=path.join(paths().manager,'update-result-'+randomUUID()+'.json');rejectLinks(resultFile);

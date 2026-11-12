@@ -31,7 +31,7 @@
     "win32-x64": "implemented"
   },
   "dataPolicy": "independent external directories; preserve credentials and conversations",
-  "updatePolicy": "desktop checks npm latest at startup and every six hours; explicit download and restart/install; pinned verified build; backup before switch; CLI remains available for recovery",
+  "updatePolicy": "desktop 0.6.13+ checks npm latest at startup and every six hours; automatically downloads and verifies in a lower-priority worker with two concurrent transfers; ready notification without focus; explicit restart/install; running tool selection unchanged until install; backup before switch",
   "authentication": "npm install does not grant model access; existing independent credentials remain local",
   "modelConfiguration": {
     "contract": 2,
@@ -172,5 +172,17 @@
       "quiet": "--quiet"
     },
     "runtimeSelectionBackupLimit": 20
+  },
+  "backgroundUpdate": {
+    "contract": 1,
+    "introducedIn": "0.6.13",
+    "startupDelaySeconds": 15,
+    "intervalHours": 6,
+    "downloadConcurrency": 2,
+    "workerPriority": "below-normal",
+    "notification": "silent ready notification and menu badge; user click opens update window",
+    "installation": "user confirmation and graceful app exit",
+    "tools": "prepare immutable versions without changing active selection",
+    "recovery": "verified prepared updates survive restart; failed downloads retain verified content blocks"
   }
 }

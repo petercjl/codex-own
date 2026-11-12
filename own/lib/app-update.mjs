@@ -26,7 +26,7 @@ export async function checkUpdate(current,{resolve=latest,manifest=manifestFor,p
   if(updateAvailable){if(m.schema!==2)fail('NPM_ASSETS_REQUIRED','This update is not distributed through npm');if(m.version!==available)fail('INVALID_MANIFEST','Manifest version does not match npm');validateManifest(m,p.platform);}
   return {ok:true,current,available,updateAvailable};
 }
-export async function prepareUpdate(current,{p=paths(),resolve=latest,manifest=manifestFor,assemble=assembleNpmAsset,report=()=>{},signal}={}) {
+export async function prepareUpdate(current,{p=paths(),resolve=latest,manifest=manifestFor,assemble=assembleNpmAsset,runtimePreparer=ensureRuntime,concurrency=4,report=()=>{},signal}={}) {
   return locked(p,async()=>{
     if(state(p)?.version!==current)fail('UNMANAGED_TARGET','The running desktop must match its managed installation');
     const checked=await checkUpdate(current,{resolve,manifest,p});
@@ -40,8 +40,9 @@ export async function prepareUpdate(current,{p=paths(),resolve=latest,manifest=m
       // The app may stay open: only read program resources, never user data.
       const native=checked.desktopUpdate!==false;
       if(native&&p.target){rejectLinks(p.target);await reuseInstalledBlocks(asset,p.target,cache,{report,signal});}
-      const transfer=native?await assemble(asset,archive,cache,tarExecutable(),{report,signal}):{downloadBytes:0,downloadBlocks:0};
-      if(m.runtimes)await ensureRuntime(m.runtimes,{p,report,signal});
+      const transfer=native?await assemble(asset,archive,cache,tarExecutable(),{report,signal,concurrency}):{downloadBytes:0,downloadBlocks:0};
+      // Preparation may run during agent work. Keep its active tools unchanged.
+      if(m.runtimes)await runtimePreparer(m.runtimes,{p,report,signal,concurrency,activate:false});
       // Verify even when a download adapter is supplied.
       if(native&&(fs.statSync(archive).size!==asset.size||await digestFile(archive)!==asset.sha256))fail('CHECKSUM_MISMATCH','Prepared update checksum mismatch');
       const receipt=path.join(dir,'receipt.json');
