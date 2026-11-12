@@ -35,7 +35,7 @@ export function patchTitleSource(source,{renderer=false}={}){
    const body=source.slice(f.body.start,f.body.end);if(!body.includes('expectedTitle')||!body.includes('persistThreadTitle'))throw Error('Thread title persistence changed');
    const guard=renderer?'globalThis.codexOwnThreadTitles.allow('+id.name+','+opt.name+')':native+'.allow(process.env.CODEX_HOME,'+id.name+','+opt.name+')';
    // Validate the upstream normalized title before recording ownership.
-   const validation=f.body.body.find(x=>x.type==='IfStatement'&&source.slice(x.start,x.end).includes('==null'));
+   const validation=f.body.body.find(x=>x.type==='IfStatement'&&x.test.type==='BinaryExpression'&&x.test.operator==='=='&&(x.test.left.value===null||x.test.right.value===null));
    if(!validation)throw Error('Thread title validation changed');
    edits.push([validation.end,validation.end,policy+'if(!('+guard+'))return false;']);
    const commits=[];walk(f.body,x=>{if(x.type==='ArrowFunctionExpression'&&x.async&&x.body.type==='BlockStatement'&&source.slice(x.body.start,x.body.end).includes('hasUnacknowledgedTitle'))commits.push(x);});

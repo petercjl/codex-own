@@ -5,7 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import net from 'node:net';
-import {replaceDevelopment, sourceInventory, assertDevelopment, matchesOfficialInput, backupProfile, developmentOptions} from '../dev.mjs';
+import {replaceDevelopment, sourceInventory, assertDevelopment, matchesOfficialInput, backupProfile, developmentOptions, detachedDevelopmentHelpers} from '../dev.mjs';
+
+test('development quit retires only the exact orphaned native input monitor',{skip:process.platform!=='darwin'},()=>{
+ const target='/Applications/development.app',command=target+'/Contents/Resources/native/bare-modifier-monitor';
+ const rows=[{pid:1,parent:1,command},{pid:2,parent:99,command},{pid:3,parent:1,command:command+' --other'},{pid:4,parent:1,command:'/Applications/original.app/Contents/Resources/native/bare-modifier-monitor'},{pid:5,parent:1,command:target+'/Contents/Resources/codex app-server'}];
+ rows.push({pid:6,parent:1,command:command+' --key DoubleCommand --immediate'});
+ assert.deepEqual(detachedDevelopmentHelpers(rows,target).map(r=>r.pid),[1,6]);
+});
 
 test('development inputs pin an exact CLI and explicit shell without accepting ambiguous arguments', () => {
   const options = developmentOptions(['--cli-version', '0.167.1', '--upstream-app', '/Applications/ChatGPT.app', '--install', '--launch']);

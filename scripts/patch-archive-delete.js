@@ -13,7 +13,7 @@
  */
 const fs = require("fs");
 const acorn = require("acorn");
-const { locateBundles, relPath } = require("./patch-util");
+const { locateBundles, locateSemanticBundles, relPath } = require("./patch-util");
 
 // ─── Layer 1: app-main route injection ──────────────────────────
 
@@ -273,7 +273,7 @@ function main() {
   const platform = args.find((a) =>
     ["mac-arm64", "mac-x64", "win"].includes(a),
   );
-  const controls=locateBundles({dir:'assets',pattern:/^data-controls-(?!settings-).*\.js$/,...(platform?{platform}:{})});
+  const controls=locateSemanticBundles({dir:'assets',platform,accept:s=>s.includes('archivedThread')&&s.includes('onDelete')&&(s.includes('showDeleteButton')||s.includes('deletingThreadIds'))});
   const native=controls.filter(b=>require('./patch-archive-native').hasNativeArchiveDelete(fs.readFileSync(b.path,'utf8')));
   if(native.length===controls.length&&native.length){
     console.log('  [verified-native] Archived conversation UI provides deleteArchivedConversation and delete controls');

@@ -5,15 +5,24 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
+import {patchProductModePreload} from './product-mode.mjs';
 import {bundleUpdater,verifyUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
 import {applyWindowsIcon} from './windows-icon.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
 import {withMacSigning,sealMacBundle} from './mac-signing.mjs';
+import {nativeWindowsChanges,optimizeWindowsPayload} from './windows-payload.mjs';
+import {planLanguageResources,pruneLanguageHeader} from './language-resources.mjs';
+import {planPresentationResources} from './payload-slim.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const root=path.resolve(import.meta.dirname,'..');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+export function migrateOverlaySource(source){
+ const old='const __codexOwnApiMode=()=>globalThis.codexOwnProductPolicy?.contract===1&&globalThis.codexOwnProductPolicy.apiMode===true;';
+ if(!source.includes('/* codex-own:api-'))return source;
+ return source.replaceAll(old,old.replace('const ','var '));
+}
 export async function upgradeUpdater(app,{version,node}={}){
  const mac=process.platform==='darwin';
  const resources=path.join(app,mac?'Contents/Resources':'resources'),archive=path.join(resources,'app.asar');
@@ -23,6 +32,14 @@ export async function upgradeUpdater(app,{version,node}={}){
  const bundled=path.join(resources,'own-updater');
  asar.uncache(archive);const header=asar.getRawHeader(archive).header;
  const menuChanges=mac?new Map():updateMenuChanges(asar,archive);
+ for(const file of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('webview/')&&n.endsWith('.js'))){
+  const before=menuChanges.get(file)?.toString()||asar.extractFile(archive,file.replaceAll('/',path.sep)).toString(),after=migrateOverlaySource(before);
+  if(after!==before)menuChanges.set(file,Buffer.from(after));
+ }
+ const preloadFile='.vite/build/preload.js',preloadBefore=(menuChanges.get(preloadFile)||asar.extractFile(archive,preloadFile)).toString(),preloadAfter=patchProductModePreload(preloadBefore);
+ if(preloadAfter!==preloadBefore)menuChanges.set(preloadFile,Buffer.from(preloadAfter));
+ const payloadOptimization=mac?null:optimizeWindowsPayload(app);
+ if(!mac)for(const [name,data]of nativeWindowsChanges(asar,archive,{priorChanges:menuChanges}))menuChanges.set(name,data);
  const entry=JSON.parse(asar.extractFile(archive,'package.json')).main,entrySource=asar.extractFile(archive,entry.replaceAll('/',path.sep)).toString();
  const gated=gateToolStartup(entrySource,mac?'own-runtime.cjs':'own-runtime-win.cjs');if(gated!==entrySource)menuChanges.set(entry,Buffer.from(gated));
  for(const file of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js'))){
@@ -30,12 +47,17 @@ export async function upgradeUpdater(app,{version,node}={}){
    if(before.includes('codex-runtimes')){const after=isolateRuntimeSource(before);if(after!==before)menuChanges.set(file,Buffer.from(after));}
  }
  const runtimeFile='.vite/build/'+(mac?'own-runtime.cjs':'own-runtime-win.cjs');
+ const languagePlan=planLanguageResources(asar,archive,{priorChanges:menuChanges});
+ for(const [name,data]of languagePlan.changes)menuChanges.set(name,data);
+ const presentationPlan=planPresentationResources(asar,archive,{priorChanges:menuChanges});
+ for(const [name,data]of presentationPlan.changes)menuChanges.set(name,data);
+ pruneLanguageHeader(header,new Set([...languagePlan.removed,...presentationPlan.removed]));
  if(!asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).toString().includes('codex-own-independent'))throw Error('Independent bootstrap missing');
  if(fs.existsSync(bundled)){
    const meta=JSON.parse(fs.readFileSync(path.join(bundled,'desktop-version.json')));
    const same=folder=>fs.readdirSync(path.join(root,folder)).every(name=>fs.existsSync(path.join(bundled,folder,name))&&fs.readFileSync(path.join(root,folder,name)).equals(fs.readFileSync(path.join(bundled,folder,name))));
    const iconCurrent=mac||fs.readFileSync(path.join(resources,'codex-own.png')).equals(fs.readFileSync(path.join(root,'../resources/own/codex-own-windows.png')));
-   if(iconCurrent&&!menuChanges.size&&meta.version===version&&same('desktop')&&same('lib')&&asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).equals(fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs'))))return {ok:true,unchanged:true,...verifyUpdater(resources)};
+   if(iconCurrent&&!payloadOptimization?.removed.length&&!languagePlan.removed.size&&!presentationPlan.removed.size&&!menuChanges.size&&meta.version===version&&same('desktop')&&same('lib')&&asar.extractFile(archive,runtimeFile.replaceAll('/',path.sep)).equals(fs.readFileSync(path.join(root,'runtime',mac?'mac.cjs':'windows.cjs'))))return {ok:true,unchanged:true,...verifyUpdater(resources)};
  }
  // Keep a recovery point even though this is a fresh candidate, not the installed app.
  const backup=fs.mkdtempSync(path.join(path.dirname(app),'before-npm-updater-'));
@@ -55,6 +77,7 @@ export async function upgradeUpdater(app,{version,node}={}){
  const next=archive+'.npm-updater-new';fs.writeFileSync(next,data,{flag:'wx'});fs.renameSync(next,archive);
  bundleUpdater(resources,{version,node});
  if(mac){
+   info.CFBundleLocalizations=['en','zh_CN'];
    info.ElectronAsarIntegrity={'Resources/app.asar':{algorithm:'SHA256',hash:headerHash}};fs.writeFileSync(infoFile,plist.build(info));
    const framework=fs.realpathSync(path.join(app,'Contents/Frameworks/Codex Framework.framework/Codex Framework'));
    fs.copyFileSync(framework,path.join(backup,'Codex Framework'),fs.constants.COPYFILE_EXCL);
@@ -66,9 +89,9 @@ export async function upgradeUpdater(app,{version,node}={}){
    const PE=require('pe-library'),exeFile=path.join(app,'codex-own.exe'),exe=PE.NtExecutable.from(fs.readFileSync(exeFile),{ignoreCert:true}),res=PE.NtExecutableResource.from(exe);
    const integrity=res.entries.find(e=>e.type==='INTEGRITY'&&e.id==='ELECTRONASAR');if(!integrity)throw Error('PE integrity resource missing');
    const values=JSON.parse(Buffer.from(integrity.bin).toString());if(values.length!==1||values[0].file!=='resources\\app.asar')throw Error('Unknown integrity layout');values[0].value=headerHash;integrity.bin=Buffer.from(JSON.stringify(values));res.outputResource(exe);
-   fs.writeFileSync(exeFile,Buffer.from(exe.generate()));const icon=applyWindowsIcon(app);Object.assign(info,{asarHeaderHash:headerHash,asarSha256:sha(data),exeSha256:sha(fs.readFileSync(exeFile)),npmUpdater:true,icon});fs.writeFileSync(path.join(app,'codex-own-build.json'),JSON.stringify(info,null,2));
+   fs.writeFileSync(exeFile,Buffer.from(exe.generate()));const icon=applyWindowsIcon(app);Object.assign(info,{asarHeaderHash:headerHash,asarSha256:sha(data),exeSha256:sha(fs.readFileSync(exeFile)),npmUpdater:true,icon,payloadOptimization,languages:languagePlan.report,presentation:presentationPlan.report});fs.writeFileSync(path.join(app,'codex-own-build.json'),JSON.stringify(info,null,2));
  }
- return {ok:true,backup,...verifyUpdater(resources)};
+ return {ok:true,backup,payloadOptimization,languages:languagePlan.report,presentation:presentationPlan.report,...verifyUpdater(resources)};
 }
 const normalized=p=>process.platform==='win32'?path.resolve(p).toLowerCase():path.resolve(p);
 if(process.argv[1]&&normalized(process.argv[1])===normalized(import.meta.filename))console.log(JSON.stringify(await upgradeUpdater(path.resolve(process.argv[2]),{version:process.env.OWN_VERSION})));

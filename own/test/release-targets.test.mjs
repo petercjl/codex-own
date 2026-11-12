@@ -9,6 +9,10 @@ const source={repository:'petercjl/codex-own',ref:'a'.repeat(40),run:'123',workf
 const inputs={entries:{},native:'b'.repeat(64),runtime:'c'.repeat(64),release:'d'.repeat(64),upstream:'e'.repeat(64),unknown:[]};
 function fixture(){
  const manifest=JSON.parse(fs.readFileSync(new URL('../release.json',import.meta.url)));delete manifest.binding;
+ // Model the historical dual-platform source explicitly; the current release
+ // manifest is Windows-only after migration has shipped.
+ manifest.platforms['darwin-arm64']={...structuredClone(manifest.platforms['win32-x64']),entry:'codex-own.app'};
+ manifest.runtimes.platforms['darwin-arm64']=structuredClone(manifest.runtimes.platforms['win32-x64']);
  for(const asset of Object.values(manifest.platforms))asset.probe={offset:512,size:8,sha256:'a'.repeat(64)};
  const proofs=Object.fromEntries(Object.entries(manifest.runtimes.platforms).map(([p,a])=>[p,{node:{identity:a.node.sha256},python:{identity:a.python.sha256},npm:{identity:identity('npm'),version:'11.19.1'}}]));
  const plan={inputs,managerVersion:'9.0.0',components:{desktop:'build',runtimes:'build'}};

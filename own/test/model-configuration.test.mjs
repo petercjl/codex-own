@@ -33,7 +33,11 @@ test('Windows user-facing configure command repairs first-start defaults through
  const original='model = "gpt-6.1-sol"\n[desktop]\nsansFontSize = 14\n',a=fixture(),core=path.join(a.p.root,'codex-own-independent','core');
  fs.mkdirSync(core,{recursive:true});fs.writeFileSync(path.join(core,'config.toml'),original,{flag:'wx',mode:0o600});
  const cli=process.env.OWN_MODEL_CONFIG_CLI||path.resolve(import.meta.dirname,'../bin/codex-own.mjs');
- const run=()=>JSON.parse(execFileSync(process.execPath,[cli,'configure','--api-key-file',a.keyFile,'--yes'],{encoding:'utf8',timeout:60000,windowsHide:true,env:{...process.env,LOCALAPPDATA:a.p.root}}));
+ // This CLI fixture owns a new empty application directory. A user's live
+ // codex-own in another profile must not turn it into an APP_RUNNING test.
+ const preload=path.join(a.p.root,'fixture-process-list.cjs');
+ fs.writeFileSync(preload,`const child=require('node:child_process'),original=child.execFileSync;child.execFileSync=function(file,args,options){if(file==='powershell.exe'&&args?.[2]===${JSON.stringify("@(Get-Process -Name 'codex-own' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id) -join ','")})return '';return original.apply(this,arguments)};require('node:module').syncBuiltinESMExports();`,{flag:'wx',mode:0o600});
+ const run=()=>JSON.parse(execFileSync(process.execPath,['--require',preload,cli,'configure','--api-key-file',a.keyFile,'--yes'],{encoding:'utf8',timeout:60000,windowsHide:true,env:{...process.env,LOCALAPPDATA:a.p.root}}));
  const result=run(),config=parse(fs.readFileSync(path.join(core,'config.toml'),'utf8'));
  assert.equal(result.ok,true);assert.equal(config.model,'deepseek-v4.1-flash');assert.equal(config.model_provider,'dashscope_deepseek');assert.equal(config.desktop.sansFontSize,14);assert.equal(fs.readFileSync(result.configBackup,'utf8'),original);assert.equal(config.model_catalog_json,path.join(core,'models.json').replaceAll('\\','/'));assert.equal(run().configPreserved,true);
 });

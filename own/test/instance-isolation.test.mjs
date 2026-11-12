@@ -75,8 +75,8 @@ test('Mac native desktop keeps the OS home while development data and task homes
  vm.runInNewContext(fs.readFileSync(new URL('../runtime/mac.cjs',import.meta.url),'utf8'),{module,process:processMock,require:n=>{
   if(n.endsWith('instance.cjs'))return {identity:()=>({name:'codex-own 开发版',channel:'development'})};
   if(n.endsWith('tool-env.cjs'))return {apply:(base,_env,_platform,options)=>{selection={base,options};}};
-  if(n.endsWith('api-input-compat.cjs')||n.endsWith('product-mode.cjs')||n.endsWith('thread-titles.cjs'))return {install(){}};
-  if(n.endsWith('controller.cjs'))return {start(){}};
+  if(n.endsWith('api-input-compat.cjs')||n.endsWith('product-mode.cjs')||n.endsWith('thread-titles.cjs')||n.endsWith('ui-locale.cjs'))return {install(){}};
+  if(n.endsWith('controller.cjs')||n.endsWith('account.cjs'))return {start(){}};
   return stubs[n];
  }});
  assert.equal(nativeEnv.HOME,home);assert.equal(nativeEnv.CFFIXED_USER_HOME,home);assert.equal(nativeEnv.USERPROFILE,home);

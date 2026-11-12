@@ -7,10 +7,12 @@ import {pathToFileURL} from 'node:url';
 import {bundleUpdater} from './updater.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
-import {isolateShellImport} from './shell-environment.mjs';
+import {isolateShellSources} from './shell-environment.mjs';
 import {productModeChanges} from './product-mode.mjs';
 import {titleChanges} from './thread-titles.mjs';
 import {launcherScript} from './mac-launcher.mjs';
+import {planLanguageResources,pruneLanguageHeader} from './language-resources.mjs';
+import {planPresentationResources,slimMacPayload} from './payload-slim.mjs';
 import {macSigningArguments,withMacSigning,sealMacBundle} from './mac-signing.mjs';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
@@ -30,29 +32,31 @@ fs.mkdirSync(output, {recursive:true});
 const app = path.join(output,productName+'.app');
 execFileSync('ditto',[source,app]);
 const resources=path.join(app,'Contents/Resources');
+const payloadOptimization=slimMacPayload(resources);
 bundleUpdater(resources);
 if(development)fs.writeFileSync(path.join(resources,'own-development.json'),JSON.stringify({schema:1,channel:'development',name:productName,automaticUpdates:false,sourceRef:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()}),{flag:'wx'});
 fs.writeFileSync(path.join(resources,'codex-own-cli'),'#!/bin/sh\nset -eu\nown_resources="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$own_resources/codex" "$@"\n',{flag:'wx',mode:0o755});
 const work=path.join(output,'asar-source');
 const originalArchive=path.join(resources,'app.asar'),header=asar.getRawHeader(originalArchive).header;
-function unpackPacked(dir,prefix=''){for(const [name,e]of Object.entries(dir.files)){const n=prefix+name;if(e.files){unpackPacked(e,n+'/');continue;}if(e.unpacked||e.link)continue;const file=path.join(work,n);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,asar.extractFile(originalArchive,n),{flag:'wx'});}}
-unpackPacked(header);
 const ownChanges=productModeChanges(asar,originalArchive);
 for(const [name,data]of titleChanges(asar,originalArchive,{priorChanges:ownChanges}))ownChanges.set(name,data);
+const languagePlan=planLanguageResources(asar,originalArchive,{priorChanges:ownChanges});
+for(const [name,data]of languagePlan.changes)ownChanges.set(name,data);
+const presentationPlan=planPresentationResources(asar,originalArchive,{priorChanges:ownChanges});
+for(const [name,data]of presentationPlan.changes)ownChanges.set(name,data);
+pruneLanguageHeader(header,new Set([...languagePlan.removed,...presentationPlan.removed]));
+function unpackPacked(dir,prefix=''){for(const [name,e]of Object.entries(dir.files)){const n=prefix+name;if(e.files){unpackPacked(e,n+'/');continue;}if(e.unpacked||e.link)continue;const file=path.join(work,n);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,asar.extractFile(originalArchive,n),{flag:'wx'});}}
+unpackPacked(header);
 for(const [name,data]of ownChanges)fs.writeFileSync(path.join(work,name),data);
 const pkgPath=path.join(work,'package.json');
 const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));
 const entry=path.join(work,pkg.main);
-if (!fs.readFileSync(entry,'utf8').startsWith('require(')) throw Error('Unknown bootstrap contract');
 const runtime=path.join(path.dirname(entry),'own-runtime.cjs');
 if(fs.existsSync(runtime))throw Error('Runtime already present');
 fs.copyFileSync(path.join(root,'own/runtime/mac.cjs'),runtime);
 fs.writeFileSync(entry,gateToolStartup('require("./own-runtime.cjs");\n'+fs.readFileSync(entry,'utf8'),'own-runtime.cjs'));
-const startupFiles=fs.readdirSync(path.dirname(entry)).filter(n=>/^startup-requirements-.*\.js$/.test(n));
-if(startupFiles.length!==1)throw Error('Ambiguous startup module');
-const startup=path.join(path.dirname(entry),startupFiles[0]);
-const before=fs.readFileSync(startup,'utf8');
-fs.writeFileSync(startup,isolateShellImport(before,'own-runtime.cjs').source);
+const startupSources=new Map(fs.readdirSync(path.dirname(entry)).filter(n=>n.endsWith('.js')).map(n=>{const file=path.join(path.dirname(entry),n);return [file,fs.readFileSync(file,'utf8')];}));
+for(const [file,source]of isolateShellSources(startupSources,'own-runtime.cjs'))fs.writeFileSync(file,source);
 // All app-owned deep links use the personal scheme; web/service URLs stay intact.
 function patchLinks(dir){for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
  const file=path.join(dir,ent.name);if(ent.isDirectory()){if(ent.name!=='node_modules')patchLinks(file);}
@@ -70,6 +74,7 @@ const hash=crypto.createHash('sha256').update(archive.subarray(16,16+archive.rea
 const infoFile=path.join(app,'Contents/Info.plist');
 const info=plist.parse(fs.readFileSync(infoFile,'utf8'));
 Object.assign(info,{CFBundleIdentifier:development?'local.codex-own.development':'local.codex-own',CFBundleName:productName,CFBundleDisplayName:productName,CFBundleExecutable:'codex-own-launch',CFBundleIconFile:'codex-own.icns',CFBundleAlternateNames:[productName],CrProductDirName:'codex-own-independent',CFBundleURLTypes:[{CFBundleURLName:scheme,CFBundleURLSchemes:[scheme]}],ElectronAsarIntegrity:{'Resources/app.asar':{algorithm:'SHA256',hash}}});
+info.CFBundleLocalizations=['en','zh_CN'];
 delete info.CFBundleIconName;delete info.CodexAppIconBaseName;delete info.CFBundleIconAssets;
 fs.writeFileSync(infoFile,plist.build(info));
 for(const ext of ['png','icns'])fs.copyFileSync(path.join(root,`resources/own/codex-own.${ext}`),path.join(resources,`codex-own.${ext}`));
@@ -92,5 +97,5 @@ execFileSync('codesign',['--verify','--strict',standaloneCli],{stdio:'inherit'})
 sealMacBundle(app,signing,{development});
 execFileSync('codesign',['--verify','--deep','--strict',app],{stdio:'inherit'});
 });
-fs.writeFileSync(path.join(output,'build-manifest.json'),JSON.stringify({app,source,version:pkg.version,asarHeaderHash:hash,identity:info.CFBundleIdentifier,stateRoot:'~/Library/Application Support/codex-own-independent',created:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
+fs.writeFileSync(path.join(output,'build-manifest.json'),JSON.stringify({app,source,version:pkg.version,asarHeaderHash:hash,payloadOptimization,presentation:presentationPlan.report,identity:info.CFBundleIdentifier,stateRoot:'~/Library/Application Support/codex-own-independent',created:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
 console.log(JSON.stringify({ok:true,app,version:pkg.version}));

@@ -21,8 +21,9 @@ const testConfig={model,model_provider:provider,model_reasoning_effort:'low',cli
 fs.writeFileSync(path.join(core,'config.toml'),stringify(testConfig),{flag:'wx',mode:0o600});
 const credential=path.join(core,'auth.json');fs.writeFileSync(credential,JSON.stringify(auth),{flag:'wx',mode:0o600});
 const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|BASH_ENV$|ZDOTDIR$|NODE_OPTIONS$|NODE_PATH$)/.test(k))delete env[k];
-Object.assign(env,{HOME:home,USERPROFILE:home,CFFIXED_USER_HOME:home,CODEX_HOME:core,PATH:path.dirname(path.join(bundle,'node'))+':/usr/bin:/bin:/usr/sbin:/sbin'});
-const child=spawn(path.join(bundle,'node'),[path.join(bundle,'lib/subagent-bridge-runner.cjs'),core,path.join(app,'Contents/Resources/codex-own-cli'),'app-server','--stdio'],{env,stdio:['pipe','pipe','pipe']});
+const bundledNode=(await import('../lib/bundled-node.cjs')).default.resolveBundledNode(bundle);
+Object.assign(env,{HOME:home,USERPROFILE:home,CFFIXED_USER_HOME:home,CODEX_HOME:core,PATH:path.dirname(bundledNode)+':/usr/bin:/bin:/usr/sbin:/sbin'});
+const child=spawn(bundledNode,[path.join(bundle,'lib/subagent-bridge-runner.cjs'),core,path.join(app,'Contents/Resources/codex-own-cli'),'app-server','--stdio'],{env,stdio:['pipe','pipe','pipe']});
 let id=0,buffer='',resolveTurn,rejectTurn;const pending=new Map(),notifications=[];
 const turn=new Promise((r,j)=>{resolveTurn=r;rejectTurn=j});turn.catch(()=>{});
 const fail=error=>{for(const p of pending.values())p.reject(error);rejectTurn(error)};

@@ -1,13 +1,14 @@
 // Explicit live acceptance, isolated from existing conversations and settings.
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';import {spawn} from 'node:child_process';import {parse,stringify} from 'smol-toml';import {configure} from '../lib/manager.mjs';import {parseModelAccess} from '../lib/model-access.mjs';
+import bundledNode from '../lib/bundled-node.cjs';
 const args=process.argv.slice(2),value=key=>args[args.indexOf(key)+1];
 if(!args.includes('--live')||!args.includes('--app')||!args.includes('--config-file'))throw Error('Required: --live --app APP --config-file FILE [--runner FILE]');
 const app=path.resolve(value('--app')),source=path.resolve(value('--config-file'));
 const access=parseModelAccess(fs.readFileSync(source,'utf8')),root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-model-live-'))),core=path.join(root,'core'),work=path.join(root,'work');
 fs.chmodSync(root,0o700);fs.mkdirSync(work,{mode:0o700});
 const bundle=path.join(app,'Contents/Resources/own-updater'),runner=args.includes('--runner')?path.resolve(value('--runner')):path.join(bundle,'lib/subagent-bridge-runner.cjs');
-const node=path.join(bundle,'node'),cli=path.join(app,'Contents/Resources/codex-own-cli'),secrets=Object.values(access.providers).map(p=>p.apiKey);
+const node=bundledNode.resolveBundledNode(bundle),cli=path.join(app,'Contents/Resources/codex-own-cli'),secrets=Object.values(access.providers).map(p=>p.apiKey);
 const redact=message=>secrets.reduce((s,key)=>s.replaceAll(key,'[redacted]'),String(message));
 await configure(source,{p:{root,core,manager:path.join(root,'manager'),target:args.includes('--runner')?path.join(root,'source-preflight'):app},isRunning:()=>[]});
 if(args.includes('--profile-core')){const desktop=parse(fs.readFileSync(path.join(path.resolve(value('--profile-core')),'config.toml'),'utf8')),file=path.join(core,'config.toml'),config=parse(fs.readFileSync(file,'utf8'));for(const key of ['mcp_servers','plugins','marketplaces'])if(desktop[key])config[key]=desktop[key];fs.writeFileSync(file,stringify(config),{mode:0o600});}

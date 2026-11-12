@@ -1,0 +1,23 @@
+// Explicit native QA on an unused Windows test account. Never use real keys.
+import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),{resolveBundledNode}=require('../lib/bundled-node.cjs');
+const [candidateArg,authorization]=process.argv.slice(2);
+if(process.platform!=='win32'||authorization!=='--allow-install')throw Error('Usage: test-candidate.mjs <candidate-output> --allow-install on an unused Windows test account');
+const candidate=path.resolve(candidateArg),directory=path.join(candidate,'installer'),record=JSON.parse(fs.readFileSync(path.join(directory,'installer-win32-x64.json')));
+assert.equal(record.channel,'local-candidate');assert.equal(record.published,false);
+const target=path.join(process.env.LOCALAPPDATA,'Programs/codex-own/current'),data=path.join(process.env.LOCALAPPDATA,'codex-own-independent');
+assert(!fs.existsSync(target)&&!fs.existsSync(data),'Native QA requires an unused codex-own account; existing data is preserved');
+const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'own-private-setup-')),key=path.join(fixture,'fixture-api.txt');fs.writeFileSync(key,'sk-fixture-no-service-access',{flag:'wx',mode:0o600});
+const env={...process.env,HTTP_PROXY:'http://127.0.0.1:9',HTTPS_PROXY:'http://127.0.0.1:9',ALL_PROXY:'http://127.0.0.1:9',NO_PROXY:'',PATH:process.env.SystemRoot+'\\System32;'+process.env.SystemRoot+'\\System32\\WindowsPowerShell\\v1.0;'+process.env.SystemRoot};
+const run=()=>execFileSync(path.join(directory,record.artifact),['/S','/APIKEYFILE='+key],{env,stdio:'inherit',windowsHide:true,timeout:600000});
+run();console.log('First offline native setup completed');
+const bundle=path.join(target,'resources/own-updater');let node=resolveBundledNode(bundle);
+const inspect=`import fs from 'node:fs';import path from 'node:path';import{pathToFileURL}from'node:url';const root=process.argv[1],m=await import(pathToFileURL(path.join(root,'lib/manager.mjs'))),t=await import(pathToFileURL(path.join(root,'lib/tool-runtime.mjs')));const p=m.paths(),s=m.state(p),health=t.runtimeDoctor(path.join(p.root,'runtimes'));if(s?.version!==${JSON.stringify(record.version)}||s.releaseManifest?.localCandidate?.private!==true||!health.ok)throw Error('Candidate installation or runtimes unavailable');if(JSON.parse(fs.readFileSync(path.join(p.core,'auth.json'))).auth_mode!=='apikey')throw Error('Fixture configuration missing');console.log(JSON.stringify({version:s.version,health,root:p.root,target:p.target}));`;
+const snapshot=()=>JSON.parse(execFileSync(node,['--input-type=module','-e',inspect,bundle],{env,encoding:'utf8'}));
+const first=snapshot(),sentinel=path.join(data,'core/candidate-preservation-proof.txt');fs.writeFileSync(sentinel,'candidate-configuration-preserved',{flag:'wx',mode:0o600});
+run();snapshot();assert.equal(fs.readFileSync(sentinel,'utf8'),'candidate-configuration-preserved');console.log('Repeat setup preserved configuration');
+fs.rmSync(target,{recursive:true});run();node=resolveBundledNode(bundle);snapshot();assert.equal(fs.readFileSync(sentinel,'utf8'),'candidate-configuration-preserved');console.log('Setup restored missing application and preserved configuration');
+const shortcut=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/codex-own/codex-own.lnk');assert(fs.statSync(shortcut).size>0);
+const report={schema:1,version:record.version,channel:'local-candidate',published:false,offline:true,noSystemNodeNpmPython:true,firstInstall:true,repeatInstallPreservesData:true,missingAppRestored:true,shortcut:true,privateRuntimeHealth:first.health,realCredentialsUsed:false};
+fs.writeFileSync(path.join(directory,'candidate-qa-win32-x64.json'),JSON.stringify(report,null,2),{flag:'wx'});console.log(JSON.stringify(report));

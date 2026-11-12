@@ -15,7 +15,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { locateBundles, relPath, SRC_DIR } = require("./patch-util");
+const { locateSemanticBundles, relPath, SRC_DIR } = require("./patch-util");
 
 // ──────────────────────────────────────────────
 //  AST walker
@@ -114,37 +114,7 @@ function collectPatches(ast, source) {
 // ──────────────────────────────────────────────
 
 function locateTargets(platform) {
-  const platforms = platform
-    ? [platform]
-    : ["mac-arm64", "mac-x64", "win"].filter((p) =>
-        fs.existsSync(path.join(SRC_DIR, p, "_asar", "webview", "assets"))
-      );
-
-  const targets = [];
-  for (const plat of platforms) {
-    // Check index-*.js
-    const indexBundles = locateBundles({ dir: "assets", pattern: /^index-.*\.js$/, platform: plat });
-    for (const b of indexBundles) {
-      const src = fs.readFileSync(b.path, "utf-8");
-      if (src.includes(FIELD_NAME)) {
-        targets.push(b);
-      }
-    }
-
-    // Check other chunks (general-settings-*.js, app-main-*.js, etc.)
-    const assetsDir = path.join(SRC_DIR, plat, "_asar", "webview", "assets");
-    if (!fs.existsSync(assetsDir)) continue;
-    for (const f of fs.readdirSync(assetsDir)) {
-      if (!f.endsWith(".js") || f.startsWith("index-")) continue;
-      const fp = path.join(assetsDir, f);
-      const src = fs.readFileSync(fp, "utf-8");
-      if (src.includes(FIELD_NAME)) {
-        targets.push({ platform: plat, path: fp });
-      }
-    }
-  }
-
-  return targets;
+  return locateSemanticBundles({dir:'assets',platform,accept:source=>source.includes(FIELD_NAME)});
 }
 
 // ──────────────────────────────────────────────

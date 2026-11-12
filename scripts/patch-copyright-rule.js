@@ -8,8 +8,8 @@ function copyrightPatches(source){
    if(n.value.type==='TemplateLiteral'&&n.value.expressions.length===0&&n.value.quasis[0].value.cooked===OLD)patches.push({start:n.value.start,end:n.value.end,replacement:JSON.stringify(NEW)});
   }
   if(n.type==='TemplateElement'){
-   const anchor='<div class="copyright">'+OLD+'</div>',i=n.value.raw.indexOf(anchor);
-   if(i>=0){const start=n.start+i+'<div class="copyright">'.length;patches.push({start,end:start+OLD.length,replacement:NEW});}
+   const match=/<div class="copyright">((?:©|\\xa9|\\u00a9) OpenAI)<\/div>/.exec(n.value.raw);
+   if(match){const start=n.start+match.index+'<div class="copyright">'.length;patches.push({start,end:start+match[1].length,replacement:NEW});}
   }
   for(const v of Object.values(n)){if(Array.isArray(v))for(const c of v)walk(c);else if(v&&typeof v==='object')walk(v);}
  }walk(ast);return patches.sort((a,b)=>b.start-a.start);

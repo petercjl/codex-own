@@ -56,6 +56,13 @@ export function matchesOfficialInput(info, checkOutput) {
     info.CFBundleShortVersionString === match[1] && String(info.CFBundleVersion) === match[2]);
 }
 
+// This input monitor can survive a graceful app quit after its parent exits.
+// Retire only the exact detached helper in the verified development bundle.
+export function detachedDevelopmentHelpers(rows,target){
+  const executable=path.join(target,'Contents/Resources/native/bare-modifier-monitor');
+  return rows.filter(r=>r.parent===1&&(r.command===executable||r.command.startsWith(executable)&&/^ --key [A-Za-z+]+(?: --(?:immediate|cancellable|trigger-on-release))?$/.test(r.command.slice(executable.length))));
+}
+
 export function backupProfile(source, destination) {
   if (fs.existsSync(destination)) throw Error('Profile backup already exists');
   const skippedSockets = [];
@@ -265,6 +272,12 @@ async function main() {
         run('/usr/bin/osascript', ['-e', `tell application id "${identifier}" to quit`], {timeout: 15000});
       for (let i = 0; i < 60 && processRows().some(r => r.command.startsWith(main)); i++) await pause(500);
       if (processRows().some(r => r.command.startsWith(main))) throw Error('Development app has not exited; installation deferred');
+      const detached=detachedDevelopmentHelpers(processRows(),target);
+      for(const row of detached){try{process.kill(row.pid,'SIGTERM');}catch(error){if(error.code!=='ESRCH')throw error;}}
+      if(detached.length){
+        report.retiredDetachedHelpers=detached.map(r=>({pid:r.pid,command:r.command,signal:'SIGTERM'}));
+        for(let i=0;i<20&&detachedDevelopmentHelpers(processRows(),target).length;i++)await pause(500);
+      }
       // Refuse surviving backends instead of replacing binaries beneath them.
       const remaining = processRows().filter(r => r.command.startsWith(target + '/') && !r.command.includes('browser_crashpad_handler'));
       if (remaining.length) throw Error('Development child processes remain; installation deferred, PIDs: ' + remaining.map(r => r.pid).join(','));

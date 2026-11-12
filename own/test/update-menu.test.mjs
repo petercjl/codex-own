@@ -28,3 +28,10 @@ test('archive extraction uses native path separators on each platform',()=>{
   const source=sources.get(file.replaceAll('\\','/'));assert.ok(source);return Buffer.from(source);
  }},'fixture');assert.equal(changes.size,2);
 });
+test('split Webpack chunks locate the actual menu contracts and qualified bindings',()=>{
+ const main='.vite/build/early-bootstrap-620-hash.js',renderer='webview/assets/async/885910.hash.js';
+ const sources=new Map([[main,'({[ea.JzA.help]:t(ea.JzA.help)})'],[renderer,'[{id:eK.JzA.help,message:e2.help,mnemonic:"h"}]'],['webview/assets/async/unrelated.js','const text="help";']]);
+ const archive={listPackage:()=>[...sources.keys()],extractFile:(_a,p)=>Buffer.from(sources.get(p.replaceAll('\\','/')))};
+ const changes=updateMenuChanges(archive,'fixture');assert.equal(changes.size,2);assert.match(changes.get(main).toString(),/"codex-own-updates"/);assert.match(changes.get(renderer).toString(),/codexOwn.updates/);
+ for(const [file,data]of changes)sources.set(file,data.toString());assert.equal(updateMenuChanges(archive,'fixture').size,0);
+});

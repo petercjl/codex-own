@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const {spawn}=require('node:child_process');
 const {StringDecoder}=require('node:string_decoder');
 const tools=require('../lib/tool-env.cjs');
+const {resolveBundledNode}=require('../lib/bundled-node.cjs');
 let pending;
 function ensureTools(electron,root,apply,{launch=spawn}={}){
  const bundle=path.resolve(__dirname,'..'),base=path.join(root,'runtimes');
@@ -30,7 +31,7 @@ function ensureTools(electron,root,apply,{launch=spawn}={}){
    return await new Promise((resolve,reject)=>{
     const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;delete env.NODE_OPTIONS;
     if(cancelled){reject(Object.assign(Error('Runtime preparation cancelled'),{code:'CANCELLED'}));return;}
-    try{child=launch(path.join(bundle,process.platform==='win32'?'node.exe':'node'),[path.join(bundle,'desktop','bootstrap-tools.mjs')],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});}catch(e){reject(e);return;}
+    try{child=launch(resolveBundledNode(bundle),[path.join(bundle,'desktop','bootstrap-tools.mjs')],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});}catch(e){reject(e);return;}
     const decoder=new StringDecoder('utf8'),stdoutDecoder=new StringDecoder('utf8');let output='',tail='';
     child.stdout.on('data',b=>{output+=stdoutDecoder.write(b);if(output.length>1048576)cancel();});
     child.stderr.on('data',b=>{fs.writeSync(log,b);tail+=decoder.write(b);const messages=tail.split('\n');tail=messages.pop();const last=messages.at(-1);if(last&&!win.isDestroyed())win.webContents.executeJavaScript('document.getElementById("status").textContent='+JSON.stringify(last)).catch(()=>{});});

@@ -1,8 +1,15 @@
 Unicode true
 RequestExecutionLevel user
-SetCompressor /FINAL zlib
-SetCompress off
-Name "codex-own ${VERSION}"
+SetCompressor /FINAL lzma
+SetCompressorDictSize 32
+SetCompress auto
+!ifndef MODE
+ !define MODE "offline"
+!endif
+!ifndef CHANNEL_LABEL
+ !define CHANNEL_LABEL ""
+!endif
+Name "codex-own ${VERSION}${CHANNEL_LABEL}"
 OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\codex-own"
 ShowInstDetails show
@@ -11,16 +18,20 @@ ShowInstDetails show
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 Var KeyFile
-Var KeyInput
 Var Parameters
 Var Installing
+Var VerifyOnly
 !define MUI_CUSTOMFUNCTION_ABORT PreventInstallAbort
-!define MUI_WELCOMEPAGE_TEXT "安装 codex-own ${VERSION}，包含完整桌面应用与独立 Node、npm、Python。$\r$\n$\r$\n安装无需预装开发工具；请预留至少 10 GB 可用空间，并先完全退出 codex-own。$\r$\n$\r$\n安装后可从开始菜单打开，后续在应用内更新。已有配置与对话会保留。"
+!if "${MODE}" == "online"
+ !define MUI_WELCOMEPAGE_TEXT "安装 codex-own ${VERSION}。本安装器包含独立 Node、npm 和 Python，安装时联网下载桌面程序。$\r$\n$\r$\n无需预装开发工具；请预留至少 10 GB 空间，并完全退出 codex-own。已有配置与对话会保留。"
+!else
+ !define MUI_WELCOMEPAGE_TEXT "安装 codex-own ${VERSION}，包含完整桌面应用与独立 Node、npm、Python，可离线安装。$\r$\n$\r$\n无需预装开发工具；请预留至少 10 GB 空间，并完全退出 codex-own。已有配置与对话会保留。"
+!endif
 !insertmacro MUI_PAGE_WELCOME
-Page custom ApiPage ApiLeave
+Page custom AccountPage
 !define MUI_PAGE_CUSTOMFUNCTION_PRE DisableCancel
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_TEXT "codex-own 已安装。请在开始菜单中打开 codex-own。$\r$\n$\r$\n后续请使用应用内的“更新”菜单。若未导入 API 配置，可退出应用后重新运行本安装器选择配置文件。$\r$\n$\r$\n安装包文件在安装成功后可自行删除。"
+!define MUI_FINISHPAGE_TEXT "codex-own 已安装。请在开始菜单中打开 codex-own。$\r$\n$\r$\n后续请使用应用内的“更新”菜单。首次打开后，按页面提示完成东轩AI授权并加载公司模型。点击左下角人名可打开设置。$\r$\n$\r$\n安装包文件在安装成功后可自行删除。"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -34,6 +45,11 @@ Function .onInit
  System::Call 'kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", p 0)'
  ${GetParameters} $Parameters
  ${GetOptions} $Parameters "/APIKEYFILE=" $KeyFile
+ StrCpy $VerifyOnly 0
+ ClearErrors
+ ${GetOptions} $Parameters "/VERIFYONLY" $0
+ IfErrors +2 0
+ StrCpy $VerifyOnly 1
 FunctionEnd
 Function DisableCancel
  GetDlgItem $0 $HWNDPARENT 2
@@ -44,40 +60,43 @@ Function PreventInstallAbort
   Abort
  ${EndIf}
 FunctionEnd
-Function ApiPage
- !insertmacro MUI_HEADER_TEXT "API 配置文件（可选）" "请选择你保存的 API 密钥 txt 文件；它只会写入本机独立配置目录。"
+Function AccountPage
+ !insertmacro MUI_HEADER_TEXT "东轩AI授权与公司模型" "安装完成后，使用公司钉钉账号登录 codex-own。"
  nsDialogs::Create 1018
  Pop $0
  ${If} $0 == error
   Abort
  ${EndIf}
- ${NSD_CreateLabel} 0 0 100% 48u "文件路径因下载位置而不同，请选择自己的文件。$\r$\n已有配置无需再次导入；文件内容和密钥不会上传到更新服务。"
+ ${NSD_CreateLabel} 0 0 100% 110u "首次打开后，按页面提示发起东轩AI授权。登录后点击左下角人名，在设置中管理账户和生图偏好。$\r$\n$\r$\n公司服务地址：https://codex.lumyne.cn$\r$\n$\r$\n在浏览器中完成钉钉授权，并核对应用窗口显示的校验码。企业身份验证通过后，可使用三个公司文本模型；生图使用本人专属配置。$\r$\n$\r$\n以后更新保留登录状态、配置与对话；凭证过期后重新登录。"
  Pop $0
- ${NSD_CreateText} 0 58u 78% 14u "$KeyFile"
- Pop $KeyInput
- ${NSD_CreateButton} 80% 57u 20% 16u "选择文件…"
- Pop $0
- ${NSD_OnClick} $0 PickKey
  nsDialogs::Show
-FunctionEnd
-Function PickKey
- nsDialogs::SelectFileDialog open "" "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*"
- Pop $0
- ${If} $0 != ""
-  ${NSD_SetText} $KeyInput $0
- ${EndIf}
-FunctionEnd
-Function ApiLeave
- ${NSD_GetText} $KeyInput $KeyFile
 FunctionEnd
 
 Section "安装 codex-own"
  StrCpy $Installing 1
  InitPluginsDir
  SetOutPath "$PLUGINSDIR\payload"
- File /r "${PAYLOAD}\*"
+ SetCompress off
+ File "${PAYLOAD}\node.zip"
+ File "${PAYLOAD}\python.tar.gz"
+ !if "${MODE}" == "offline"
+  File "${PAYLOAD}\desktop.tar.gz"
+ !endif
+ SetCompress auto
+ File /r /x desktop.tar.gz /x node.zip /x python.tar.gz "${PAYLOAD}\*"
+ DetailPrint "正在准备已校验的安装运行环境…"
+ nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\bootstrap-node.ps1" -Payload "$PLUGINSDIR\payload"'
+ Pop $0
+ Pop $1
+ ${If} $0 != 0
+  MessageBox MB_ICONSTOP "安装运行环境准备失败，请检查安装包完整性和可用空间。"
+  SetErrorLevel 5
+  Abort
+ ${EndIf}
  DetailPrint "正在校验并安装完整资源，请耐心等待…"
- ${If} $KeyFile == ""
+ ${If} $VerifyOnly == 1
+  nsExec::ExecToStack '"$PLUGINSDIR\payload\engine\node.exe" "$PLUGINSDIR\payload\offline-install.mjs" --verify-only'
+ ${ElseIf} $KeyFile == ""
   nsExec::ExecToStack '"$PLUGINSDIR\payload\engine\node.exe" "$PLUGINSDIR\payload\offline-install.mjs"'
  ${Else}
   nsExec::ExecToStack '"$PLUGINSDIR\payload\engine\node.exe" "$PLUGINSDIR\payload\offline-install.mjs" --api-key-file "$KeyFile"'
@@ -108,6 +127,10 @@ Section "安装 codex-own"
   SetErrorLevel $0
   Abort
  ${EndIf}
+ ${If} $VerifyOnly == 1
+  SetErrorLevel 0
+  Quit
+ ${EndIf}
  DetailPrint "完整资源安装和配置已完成。"
  SetOutPath "$INSTDIR"
  IfFileExists "$INSTDIR\Uninstall-codex-own.exe" 0 no_previous_uninstaller
@@ -133,7 +156,10 @@ SectionEnd
 Section "Uninstall"
  SetShellVarContext current
  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\codex-own"
- nsExec::ExecToStack '"$INSTDIR\current\resources\own-updater\node.exe" "$INSTDIR\installer-support-${VERSION}\uninstall-check.cjs"'
+ StrCpy $0 "$INSTDIR\current\resources\own-updater\node.exe"
+ IfFileExists "$0" +2 0
+ StrCpy $0 "$INSTDIR\current\resources\cua_node\bin\node.exe"
+ nsExec::ExecToStack '"$0" "$INSTDIR\installer-support-${VERSION}\uninstall-check.cjs"'
  Pop $0
  Pop $1
  ${If} $0 != 0

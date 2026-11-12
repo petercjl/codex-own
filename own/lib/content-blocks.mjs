@@ -104,6 +104,19 @@ export async function reuseInstalledBlocks(asset,root,cache,{signal,report=()=>{
   if(asset.transport!==TRANSPORT||!root||!fs.existsSync(root))return {seededBlocks:0,seededBytes:0};
   fs.mkdirSync(cache,{recursive:true,mode:0o700});
   const wanted=new Map(asset.parts.map(p=>[p.sha256,p.size]));
+  // Revalidate the cache before reading the installed tree. A complete cache
+  // already supplies every byte and needs no second multi-GB program scan.
+  let cachedBlocks=0;
+  for(const [hash,size] of wanted){
+    abort(signal);const file=path.join(cache,hash+'.bin');
+    if(!fs.existsSync(file))continue;
+    const st=fs.lstatSync(file);
+    if(st.isSymbolicLink()||!st.isFile())throw Object.assign(Error('Unsafe content cache entry'),{code:'UNSAFE_PATH'});
+    if(st.size!==size)continue;
+    const digest=crypto.createHash('sha256');for await(const b of fs.createReadStream(file)){abort(signal);digest.update(b);}
+    if(digest.digest('hex')===hash){wanted.delete(hash);cachedBlocks++;}
+  }
+  if(!wanted.size){report('已校验完整内容缓存，跳过已安装程序扫描');return {seededBlocks:0,seededBytes:0,cachedBlocks,skippedScan:true};}
   let seededBlocks=0,seededBytes=0,scanned=0,last=0;
   report('正在扫描已安装程序，匹配可复用的内容块');
   for await(const b of contentBlocks(canonicalTar(root,asset.entry,{signal}),{signal})){

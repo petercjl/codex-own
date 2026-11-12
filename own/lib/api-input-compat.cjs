@@ -50,6 +50,8 @@ function install({cli,core,processApi=childProcess}={}){
   const tools=require('./tool-env.cjs');
   const backendEnv=tools.environment(path.join(core,'..','runtimes'),options?.env||process.env);
   if(backendEnv)options={...options,env:backendEnv};
+  const registeredShell=processApi[Symbol.for('codex-own.windows-agent-shell')];
+  if(registeredShell)options={...options,env:require('./windows-agent-shell.cjs').shellEnvironment(registeredShell.selection,options?.env||process.env)};
   const {parse}=require('smol-toml');
   const configPath=path.join(core,'config.toml');
   const baseline=fs.existsSync(configPath)?parse(fs.readFileSync(configPath,'utf8')):{};
@@ -65,7 +67,7 @@ function install({cli,core,processApi=childProcess}={}){
    if(message?.params?.modelProvider!==undefined&&message.params.modelProvider!==baseline.model_provider)return false;
    return baseActive;
   };
-  const shellHook=invocation&&processApi[Symbol.for('codex-own.windows-agent-shell')];
+  const shellHook=invocation&&registeredShell;
   const shell=shellHook?require('./windows-agent-shell.cjs'):null;
   const target=child.stdin,stream=inputStream({active,adapt:(message,on)=>{const next=request(message,on);return shell?shell.request(next,shellHook.selection,shell.readInstructions(core)):next;}});
   stream.on('error',error=>{child.emit('error',error);target.destroy();child.kill();});

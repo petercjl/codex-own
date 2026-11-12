@@ -59,16 +59,29 @@ function serverInvocation(file,args,cli){
  const inline=args.find(a=>typeof a==='string'&&a.startsWith('--listen='));if(inline&&inline!=='--listen=stdio://')return false;
  const listen=args.indexOf('--listen');return listen<0||args[listen+1]==='stdio://';
 }
+function shellEnvironment(selection,env){
+ if(!selection.supported||!selection.bash)return env;
+ const p=path.win32,normalize=s=>p.normalize(s).replace(/[\\/]+$/,'').toLowerCase();
+ const key=Object.hasOwn(env,'PATH')?'PATH':Object.keys(env).find(k=>k.toUpperCase()==='PATH'),directory=p.dirname(selection.bash);
+ const dirs=String(key?env[key]:'').split(';').filter(Boolean).filter(d=>normalize(d)!==normalize(directory));
+ const root=env.CODEX_OWN_RUNTIME_ROOT&&normalize(env.CODEX_OWN_RUNTIME_ROOT);let protectedCount=0;
+ while(root&&protectedCount<dirs.length&&(normalize(dirs[protectedCount])===root||normalize(dirs[protectedCount]).startsWith(root+'\\')))protectedCount++;
+ dirs.splice(protectedCount,0,directory);
+ const result={...env};for(const k of Object.keys(result))if(k.toUpperCase()==='PATH')delete result[k];result.PATH=dirs.join(';');return result;
+}
 function install({cli,core,env=process.env,platform=process.platform,processApi=childProcess,selection=discover({env,platform})}={}){
  if(platform!=='win32')return selection;
  if(processApi[HOOK])return processApi[HOOK].selection;
  const original=processApi.spawn;
  processApi.spawn=function(file,args,options){
-  const child=original.apply(this,arguments);if(!serverInvocation(file,args,cli)||!child.stdin)return child;
+  const owned=serverInvocation(file,args,cli);
+  // The engine uses a model-supplied shell path to select the type, then
+  // discovers its executable again on PATH. Keep private tool bins first.
+  const child=owned?original.call(this,file,args,{...options,env:shellEnvironment(selection,options?.env||env)}):original.apply(this,arguments);if(!owned||!child.stdin)return child;
   const target=child.stdin,stream=inputStream(selection,{baseline:()=>readInstructions(core)});
   stream.on('error',error=>{child.emit('error',error);target.destroy();child.kill();});target.on('error',error=>stream.destroy(error));child.once('exit',()=>{stream.destroy();target.destroy();});stream.pipe(target);child.stdin=stream;return child;
  };
  processApi[HOOK]={selection,restore(){processApi.spawn=original;delete processApi[HOOK];}};
  return selection;
 }
-module.exports={discover,policy,compose,readInstructions,request,inputStream,serverInvocation,install,HOOK};
+module.exports={discover,policy,compose,readInstructions,request,inputStream,serverInvocation,shellEnvironment,install,HOOK};

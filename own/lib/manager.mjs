@@ -137,6 +137,8 @@ export async function configure(keyFile,{p=paths(),isRunning=running}={}){if(!ke
  if(previous!==updated){const next=config+'.new-'+crypto.randomUUID();fs.writeFileSync(next,updated,{flag:'wx',mode:0o600});fs.renameSync(next,config);if(fs.readFileSync(config,'utf8')!==updated)fail('VERIFY_FAILED','Model configuration did not match the requested provider');}
  return {ok:true,configured:true,backup,configBackup,configPreserved:previous===updated,settingsPreserved:true,modelProvider:'dashscope_deepseek'};});}
 
+export async function configureModels(input,{p=paths(),isRunning=running}={}){return configureAccess(parseModelAccess(JSON.stringify(input)),{p,isRunning});}
+
 // Validate every input and save recoverable copies before committing this set.
 // Credentials remain in the private model-access file; CLI receipts are redacted.
 async function configureAccess(access,{p,isRunning}){return locked(p,async()=>{

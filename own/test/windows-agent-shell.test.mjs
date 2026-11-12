@@ -7,6 +7,10 @@ import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 const require=createRequire(import.meta.url);
 const adapter=require(process.env.OWN_AGENT_SHELL_MODULE||'../lib/windows-agent-shell.cjs');
 const selection={supported:true,preferred:'gitBash',bash:'C:\\Program Files\\Git\\bin\\bash.exe',powershell:'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',fallbackReason:null};
+test('Git Bash is discoverable before system stubs while private Node and Python retain priority and PATH casing is unambiguous',()=>{
+ const root='C:\\own\\runtimes',privateBins=root+'\\bin;'+root+'\\versions\\node\\bin',env={Path:'C:\\global',PATH:privateBins+';C:\\Windows\\System32',CODEX_OWN_RUNTIME_ROOT:root,CODEX_OWN_NODE:root+'\\node.exe',CODEX_OWN_PYTHON:root+'\\python.exe'};
+ const result=adapter.shellEnvironment(selection,env);assert.equal(result.PATH,privateBins+';C:\\Program Files\\Git\\bin;C:\\Windows\\System32');assert(!Object.hasOwn(result,'Path'));assert.equal(result.CODEX_OWN_NODE,env.CODEX_OWN_NODE);assert.equal(result.CODEX_OWN_PYTHON,env.CODEX_OWN_PYTHON);assert.equal(env.Path,'C:\\global');assert.deepEqual(adapter.shellEnvironment(selection,result),result);assert.equal(adapter.shellEnvironment({supported:false},env),env);
+});
 test('discovers working Git Bash from a custom Git PATH and retains PowerShell',()=>{
  const bash='D:\\工具 Git\\bin\\bash.exe',ps='C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',files=new Set([bash,ps,'D:\\工具 Git\\cmd\\git.exe']);
  const result=adapter.discover({platform:'win32',env:{Path:'"D:\\工具 Git\\cmd"',SystemRoot:'C:\\Windows'},exists:f=>files.has(f),probe:f=>{assert.equal(f,bash);return 'GNU bash, version 5.3.15\r\n';}});

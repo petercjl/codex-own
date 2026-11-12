@@ -15,13 +15,18 @@ function fixture(t,installed=false){
  const state={installed,applied:0,spawned:0,errors:0,windows:[],relaunches:0},app=new EventEmitter();app.whenReady=async()=>{};app.relaunch=()=>state.relaunches++;app.exit=code=>state.exitCode=code;
  class Window extends EventEmitter{constructor(){super();this.destroyed=false;state.windows.push(this);this.webContents={executeJavaScript:async text=>{state.lastProgress=text;}};}async loadURL(url){assert.match(url,/data:text\/html/);}setMenuBarVisibility(){}isDestroyed(){return this.destroyed;}destroy(){this.destroyed=true;this.emit('closed');}}
  const electron={app,BrowserWindow:Window,dialog:{showErrorBox:()=>state.errors++}},child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.connected=true;child.send=message=>{state.cancel=message;queueMicrotask(()=>child.emit('close',1));};
- const module={exports:{}};vm.runInNewContext(fs.readFileSync(new URL('../desktop/tool-bootstrap.cjs',import.meta.url),'utf8'),{module,__dirname:path.join(bundle,'desktop'),process:{platform:process.platform,env:{NODE_OPTIONS:'unsafe',ELECTRON_RUN_AS_NODE:'1'}},require:n=>({'node:fs':fs,'node:path':path,'node:crypto':crypto,'node:child_process':{},'node:string_decoder':{StringDecoder},'../lib/tool-env.cjs':{active:()=>state.installed?{version}:null}}[n])});
+ const module={exports:{}};vm.runInNewContext(fs.readFileSync(new URL('../desktop/tool-bootstrap.cjs',import.meta.url),'utf8'),{module,__dirname:path.join(bundle,'desktop'),process:{platform:process.platform,env:{NODE_OPTIONS:'unsafe',ELECTRON_RUN_AS_NODE:'1'}},require:n=>({'../lib/bundled-node.cjs':{resolveBundledNode:(bundle,platform=process.platform)=>path.join(bundle,platform==='win32'?'node.exe':'node'),materializeBundledNode:(_bundle,dest)=>path.join(dest,process.platform==='win32'?'node.exe':'node')},'node:fs':fs,'node:path':path,'node:crypto':crypto,'node:child_process':{},'node:string_decoder':{StringDecoder},'../lib/tool-env.cjs':{active:()=>state.installed?{version}:null}}[n])});
  const start=action=>module.exports.ensureTools(electron,root,()=>state.applied++,{launch:(node,args,options)=>{state.spawned++;assert.ok(node.startsWith(bundle));assert.equal(options.env.NODE_OPTIONS,undefined);assert.equal(options.env.ELECTRON_RUN_AS_NODE,undefined);assert.equal(options.stdio.at(-1),'ipc');queueMicrotask(()=>action(child,state));return child;}});
  return {state,child,start,root};
 }
 test('old updater migration gates async desktop startup and fails on changed upstream entry',()=>{
  const source='setBrowserFlags();d();async function d(){let{initializeNodeNetworkPermissions:e}=await load();await e();}';
  const gated=gateToolStartup(source,'own-runtime-win.cjs');assert.ok(gated.includes('async function d(){await require("./own-runtime-win.cjs").ensureTools();'));assert.equal(gateToolStartup(gated,'own-runtime-win.cjs'),gated);assert.throws(()=>gateToolStartup('startImmediately();','own-runtime.cjs'),/bootstrap contract/);
+});
+test('split bootstrap gates the async IIFE before network initialization and refuses ambiguity',()=>{
+ const source='setBrowserFlags();(async function(){let{initializeNodeNetworkPermissions:e}=await load();await e()})()';
+ const gated=gateToolStartup(source,'own-runtime.cjs');assert(gated.includes('(async function(){await require("./own-runtime.cjs").ensureTools();'));
+ assert.throws(()=>gateToolStartup(source+';(async()=>{await initializeNodeNetworkPermissions()})()','own-runtime.cjs'),/bootstrap contract/);
 });
 test('valid installed tools allow offline startup without launching a helper or window',async t=>{
  const {state,start}=fixture(t,true);assert.equal((await start()).unchanged,true);assert.equal(state.applied,1);assert.equal(state.spawned,0);assert.equal(state.windows.length,0);assert.equal(state.relaunches,0);

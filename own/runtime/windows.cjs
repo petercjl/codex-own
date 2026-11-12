@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {app}=require('electron');
+require(path.join(process.resourcesPath,'own-updater','lib','ui-locale.cjs')).install(app);
 if(process.platform!=='win32')throw Error('Windows build only');
 const root=path.join(process.env.LOCALAPPDATA||path.join(os.homedir(),'AppData','Local'),'codex-own-independent');
 const paths={root,core:path.join(root,'core'),desktop:path.join(root,'desktop'),tmp:path.join(root,'tmp'),logs:path.join(root,'logs')};
@@ -22,6 +23,7 @@ app.setAppUserModelId('local.codex-own');
 app.setName=()=>{};app.setAppUserModelId=()=>{};
 app.setAsDefaultProtocolClient=()=>false;app.removeAsDefaultProtocolClient=()=>false;
 require(path.join(process.resourcesPath,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
+require(path.join(process.resourcesPath,'own-updater','desktop','account.cjs')).start(require('electron'),root);
 require(path.join(process.resourcesPath,'own-updater','desktop','product-mode.cjs')).install(require('electron'),paths.core);
 require(path.join(process.resourcesPath,'own-updater','desktop','thread-titles.cjs')).install(require('electron'),paths.core);
 module.exports={apply,paths,ensureTools:()=>require(path.join(process.resourcesPath,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply)};

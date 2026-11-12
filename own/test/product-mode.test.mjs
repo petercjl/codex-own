@@ -81,11 +81,24 @@ test('combined upstream chunks retain execution and menu policy plus an earlier 
  const name='webview/assets/app-initial-combined.js',files=new Map([[name,combined],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
  const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
  const priorChanges=new Map([[name,Buffer.from('/* preceding Windows update menu edit */\n'+combined)]]),changes=productModeChanges(asar,'fixture',{priorChanges});
- assert.equal(changes.size,2);const source=changes.get(name).toString();assert.ok(source.includes('/* preceding Windows update menu edit */'));assert.equal(source.split('const __codexOwnApiMode=').length,2);
+ assert.equal(changes.size,2);const source=changes.get(name).toString();assert.ok(source.includes('/* preceding Windows update menu edit */'));assert.equal(source.split('var __codexOwnApiMode=').length,2);
  const context=vm.createContext({codexOwnProductPolicy:{contract:1,apiMode:true}});vm.runInContext(source,context);
  assert.equal(context.fixture.derivedMode({get:()=> 'STEPS_PROSE'}),'codex');assert.equal(context.sharedFixture.executionDetail({get:()=> 'STEPS_PROSE'}),'STEPS_COMMANDS');
  assert.equal(context.fixture.Sidebar({codexAvailable:true,mode:'work',onModeSelect:()=>{throw Error('disabled')}}).work.props.onSelect,undefined);
  for(const [file,bytes]of changes)files.set(file,bytes.toString());assert.equal(productModeChanges(asar,'fixture').size,0);
+});
+test('split script chunks preserve API mode, disabled Work action and onboarding with no global helper collision',()=>{
+ const prefix=fixture.slice(0,fixture.indexOf('const Item='));
+ const sidebar='const Item="item",jsx=(type,props)=>({type,props});'+fixture.slice(fixture.indexOf('function Sidebar'),fixture.indexOf('globalThis.fixture='));
+ const sources=[prefix+'globalThis.mode=derivedMode;', 'function switchMode(store,{codexLocalAccessStatus:access,nextMode:next}){store.mode=next;}globalThis.switchMode= switchMode;',sidebar+'globalThis.Sidebar=Sidebar;', 'const route=function({auth:a,codexFeatureAccess:f,backendOnboardingCompleted:done}){return done?"app":"welcome"};globalThis.route=route;',sharedFixture];
+ const files=new Map(sources.map((s,i)=>['webview/assets/async/'+(100+i)+'.hash.js','(()=>{'+s+'})()']));files.set('.vite/build/early-bootstrap.js','start();');files.set('.vite/build/preload.js','const bridge={exposeInMainWorld(){}};');
+ const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
+ const changed=productModeChanges(asar,'fixture'),context=vm.createContext({codexOwnProductPolicy:{contract:1,apiMode:true}});
+ for(const [file,data]of changed){files.set(file,data.toString());if(file.startsWith('webview/'))vm.runInContext(data.toString(),context);}
+ assert.equal(context.mode({get:()=> 'STEPS_PROSE'}),'codex');const store={mode:'codex'};context.switchMode(store,{nextMode:'work'});assert.equal(store.mode,'codex');
+ assert.equal(context.Sidebar({codexAvailable:false,mode:'work',onModeSelect:()=>{throw Error('disabled')}}).work.props.onSelect,undefined);
+ assert.equal(context.route({auth:{authMethod:'apikey'},backendOnboardingCompleted:false}),'app');assert.equal(productModeChanges(asar,'fixture').size,0);
+ files.delete('webview/assets/async/101.hash.js');assert.throws(()=>productModeChanges(asar,'fixture'),/entry points missing/);
 });
 
 test('API users enter the workbench while authentication and gateway readiness remain enforced',()=>{

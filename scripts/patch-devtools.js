@@ -14,7 +14,7 @@
 const fs = require("fs");
 const path = require("path");
 const { parse } = require("acorn");
-const { locateBundles, relPath } = require("./patch-util");
+const { locateSemanticBundles, relPath } = require("./patch-util");
 
 // ──────────────────────────────────────────────
 //  AST walker
@@ -85,9 +85,9 @@ function main() {
   const isCheck = args.includes("--check");
   const platform = args.find((a) => ["mac-arm64", "mac-x64", "win"].includes(a));
 
-  const bundles = locateBundles({
+  const bundles = locateSemanticBundles({
     dir: "build",
-    pattern: /^main(-[^.]+)?\.js$/,
+    accept: source => source.includes('allowInspectElement'),
     platform,
   });
 

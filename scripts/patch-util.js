@@ -82,4 +82,20 @@ function relPath(absPath) {
   return path.relative(PROJECT_ROOT, absPath);
 }
 
-module.exports = { locateBundles, relPath, SRC_DIR, PROJECT_ROOT };
+// Numeric Rspack chunks and nested async directories are selected by their
+// executable contract rather than a bundler-specific filename.
+function locateSemanticBundles({dir,platform,accept}) {
+  const roots={build:'.vite/build',assets:'webview/assets'};
+  if(!roots[dir]||typeof accept!=='function')throw Error('Semantic bundle selector required');
+  const result=[];
+  for(const plat of platform?[platform]:['mac-arm64','mac-x64','win']){
+    const root=path.join(SRC_DIR,plat,'_asar',roots[dir]);if(!fs.existsSync(root))continue;
+    function visit(folder){for(const e of fs.readdirSync(folder,{withFileTypes:true})){
+      const file=path.join(folder,e.name);
+      if(e.isDirectory())visit(file);
+      else if(e.isFile()&&e.name.endsWith('.js')){const source=fs.readFileSync(file,'utf8');if(accept(source,file))result.push({platform:plat,path:file});}
+    }}visit(root);
+  }
+  return result;
+}
+module.exports = { locateBundles, locateSemanticBundles, relPath, SRC_DIR, PROJECT_ROOT };

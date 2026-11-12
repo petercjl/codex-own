@@ -52,11 +52,11 @@ function rpcInput(url,{maxFrameBytes=64*1024*1024,provider='dashscope_deepseek'}
 }
 function invocation({cli,args,options,core,config,platform=process.platform}){
  if(!selected(config))return null;
- const root=path.join(path.dirname(cli),'own-updater'),node=path.join(root,platform==='win32'?'node.exe':'node'),runner=path.join(root,'lib','subagent-bridge-runner.cjs');
+ const root=path.join(path.dirname(cli),'own-updater'),node=require('./bundled-node.cjs').resolveBundledNode(root,platform),runner=path.join(root,'lib','subagent-bridge-runner.cjs');
  if(!fs.existsSync(node)||!fs.existsSync(runner))throw Object.assign(Error('Bundled API compatibility runtime is missing'),{code:'AGENT_BRIDGE_MISSING'});
  return {file:node,args:[runner,core,cli,...args],options};
 }
-async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1024*1024,resolveRoute,authorization}){
+async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1024*1024,resolveRoute,authorization,prepareBody=body=>body}){
  const http=require('node:http'),base=new URL(upstream||'http://127.0.0.1');
  if(!['http:','https:'].includes(base.protocol)||base.username||base.password)throw Error('Invalid configured API endpoint');
  const active=new Set();
@@ -71,7 +71,7 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1
    if(req.headers['content-encoding']&&req.headers['content-encoding']!=='identity')throw Object.assign(Error('Compressed request is unsupported'),{code:'AGENT_BRIDGE_ENCODING'});
    const chunks=[];let length=0;
    for await(const chunk of req){length+=chunk.length;if(length>maxBodyBytes)throw Object.assign(Error('API request exceeds limit'),{code:'AGENT_BRIDGE_TOO_LARGE'});chunks.push(chunk);}
-   const bytes=Buffer.concat(chunks),originalBody=JSON.parse(bytes.toString('utf8')),route=resolveRoute?.(originalBody.model),body=route?{...originalBody,model:route.model}:originalBody;
+   const bytes=Buffer.concat(chunks),originalBody=JSON.parse(bytes.toString('utf8')),route=resolveRoute?.(originalBody.model),body=prepareBody(route?{...originalBody,model:route.model}:originalBody);
    if(route?.protocol==='anthropic'){
     if(pathname.pathname!=='/responses')throw Object.assign(Error('Messages API does not support remote compaction'),{code:'ANTHROPIC_COMPACTION_UNSUPPORTED'});
     await require('./anthropic-responses.cjs').serve({body,route,response:res,signal:abort.signal,fetch:(url,options)=>fetchApi(url,{...options,...dispatcher?{dispatcher}:{}})});return;

@@ -86,3 +86,12 @@ test('incremental manifests accept more than 64 content blocks but reject an unk
   const asset={transport:TRANSPORT,parts:Array(100).fill(part),size:100};assert.ok(validateParts(asset));
   assert.throws(()=>validateParts({...asset,transport:'unknown'}),{code:'INVALID_MANIFEST'});
 });
+test('complete content cache skips program traversal, but changed cache bytes cannot bypass a scan',async t=>{
+ const d=temp(t),root=path.join(d,'app'),cache=path.join(d,'cache');fs.mkdirSync(root);fs.mkdirSync(cache);fs.writeFileSync(path.join(root,'a'),'content');
+ const index=await writeCanonicalArchive(root,'app',path.join(d,'a.tar')),asset={...index,entry:'app',parts:index.blocks};
+ await reuseInstalledBlocks(asset,root,cache,{report:()=>{}});
+ fs.rmSync(root,{recursive:true});fs.writeFileSync(root,'not a traversable directory');
+ const r=await reuseInstalledBlocks(asset,root,cache,{report:()=>{}});assert.equal(r.skippedScan,true);assert.equal(r.cachedBlocks,index.blocks.length);
+ const file=path.join(cache,index.blocks[0].sha256+'.bin'),bad=fs.readFileSync(file);bad[bad.length-1]^=1;fs.writeFileSync(file,bad);
+ await assert.rejects(reuseInstalledBlocks(asset,root,cache,{report:()=>{}}),/Expected a real application directory/);
+});

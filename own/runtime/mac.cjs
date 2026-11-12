@@ -36,6 +36,7 @@ if (!fs.existsSync(config)) fs.writeFileSync(config,
   '# codex-own private configuration\ncli_auth_credentials_store = "file"\nforced_login_method = "api"\n', {flag:'wx',mode:0o600});
 apply();
 const {app, nativeImage} = require('electron');
+require(path.join(resources,'own-updater','lib','ui-locale.cjs')).install(app);
 app.setName(identity.name);
 app.setPath('userData', paths.desktop);
 app.setPath('logs', path.join(root, 'logs'));
@@ -44,6 +45,7 @@ app.setName = () => {};
 app.setAsDefaultProtocolClient = () => false;
 app.removeAsDefaultProtocolClient = () => false;
 require(path.join(resources,'own-updater','desktop','controller.cjs')).start(require('electron'),root);
+require(path.join(resources,'own-updater','desktop','account.cjs')).start(require('electron'),root);
 require(path.join(resources,'own-updater','desktop','product-mode.cjs')).install(require('electron'),paths.core);
 require(path.join(resources,'own-updater','desktop','thread-titles.cjs')).install(require('electron'),paths.core);
 app.whenReady().then(() => {

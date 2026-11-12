@@ -3,7 +3,7 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import http from 'node:http';
 import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),bridge=require(process.env.OWN_AGENT_BRIDGE_MODULE||'../lib/subagent-bridge.cjs');
-const app=path.resolve(process.argv[2]),root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-history-'))),core=path.join(root,'core');fs.mkdirSync(core);
+const app=path.resolve(process.argv[2]),mac=process.platform==='darwin',root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-history-'))),core=path.join(root,'core'),sandbox=mac?'workspace-write':'danger-full-access';fs.mkdirSync(core);
 let count=0,fixtureError,ready;const interruptedRequest=new Promise(r=>{ready=r;});
 const patch=n=>'*** Begin Patch\n'+(n===1?'*** Add File: proof.txt\n+中文第一版':'*** Update File: proof.txt\n@@\n-中文第一版\n+中文恢复版')+'\n*** End Patch';
 function assertPairs(input){
@@ -19,7 +19,7 @@ const upstream=http.createServer(async(req,res)=>{
   if(count===3)assert.equal(body.input.filter(x=>/call_output$/.test(x.type)).length,2,'Resume must retain actual earlier results');
   if(count===4)assert.equal(body.input.filter(x=>/call_output$/.test(x.type)).length,4);
   const output=n?[
-   {type:'function_call',id:'fc_'+n,call_id:'exec_'+n,name:'exec_command',arguments:JSON.stringify({cmd:n===1?'printf "HISTORY_SHELL_OK\\n"':'cat proof.txt'})},
+   {type:'function_call',id:'fc_'+n,call_id:'exec_'+n,name:'exec_command',arguments:JSON.stringify(mac?{cmd:n===1?'printf "HISTORY_SHELL_OK\\n"':'cat proof.txt'}:{cmd:n===1?'Write-Output "HISTORY_SHELL_OK"':'Get-Content -LiteralPath proof.txt -Encoding UTF8',shell:path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),login:false})},
    {type:'reasoning',id:'reason_'+n,summary:[],content:[{type:'reasoning_text',text:'Continue with the other tool while the shell is pending.'}]},
    {type:'custom_tool_call',id:'ct_'+n,call_id:'patch_'+n,name:'apply_patch',input:JSON.stringify({data:patch(n)})}
   ]:[{type:'message',id:'final',role:'assistant',content:[{type:'output_text',text:'HISTORY_RESUME_OK',annotations:[]}]}];
@@ -33,8 +33,8 @@ await new Promise(r=>upstream.listen(0,'127.0.0.1',r));const server=await bridge
 fs.writeFileSync(path.join(core,'config.toml'),`model="deepseek-v4.1-flash"\nmodel_provider="offline_fixture"\nmodel_catalog_json=${JSON.stringify(path.resolve('own/defaults/models.json'))}\n[model_providers.offline_fixture]\nname="Offline history fixture"\nbase_url=${JSON.stringify(server.url)}\nwire_api="responses"\nrequires_openai_auth=false\n`,{flag:'wx',mode:0o600});
 let backend;
 function start(){
- const env={...process.env,CODEX_HOME:core,HOME:root};for(const k of Object.keys(env))if(/^(OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|BASH_ENV$|ZDOTDIR$|NODE_OPTIONS$)/.test(k))delete env[k];
- const child=spawn(path.join(app,'Contents/Resources/codex-own-cli'),['app-server','--stdio'],{env,stdio:['pipe','pipe','pipe']});
+ const env={...process.env,CODEX_HOME:core,HOME:root,USERPROFILE:root};for(const k of Object.keys(env))if(/^(OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|BASH_ENV$|ZDOTDIR$|NODE_OPTIONS$)/.test(k))delete env[k];
+ const child=spawn(path.join(app,mac?'Contents/Resources/codex-own-cli':'resources/codex.exe'),['app-server','--stdio'],{env,stdio:['pipe','pipe','pipe']});
  let id=0,buffer='',finished;const pending=new Map(),turn=new Promise(r=>{finished=r;});child.stderr.on('data',()=>{});
  child.stdout.on('data',c=>{buffer+=c;let i;while((i=buffer.indexOf('\n'))>=0){const m=JSON.parse(buffer.slice(0,i));buffer=buffer.slice(i+1);const p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p.j(Error(JSON.stringify(m.error))):p.r(m.result);}if(m.method==='turn/completed')finished(m.params.turn);}});
  return {child,turn,call:(method,params)=>new Promise((r,j)=>{pending.set(++id,{r,j});child.stdin.write(JSON.stringify({id,method,params})+'\n');}),stop:()=>new Promise(r=>{child.once('exit',r);child.kill();child.stdin.destroy();child.stdout.destroy();child.stderr.destroy();})};
@@ -42,12 +42,12 @@ function start(){
 async function initialize(){backend=start();await backend.call('initialize',{clientInfo:{name:'history-resume-qa',version:'1'},capabilities:{experimentalApi:true}});backend.child.stdin.write('{"method":"initialized"}\n');}
 const timer=setTimeout(()=>{console.error('History fixture timed out');process.exit(1);},60000);
 try{
- await initialize();const thread=await backend.call('thread/start',{cwd:root,approvalPolicy:'never',sandbox:'workspace-write'});
+ await initialize();const thread=await backend.call('thread/start',{cwd:root,approvalPolicy:'never',sandbox});
  const turn=await backend.call('turn/start',{threadId:thread.thread.id,input:[{type:'text',text:'Run parallel shell and patch tools.',text_elements:[]}]});
  await interruptedRequest;if(fixtureError)throw fixtureError;
  await backend.call('turn/interrupt',{threadId:thread.thread.id,turnId:turn.turn.id});assert.equal((await backend.turn).status,'interrupted');
  await backend.stop();backend=null;
- await initialize();await backend.call('thread/resume',{threadId:thread.thread.id,cwd:root,approvalPolicy:'never',sandbox:'workspace-write'});
+ await initialize();await backend.call('thread/resume',{threadId:thread.thread.id,cwd:root,approvalPolicy:'never',sandbox});
  await backend.call('turn/start',{threadId:thread.thread.id,input:[{type:'text',text:'Continue after restart.',text_elements:[]}]});assert.equal((await backend.turn).status,'completed');if(fixtureError)throw fixtureError;
  assert.equal(count,4);assert.equal(fs.readFileSync(path.join(root,'proof.txt'),'utf8'),'中文恢复版\n');
  console.log(JSON.stringify({ok:true,realNativeTools:true,parallelRounds:2,reasoningBetweenCalls:true,interruptedAndResumed:true,backendRestart:true,patchCreateAndUpdate:true,realCredentialsUsed:false,profile:root}));

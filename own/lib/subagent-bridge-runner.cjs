@@ -7,7 +7,7 @@ async function main(){
  const [core,cli,...args]=process.argv.slice(2);
  const config=parse(fs.readFileSync(path.join(core,'config.toml'),'utf8'));
  if(!bridge.selected(config))throw Error('API compatibility configuration changed');
- const provider=config.model_provider,dispatcher=new EnvHttpProxyAgent(),server=provider==='codex_own_imported'?await require('./model-router.cjs').start({core,config,fetch,dispatcher}):await bridge.startServer({upstream:config.model_providers[provider].base_url,fetch,dispatcher});
+ const provider=config.model_provider,dispatcher=new EnvHttpProxyAgent(),server=provider==='codex_own_imported'?await require('./model-router.cjs').start({core,config,fetch,dispatcher}):await bridge.startServer({upstream:config.model_providers[provider].base_url,fetch,dispatcher,prepareBody:body=>require('./image-provider.cjs').apply(body,core)});
  const i=args.indexOf('app-server');if(i<0)throw Error('Expected owned app-server invocation');
  const backend=[...args.slice(0,i),'-c','model_providers.'+provider+'.base_url='+JSON.stringify(server.url),...args.slice(i)];
  const child=spawn(cli,backend,{env:{...process.env,CODEX_HOME:core},stdio:['pipe','pipe','inherit'],windowsHide:true});

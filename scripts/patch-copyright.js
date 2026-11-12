@@ -1,10 +1,10 @@
 /** Preserve upstream attribution while applying the Rebuild about-panel label. */
 const fs=require('node:fs');
-const {locateBundles,relPath}=require('./patch-util');
+const {locateSemanticBundles,relPath}=require('./patch-util');
 const {copyrightPatches,NEW_COPYRIGHT}=require('./patch-copyright-rule');
 function main(){
  const args=process.argv.slice(2),check=args.includes('--check'),platform=args.find(a=>['mac-arm64','mac-x64','win'].includes(a));
- const bundles=locateBundles({dir:'build',pattern:/^main(-[^.]+)?\.js$/,platform});
+ const bundles=locateSemanticBundles({dir:'build',platform,accept:s=>s.includes(NEW_COPYRIGHT)||copyrightPatches(s).length>0});
  if(!bundles.length)throw Error('No main bundle found');
  for(const bundle of bundles){
   const source=fs.readFileSync(bundle.path,'utf8'),patches=copyrightPatches(source);

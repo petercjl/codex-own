@@ -68,3 +68,13 @@ test('invalid private configuration fails before starting a backend',t=>{
  let started=0;const api={spawn(){started++;}},cli=path.join(core,'codex');a.install({cli,core,processApi:api});t.after(()=>api[a.HOOK]?.restore());
  assert.throws(()=>api.spawn(cli,['app-server']));assert.equal(started,0);assert.equal(fs.readFileSync(file,'utf8'),invalid);
 });
+test('API routing keeps Git Bash discovery in the Node bridge environment after private tool preparation',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'own-api-shell-')),core=path.join(root,'core'),bundle=path.join(root,'own-updater');t.after(()=>fs.rmSync(root,{recursive:true,force:true}));fs.mkdirSync(core);fs.mkdirSync(path.join(bundle,'lib'),{recursive:true});
+ fs.writeFileSync(path.join(bundle,process.platform==='win32'?'node.exe':'node'),'fixture');fs.writeFileSync(path.join(bundle,'lib/subagent-bridge-runner.cjs'),'fixture');
+ fs.writeFileSync(path.join(core,'config.toml'),'forced_login_method="api"\nmodel="deepseek-v4.1-flash"\nmodel_provider="dashscope_deepseek"\n[model_providers.dashscope_deepseek]\nwire_api="responses"\nbase_url="https://fixture.invalid/v1"\n');
+ const selection={supported:true,bash:'C:\\Git\\bin\\bash.exe',powershell:'C:\\Windows\\powershell.exe'},env={PATH:'C:\\own\\runtimes\\bin;C:\\Windows\\System32',CODEX_OWN_RUNTIME_ROOT:'C:\\own\\runtimes'};let captured;
+ const api={spawn(file,args,options){captured={file,args,options};const c=new EventEmitter();c.stdin=new PassThrough();c.kill=()=>{};return c;},[Symbol.for('codex-own.windows-agent-shell')]:{selection}};
+ const cli=path.join(root,'codex');a.install({cli,core,processApi:api});t.after(()=>api[a.HOOK]?.restore());const child=api.spawn(cli,['app-server'],{env});
+ assert.equal(captured.args[0],path.join(bundle,'lib/subagent-bridge-runner.cjs'));assert.equal(captured.options.env.PATH,'C:\\own\\runtimes\\bin;C:\\Git\\bin;C:\\Windows\\System32');assert.equal(env.PATH,'C:\\own\\runtimes\\bin;C:\\Windows\\System32');child.stdin.destroy();
+ api.spawn(cli,['exec'],{env});assert.equal(captured.options.env,env);
+});

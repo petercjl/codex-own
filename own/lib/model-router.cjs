@@ -16,6 +16,6 @@ async function start({core, config, fetch, dispatcher}) {
   const {readModelAccess} = await import('./model-access.mjs');
   const access = readModelAccess(core), token = config.model_providers?.codex_own_imported?.experimental_bearer_token;
   if (!access || typeof token !== 'string' || token.length < 32) throw Error('Imported model routing configuration is incomplete');
-  return bridge.startServer({resolveRoute: routing(access), authorization: token, fetch, dispatcher});
+  return bridge.startServer({resolveRoute: routing(access), authorization: token, fetch, dispatcher,prepareBody:body=>require('./image-provider.cjs').apply(body,core)});
 }
 module.exports = {routing, start};

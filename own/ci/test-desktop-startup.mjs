@@ -4,7 +4,7 @@ import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import net from 'node:net';import assert from 'node:assert/strict';import {spawn,execFileSync} from 'node:child_process';
 import {installRuntime} from '../lib/tool-runtime.mjs';
 import {createRequire} from 'node:module';
-import {nativeDeviceContract} from './native-device-contract.mjs';
+import {nativeDeviceContract,nativeDeviceBundleContract} from './native-device-contract.mjs';
 const app=path.resolve(process.argv[2]),out=path.resolve(process.argv[3]),mac=process.platform==='darwin';
 if(fs.existsSync(out))throw Error('Choose a fresh GUI evidence directory');fs.mkdirSync(out,{recursive:true});
 // Darwin Unix-domain socket paths are limited to roughly 104 bytes.
@@ -47,7 +47,7 @@ try{
  let target;const deadline=Date.now()+120000;
  while(Date.now()<deadline){
   if(launchError)throw launchError;if(child.exitCode!==null)throw Error('Desktop exited before renderer became ready: '+child.exitCode);
-  try{const list=await(await fetch(`http://127.0.0.1:${port}/json/list`,{signal:AbortSignal.timeout(2000)})).json();target=list.find(t=>t.type==='page'&&/^(file|app|codex-own):/.test(t.url)&&!t.url.includes('update.html'));if(target)break;}catch{}
+  try{const list=await(await fetch(`http://127.0.0.1:${port}/json/list`,{signal:AbortSignal.timeout(2000)})).json();target=list.find(t=>t.type==='page'&&t.url.startsWith('app://-/index.html'));if(target)break;}catch{}
   await delay(500);
  }
  if(!target)throw Error('No main desktop renderer observed; see desktop.log');
@@ -55,22 +55,44 @@ try{
  socket.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(m.method==='Runtime.exceptionThrown'||m.method==='Log.entryAdded')events.push(m);if(p){pending.delete(m.id);clearTimeout(p.timer);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
  const call=(method,params={})=>new Promise((resolve,reject)=>{const key=++id,timer=setTimeout(()=>{pending.delete(key);reject(Error('CDP timeout '+method))},10000);pending.set(key,{resolve,reject,timer});socket.send(JSON.stringify({id:key,method,params}));});
  await call('Runtime.enable');await call('Log.enable');
- let state;for(let i=0;i<180;i++){const result=await call('Runtime.evaluate',{expression:'JSON.stringify({title:document.title,url:location.href,ready:document.readyState,buttons:document.querySelectorAll("button").length,composer:document.querySelectorAll("textarea,[contenteditable=true]").length,text:document.body?.innerText||"",elements:document.body?.querySelectorAll("*").length||0,html:document.body?.innerHTML.slice(0,5000),policy:globalThis.codexOwnProductPolicy})',returnByValue:true});state=JSON.parse(result.result.value);if(state.ready==='complete'&&state.buttons>=5&&state.composer>=1&&state.text.trim().length>30)break;await delay(500);}
+ let state;for(let i=0;i<180;i++){const result=await call('Runtime.evaluate',{expression:'JSON.stringify({title:document.title,url:location.href,ready:document.readyState,buttons:document.querySelectorAll("button").length,composer:document.querySelectorAll("textarea,[contenteditable=true]").length,text:document.body?.innerText||"",elements:document.body?.querySelectorAll("*").length||0,html:document.body?.innerHTML.slice(0,5000),policy:globalThis.codexOwnProductPolicy,loginGateVisible:!!document.getElementById("codex-own-login-gate")&&!document.getElementById("codex-own-login-gate").hidden,accountBadge:document.getElementById("codex-own-account-badge")?.getAttribute("aria-label"),backgroundInert:[...document.body.children].some(e=>e.inert)})',returnByValue:true});state=JSON.parse(result.result.value);if(state.ready==='complete'&&state.buttons>=5&&state.composer>=1&&state.text.trim().length>30)break;await delay(500);}
  const screenshot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'desktop.png'),Buffer.from(screenshot.data,'base64'),{flag:'wx'});
  fs.writeFileSync(path.join(out,'renderer.json'),JSON.stringify({...state,text:state.text.slice(0,2000)},null,2),{flag:'wx'});
  assert.equal(state.ready,'complete');assert.ok(state.buttons>=5&&state.composer>=1&&state.text.trim().length>30,'Desktop workbench did not become interactive');
+ assert.equal(state.loginGateVisible,true,'Legacy fixture credential must not bypass enterprise login');assert.match(state.accountBadge,/未登录/);assert.equal(state.backgroundInert,true);
  if(!mac){
+  let layout;
+  for(let i=0;i<60;i++){
+   const result=await call('Runtime.evaluate',{expression:'JSON.stringify([...document.querySelectorAll("[data-app-navigation-rail]")].map(e=>({width:e.getBoundingClientRect().width,x:e.getBoundingClientRect().x,buttons:e.querySelectorAll("button").length})))',returnByValue:true});layout=JSON.parse(result.result.value);if(layout.some(e=>e.width>20&&e.width<100&&e.buttons>=2))break;await delay(250);
+  }
+  assert.ok(layout.some(e=>e.width>20&&e.width<100&&e.buttons>=2),'Windows native navigation rail did not render');
+  const accountPlacement=await call('Runtime.evaluate',{expression:'!!document.getElementById("codex-own-account-badge")?.closest("[data-app-navigation-rail]")',returnByValue:true});assert.equal(accountPlacement.result.value,true,'Windows account badge must use the navigation rail');
+  fs.writeFileSync(path.join(out,'sidebar-layout.json'),JSON.stringify({nativeNavigationRail:true,rails:layout,fixtureOnly:true},null,2),{flag:'wx'});
+  // The login gate was verified above. Reveal only this disposable fixture's
+  // workbench for a layout screenshot, then restore the gate immediately.
+  await call('Runtime.evaluate',{expression:'document.getElementById("codex-own-login-gate").style.visibility="hidden"'});
+  try{const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'sidebar-layout.png'),Buffer.from(shot.data,'base64'),{flag:'wx'});}
+  finally{await call('Runtime.evaluate',{expression:'document.getElementById("codex-own-login-gate").style.removeProperty("visibility")'});}
   const asar=createRequire(import.meta.url)('@electron/asar'),archive=path.join(resources,'app.asar');
   const bridges=asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>/^webview\/assets\/codex-micro-bridge-[\w-]+\.js$/.test(n));
-  assert.equal(bridges.length,1,'Expected one native device bridge');
-  const contract=nativeDeviceContract(asar.extractFile(archive,bridges[0].replaceAll('/',path.sep)).toString());
-  const result=await call('Runtime.evaluate',{expression:`(async()=>{const api=(await import(${JSON.stringify('app://-'+contract.module)}))[${JSON.stringify(contract.binding)}];if(api?.codexMicro==null)throw Error('Native device host service unavailable');await api.codexMicro.getState();await new Promise(r=>setTimeout(r,1500));const state=await api.codexMicro.getState();return JSON.stringify({runtime:'official Owl',status:state.status,error:state.error,physicalDeviceCommunicationTested:false});})()`,awaitPromise:true,returnByValue:true});
+  let contract,apiExpression;
+  if(bridges.length){
+   assert.equal(bridges.length,1,'Expected one native device bridge');
+   contract=nativeDeviceContract(asar.extractFile(archive,bridges[0].replaceAll('/',path.sep)).toString());
+   apiExpression=`(await import(${JSON.stringify('app://-'+contract.module)}))[${JSON.stringify(contract.binding)}]`;
+  }else{
+   const files=new Map();for(const raw of asar.listPackage(archive)){const name=raw.replaceAll('\\','/').replace(/^\//,'');if(name.startsWith('webview/assets/')&&name.endsWith('.js'))files.set(name.slice(8),asar.extractFile(archive,name.replaceAll('/',path.sep)).toString());}
+   contract=nativeDeviceBundleContract(files,asar.extractFile(archive,['webview','index.html'].join(path.sep)).toString());
+   apiExpression=`(await import(${JSON.stringify('app://-'+contract.runtimeModule)})).__webpack_require__(${JSON.stringify(contract.moduleId)})[${JSON.stringify(contract.binding)}]`;
+  }
+  fs.writeFileSync(path.join(out,'native-device-contract.json'),JSON.stringify(contract,null,2),{flag:'wx'});
+  const result=await call('Runtime.evaluate',{expression:`(async()=>{const api=${apiExpression};if(api?.codexMicro==null)throw Error('Native device host service unavailable');await api.codexMicro.getState();await new Promise(r=>setTimeout(r,1500));const state=await api.codexMicro.getState();return JSON.stringify({runtime:'official Owl',status:state.status,error:state.error,physicalDeviceCommunicationTested:false});})()`,awaitPromise:true,returnByValue:true});
   assert.ok(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));const native=JSON.parse(result.result.value);
   fs.writeFileSync(path.join(out,'native-device-service.json'),JSON.stringify(native,null,2),{flag:'wx'});
   assert.ok(['not-detected','detected','connected'].includes(native.status),'Native device discovery failed');assert.equal(native.error,null);
  }
  assert.equal(events.filter(e=>e.method==='Runtime.exceptionThrown').length,0,'Renderer raised an unhandled exception');
- console.log(JSON.stringify({ok:true,platform:process.platform,nativeDesktopLaunched:true,rendererHydrated:true,workbenchControlsAndComposer:true,screenshot:path.join(out,'desktop.png'),profile:root,realCredentialsUsed:false,interactiveFeaturesTested:false}));
+ console.log(JSON.stringify({ok:true,platform:process.platform,nativeDesktopLaunched:true,rendererHydrated:true,workbenchControlsAndComposer:true,enterpriseLoginRequired:true,accountBadgeVerified:true,screenshot:path.join(out,'desktop.png'),profile:root,realCredentialsUsed:false,interactiveFeaturesTested:false}));
 }finally{
  socket?.close();for(const p of pending.values())clearTimeout(p.timer);
  fs.writeFileSync(path.join(out,'renderer-events.json'),JSON.stringify(events,null,2),{flag:'wx'});

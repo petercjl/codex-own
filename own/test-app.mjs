@@ -11,9 +11,15 @@ import {verifyWindowsIcon} from './builders/windows-icon.mjs';
 import {verifyWindowsAgentShell} from './ci/windows-shell-qa.mjs';
 import {verifyProductMode} from './builders/product-mode.mjs';
 import {verifyThreadTitles} from './builders/thread-titles.mjs';
+import {verifyNativeImageSettings} from './builders/native-image-settings.mjs';
+import {verifyWindowsReadiness} from './builders/windows-readiness.mjs';
+import {verifyWindowsSidebar} from './builders/windows-sidebar.mjs';
 const app=path.resolve(process.argv[2]),mac=process.platform==='darwin';
+if(!mac)console.log(JSON.stringify({windowsReadiness:verifyWindowsReadiness(app,createRequire(import.meta.url)('@electron/asar'))}));
+if(!mac)console.log(JSON.stringify({windowsSidebar:verifyWindowsSidebar(app,createRequire(import.meta.url)('@electron/asar'))}));
 console.log(JSON.stringify({productMode:verifyProductMode(app,createRequire(import.meta.url)('@electron/asar'))}));
 console.log(JSON.stringify({threadTitles:verifyThreadTitles(app,createRequire(import.meta.url)('@electron/asar'))}));
+console.log(JSON.stringify({imageSettings:verifyNativeImageSettings(app,createRequire(import.meta.url)('@electron/asar'))}));
 console.log(JSON.stringify({i18n:verifyTranslations(app)}));
 console.log(JSON.stringify({updater:verifyUpdater(path.join(app,mac?'Contents/Resources':'resources'))}));
 if(!mac){assert.equal(updateMenuChanges(createRequire(import.meta.url)('@electron/asar'),path.join(app,'resources','app.asar')).size,0,'Windows standalone update menu missing');console.log(JSON.stringify({standaloneUpdateMenu:true,icon:verifyWindowsIcon(app)}));}
@@ -22,6 +28,7 @@ fs.writeFileSync(path.join(home,'config.toml'),'cli_auth_credentials_store = "fi
 const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_)/.test(k))delete env[k];env.CODEX_HOME=home;
 const cli=path.join(app,mac?'Contents/Resources/codex-own-cli':'resources/codex.exe');
 if(!mac)console.log(JSON.stringify({agentShell:await verifyWindowsAgentShell({cli,adapterPath:path.join(app,'resources','own-updater','lib','windows-agent-shell.cjs'),catalog:path.join(import.meta.dirname,'defaults','models.json')})}));
+if(!mac)console.log(JSON.stringify({apiAgentShell:await verifyWindowsAgentShell({cli,adapterPath:path.join(app,'resources','own-updater','lib','windows-agent-shell.cjs'),apiCompatPath:path.join(app,'resources','own-updater','lib','api-input-compat.cjs'),catalog:path.join(import.meta.dirname,'defaults','models.json')})}));
 const child=spawn(cli,['app-server','--stdio'],{env,stdio:['pipe','pipe','pipe']});let buffer='',id=0;const pending=new Map();
 child.stdout.on('data',b=>{buffer+=b;for(;;){const i=buffer.indexOf('\n');if(i<0)break;const line=buffer.slice(0,i);buffer=buffer.slice(i+1);try{const m=JSON.parse(line),p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}}catch{}}});
 child.stderr.on('data',()=>{});child.on('error',e=>{for(const p of pending.values())p.reject(e)});child.on('exit',()=>{for(const p of pending.values())p.reject(Error('CLI exited'))});

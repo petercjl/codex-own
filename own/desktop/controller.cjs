@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path');
 const {spawn}=require('node:child_process');
 const {StringDecoder}=require('node:string_decoder');
 const {pathToFileURL}=require('node:url');
+const {resolveBundledNode,materializeBundledNode}=require('../lib/bundled-node.cjs');
 const CHANNEL='codex-own:update';
 module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},root){
   const identity=require('../lib/instance.cjs').identity(process.resourcesPath);
@@ -44,7 +45,7 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
   const emit=patch=>{state={...state,...patch};if(notice()!==lastNotice){lastNotice=notice();syncNotice();}if(window&&!window.isDestroyed())window.webContents.send('codex-own:update-state',state);};
   const errors={APP_RUNNING:'应用尚未完全退出，安装已取消。请结束任务后重试。',UNMANAGED_TARGET:'当前 App 尚未由 codex-own 安装器管理，请先完成一次命令行安装。',BUSY:'另一项安装或更新正在运行，请稍后重试。',CHECKSUM_MISMATCH:'下载文件校验失败，当前版本保持不变，请重试。',INSTALLATION_CHANGED:'安装版本已经改变，请重新检查更新。'};
   function run(action){return new Promise((resolve,reject)=>{
-    const child=spawn(path.join(bundle,process.platform==='win32'?'node.exe':'node'),[path.join(bundle,'desktop','worker.mjs'),action,meta.version],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
+    const child=spawn(resolveBundledNode(bundle),[path.join(bundle,'desktop','worker.mjs'),action,meta.version],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
     if(action==='download')downloadWorker=child;
     let output='',error,result,settled=false;const decoder=new StringDecoder('utf8');
     child.stdout.on('data',b=>{output+=decoder.write(b);for(;;){const i=output.indexOf('\n');if(i<0)break;const line=output.slice(0,i);output=output.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}
@@ -97,7 +98,7 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog},r
         const handoff=fs.mkdtempSync(path.join(base,'apply-'));fs.cpSync(bundle,path.join(handoff,'runtime'),{recursive:true,force:false,errorOnExist:true});
         const runtime=path.join(handoff,'runtime'),log=fs.openSync(path.join(handoff,'install.log'),'wx',0o600);
         let child;
-        try{child=spawn(path.join(runtime,process.platform==='win32'?'node.exe':'node'),[path.join(runtime,'desktop','worker.mjs'),'apply',meta.version,receipt],{env,cwd:root,windowsHide:true,detached:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}
+        try{child=spawn(materializeBundledNode(bundle,runtime),[path.join(runtime,'desktop','worker.mjs'),'apply',meta.version,receipt],{env,cwd:root,windowsHide:true,detached:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}
         let spawnError;child.on('error',e=>{spawnError=e;});child.unref();
         child.on('exit',()=>{busy=false;emit({phase:'ready',message:'应用未完成退出或安装未完成，请结束任务后重试。安装记录已保存在独立更新目录。'});});
         const ready=path.join(runtime,'handoff-ready.json'),deadline=Date.now()+15000;

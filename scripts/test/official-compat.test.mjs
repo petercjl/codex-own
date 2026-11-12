@@ -55,6 +55,13 @@ test('copyright recognizes the native about HTML template and remains idempotent
 test('platform selection rejects contradictory or unknown arguments',()=>{
  assert.deepEqual(selectPlatforms(['--platform','mac-arm64']),['mac-arm64']);assert.deepEqual(selectPlatforms(['--skip-mac']),['win']);assert.throws(()=>selectPlatforms(['--platform','win','--skip-win']));assert.throws(()=>selectPlatforms(['--platform','wrong']));
 });
+test('numeric chunks retain escaped attribution and grouped native archive deletion',()=>{
+ const source='const html=`<div class="copyright">\\xa9 OpenAI</div>`;';
+ assert.equal(copyrightPatches(source).length,1);
+ const grouped='function row({archivedThread,deletingThreadIds,onDelete,onConfirm,isDeleteDisabled,onUnarchive}){};function remove(client,id){return client.deleteArchivedConversation(id)}';
+ assert.equal(hasNativeArchiveDelete(grouped),true);
+ assert.equal(hasNativeArchiveDelete(grouped.replace('onConfirm','unrelated')),false);
+});
 
 test('Microsoft Store selection pins newest x64 MSIX even when ARM64 is listed first',()=>{
  const pkg=(version,arch,digest='one')=>({name:`OpenAI.Codex_${version}_${arch}__publisher.msix`,digest});

@@ -9,11 +9,16 @@ import {bundleUpdater} from './updater.mjs';
 import {updateMenuChanges} from './update-menu.mjs';
 import {isolateRuntimeSource} from './runtime-isolation.mjs';
 import {gateToolStartup} from './tool-gate.mjs';
-import {isolateShellImport} from './shell-environment.mjs';
+import {isolateShellSources} from './shell-environment.mjs';
 import {productModeChanges} from './product-mode.mjs';
 import {titleChanges} from './thread-titles.mjs';
+import {nativeWindowsChanges,optimizeWindowsPayload,disableUpstreamUpdates} from './windows-payload.mjs';
+import {windowsReadinessChanges} from './windows-readiness.mjs';
+import {windowsSidebarChanges} from './windows-sidebar.mjs';
+import {planLanguageResources,pruneLanguageHeader} from './language-resources.mjs';
+import {planPresentationResources} from './payload-slim.mjs';
 const require=createRequire(import.meta.url);
-const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit'),acorn=require('acorn');
+const asar=require('@electron/asar'),PE=require('pe-library'),RE=require('resedit');
 const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve('@electron/asar')),'pickle.js')));
 const root=path.resolve(import.meta.dirname,'../..');
 const source=process.env.OWN_PREPARED_APP;if(!source)throw Error('Prepared upstream app required');
@@ -23,27 +28,34 @@ fs.statSync(path.join(source,'ChatGPT.exe'));fs.mkdirSync(out,{recursive:true});
 const app=path.join(out,'app');fs.cpSync(source,app,{recursive:true,errorOnExist:true,force:false});
 const resources=path.join(app,'resources'),archive=path.join(resources,'app.asar');
 bundleUpdater(resources);
+const payloadOptimization=optimizeWindowsPayload(app);
 const header=asar.getRawHeader(archive).header;
 const pkg=JSON.parse(asar.extractFile(archive,'package.json'));
 const changes=updateMenuChanges(asar,archive);
 for(const [name,data]of productModeChanges(asar,archive,{priorChanges:changes}))changes.set(name,data);
 for(const [name,data]of titleChanges(asar,archive,{priorChanges:changes}))changes.set(name,data);
+for(const [name,data]of nativeWindowsChanges(asar,archive,{priorChanges:changes}))changes.set(name,data);
+for(const [name,data]of windowsReadinessChanges(asar,archive,{priorChanges:changes}))changes.set(name,data);
+for(const [name,data]of windowsSidebarChanges(asar,archive,{priorChanges:changes}))changes.set(name,data);
+const languagePlan=planLanguageResources(asar,archive,{priorChanges:changes});
+for(const [name,data]of languagePlan.changes)changes.set(name,data);
+const presentationPlan=planPresentationResources(asar,archive,{priorChanges:changes});
+ for(const [name,data]of presentationPlan.changes)changes.set(name,data);
+ pruneLanguageHeader(header,new Set([...languagePlan.removed,...presentationPlan.removed]));
 pkg.name='codex-own';pkg.productName='codex-own';pkg.description='Independent DeepSeek desktop';
 changes.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
 changes.set(pkg.main,Buffer.from(gateToolStartup('require("./own-runtime-win.cjs");\n'+asar.extractFile(archive,pkg.main.replaceAll('/',path.sep)).toString(),'own-runtime-win.cjs')));
 changes.set('.vite/build/own-runtime-win.cjs',fs.readFileSync(path.join(root,'own/runtime/windows.cjs')));
 let shellPatches=0,updaterPatches=0;
-function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const x of v)walk(x,fn);else if(v&&typeof v==='object')walk(v,fn)}}
 for(const name of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js'))){
  let s=changes.has(name)?changes.get(name).toString():asar.extractFile(archive,name.replaceAll('/',path.sep)).toString(),before=s;
- if(name.includes('startup-requirements-')){const result=isolateShellImport(s,'own-runtime-win.cjs');s=result.source;shellPatches+=result.patches;}
  if(s.includes('shouldIncludeUpdater')){
-  const edits=[];walk(acorn.parse(s,{ecmaVersion:'latest',sourceType:'module'}),n=>{
-   if(n.type==='Property'&&['shouldIncludeSparkle','shouldIncludeWindowsUpdater','shouldIncludeWindowsMsixUpdater','shouldIncludeUpdater'].includes(n.key?.name||n.key?.value)&&n.value?.body?.type==='BlockStatement')edits.push([n.value.body.start,n.value.body.end,'{return false}']);
-  });for(const [a,b,v] of edits.sort((a,b)=>b[0]-a[0])){s=s.slice(0,a)+v+s.slice(b);updaterPatches++}
+  const result=disableUpstreamUpdates(s);s=result.source;updaterPatches+=result.patches;
  }
  s=isolateRuntimeSource(s.replaceAll('codex://','codex-own://'));if(s!==before)changes.set(name,Buffer.from(s));
 }
+const shellSources=new Map(asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,'')).filter(n=>n.startsWith('.vite/build/')&&n.endsWith('.js')).map(n=>[n,changes.get(n)?.toString()||asar.extractFile(archive,n.replaceAll('/',path.sep)).toString()]));
+for(const [name,source]of isolateShellSources(shellSources,'own-runtime-win.cjs')){changes.set(name,Buffer.from(source));shellPatches++;}
 if(shellPatches!==1||updaterPatches===0)throw Error('Required Windows isolation patch missing');
 // Rebuild packed data while preserving every original unpacked/link entry.
 // MSIX scoped paths must already resolve to the original signed native files.
@@ -90,7 +102,7 @@ for(const n of ['ChatGPT.exe','Codex.exe'])fs.unlinkSync(path.join(app,n));
 fs.copyFileSync(path.join(root,'scripts/Install-CodexOwn.ps1'),path.join(out,'Install-CodexOwn.ps1'),fs.constants.COPYFILE_EXCL);
 fs.copyFileSync(path.join(root,'resources/own/deepseek-models.json'),path.join(out,'models.json'),fs.constants.COPYFILE_EXCL);
 fs.writeFileSync(path.join(out,'api-key.example.txt'),'Replace this line with your DashScope API key.\r\n',{flag:'wx'});
-const manifest={identity:'local.codex-own',version:pkg.version,architecture:'x64',exeSha256:hash(fs.readFileSync(outputExe)),asarSha256:hash(updated),asarHeaderHash:headerHash,windowsRuntimeTested:false,shellPatches,updaterPatches};
+const manifest={identity:'local.codex-own',version:pkg.version,architecture:'x64',exeSha256:hash(fs.readFileSync(outputExe)),asarSha256:hash(updated),asarHeaderHash:headerHash,windowsRuntimeTested:false,shellPatches,updaterPatches,payloadOptimization,languages:languagePlan.report,presentation:presentationPlan.report};
 fs.writeFileSync(path.join(app,'codex-own-build.json'),JSON.stringify(manifest,null,2),{flag:'wx'});
 verifyTranslations(app);
 console.log(JSON.stringify({ok:true,out,...manifest}));

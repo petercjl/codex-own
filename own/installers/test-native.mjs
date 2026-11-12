@@ -20,7 +20,7 @@ if(process.platform==='win32'){
  run=()=>execFileSync(path.join(payload,'engine','node'),[path.join(payload,'offline-install.mjs'),'--api-key-file',key],{env,stdio:'inherit',timeout:600000});run();
 }
 try{
- const lib=path.join(payload,process.platform==='win32'?'lib':'engine/lib'),node=path.join(payload,process.platform==='win32'?'node.exe':'engine/node');
+ const lib=path.join(payload,process.platform==='win32'?'lib':'engine/lib'),node=process.platform==='win32'?createRequire(import.meta.url)('../lib/bundled-node.cjs').resolveBundledNode(payload):path.join(payload,'engine/node');
  const inspect=`import fs from 'node:fs';import path from 'node:path';import{pathToFileURL}from'node:url';const base=process.argv[1],m=await import(pathToFileURL(path.join(base,'manager.mjs'))),tools=await import(pathToFileURL(path.join(base,'tool-runtime.mjs')));const p=m.paths(),s=m.state(p);if(!s||s.identity!=='local.codex-own'||s.releaseManifest?.binding?.managerVersion!==${JSON.stringify(version)})throw Error('Managed installation binding missing');if(!tools.runtimeDoctor().ok)throw Error('Private runtimes unavailable');if(JSON.parse(fs.readFileSync(path.join(p.core,'auth.json'))).auth_mode!=='apikey')throw Error('API configuration missing');console.log(JSON.stringify({root:p.root,core:p.core,target:p.target,desktop:s.version,manager:s.releaseManifest.binding.managerVersion}));`;
  const snapshot=()=>JSON.parse(execFileSync(node,['--input-type=module','-e',inspect,lib],{env,encoding:'utf8'}));const first=snapshot();
  const sentinel=path.join(first.core,'installer-preservation-sentinel.txt');fs.writeFileSync(sentinel,'configuration-and-chat-preserved',{flag:'wx',mode:0o600});

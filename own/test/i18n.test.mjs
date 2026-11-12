@@ -4,8 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {createRequire} from 'node:module';
-import {patchTranslationGate,inspectTranslations,verifyTranslations} from '../builders/i18n.mjs';
+import {patchTranslationGate,inspectTranslations,verifyTranslations,hasSimplifiedChineseDictionary} from '../builders/i18n.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
+test('numeric locale chunks require a real complete Simplified Chinese dictionary',()=>{
+ const dictionary={'sidebarElectron.productMode.trigger':'切换模式，当前模式：{mode}','sidebarElectron.productMode.work.description.recommended':'创建、学习和探索',...Object.fromEntries(Array.from({length:110},(_,i)=>['label'+i,'中文标签']))};
+ const source='const table=JSON.parse('+JSON.stringify(JSON.stringify(dictionary))+');';assert.equal(hasSimplifiedChineseDictionary(source),true);
+ assert.equal(hasSimplifiedChineseDictionary('// '+source),false);assert.equal(hasSimplifiedChineseDictionary(source.replace('切换模式','切換模式')),false);
+ assert.equal(hasSimplifiedChineseDictionary('const table='+JSON.stringify(Object.fromEntries(Object.entries(dictionary).slice(0,2)))+';'),false);
+});
 test('enable translation independently of remote defaults and preserve locale choice',()=>{
   const source='let a=config?.get(`enable_i18n`,!1),b=config.get("enable_i18n",true);let locale=config.get("locale_source","IDE");';
   const patched=patchTranslationGate(source);

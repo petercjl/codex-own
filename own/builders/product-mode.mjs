@@ -1,51 +1,49 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {patchNativeImageSettings} from './native-image-settings.mjs';
 const require=createRequire(import.meta.url),acorn=require('acorn');
-const helper='const __codexOwnApiMode=()=>globalThis.codexOwnProductPolicy?.contract===1&&globalThis.codexOwnProductPolicy.apiMode===true;\n';
+const helper='var __codexOwnApiMode=()=>globalThis.codexOwnProductPolicy?.contract===1&&globalThis.codexOwnProductPolicy.apiMode===true;\n';
 const stateMarker='/* codex-own:api-mode-state-v1 */';
 const switchMarker='/* codex-own:api-mode-switch-v1 */';
 const menuMarker='/* codex-own:api-mode-menu-v1 */';
 const detailMarker='/* codex-own:api-detail-state-v1 */';
 const onboardingMarker='/* codex-own:api-onboarding-state-v1 */';
 const preferenceMarker='/* codex-own:api-detail-write-v1 */';
-export const policyPreload=';(()=>{const {contextBridge,ipcRenderer}=require("electron");const p=ipcRenderer.sendSync("codex-own:product-policy:v1");if(!p||p.contract!==1||typeof p.apiMode!=="boolean")throw Error("codex-own product policy unavailable");contextBridge.exposeInMainWorld("codexOwnProductPolicy",{contract:1,apiMode:p.apiMode});})();\n';
+const productBridge=';(()=>{const {contextBridge,ipcRenderer}=require("electron");const p=ipcRenderer.sendSync("codex-own:product-policy:v1");if(!p||p.contract!==1||typeof p.apiMode!=="boolean")throw Error("codex-own product policy unavailable");contextBridge.exposeInMainWorld("codexOwnProductPolicy",{contract:1,apiMode:p.apiMode});})();\n';
+const accountDisplay=fs.readFileSync(new URL('../desktop/account-display-preload.js',import.meta.url),'utf8');
+export const policyPreload=productBridge+accountDisplay;
 function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const c of v)walk(c,fn);else if(v&&typeof v==='object')walk(v,fn);}}
 const key=p=>p.key?.name??p.key?.value;
 const property=(node,name)=>node?.properties?.find(p=>key(p)===name);
 const text=(s,n)=>s.slice(n.start,n.end);
 const stringValue=n=>n?.type==='Literal'?n.value:n?.type==='TemplateLiteral'&&n.expressions.length===0?n.quasis[0].value.cooked:undefined;
 const one=(items,name)=>{if(items.length!==1)throw Error(`Product mode contract changed: ${name} count=${items.length}`);return items[0];};
-export function patchProductModeSource(source){
-  if(!source.includes('sidebarElectron.productMode.trigger'))return {source,patched:false};
-  if(source.includes(stateMarker)){verifyProductModeSource(source);return {source,patched:false,already:true};}
+export function patchProductModeSource(source,{partial=false}={}){
+  const counts=()=>Object.fromEntries([['state',stateMarker],['transition',switchMarker],['selector',menuMarker],['onboarding',onboardingMarker]].map(([k,m])=>[k,source.split(m).length-1]));
+  if(!source.includes('sidebarElectron.productMode.trigger')&&!partial)return {source,patched:false};
+  if([stateMarker,switchMarker,menuMarker,onboardingMarker].some(m=>source.includes(m))){if(!partial)verifyProductModeSource(source);return {source,patched:false,already:true,counts:counts()};}
   const ast=acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'}),states=[],switches=[],selectors=[],onboarding=[];
   walk(ast,n=>{
     if(n.type==='ArrowFunctionExpression'&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'get')&&n.body.type==='BlockStatement'){
       const s=text(source,n.body),r=n.body.body.find(n=>n.type==='ReturnStatement')?.argument;
-      if(s.includes('conversationDetailMode')&&s.includes('STEPS_PROSE')&&s.length<2000&&r?.type==='ConditionalExpression'&&stringValue(r.consequent)==='work'&&stringValue(r.alternate)==='codex')states.push(n);
+      if(s.includes('conversationDetailMode')&&s.length<2000&&r?.type==='ConditionalExpression'&&stringValue(r.consequent)==='work'&&stringValue(r.alternate)==='codex')states.push(n);
     }
-    if(n.type==='FunctionDeclaration'&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'backendOnboardingCompleted')&&property(n.params[0],'auth')&&property(n.params[0],'codexFeatureAccess'))onboarding.push(n);
+    if(['FunctionDeclaration','FunctionExpression'].includes(n.type)&&n.params[0]?.type==='ObjectPattern'&&property(n.params[0],'backendOnboardingCompleted')&&property(n.params[0],'auth')&&property(n.params[0],'codexFeatureAccess'))onboarding.push(n);
     if(n.type==='FunctionDeclaration'&&n.params[1]?.type==='ObjectPattern'&&property(n.params[1],'nextMode')&&property(n.params[1],'codexLocalAccessStatus'))switches.push(n);
     if(n.type==='FunctionDeclaration'&&n.body.end-n.body.start<30000&&text(source,n.body).includes('sidebarElectron.productMode.trigger')&&text(source,n.body).includes('sidebarElectron.productMode.work.description.recommended'))selectors.push(n);
   });
-  const state=one(states,'state'),transition=one(switches,'transition'),selector=one(selectors,'selector');
-  const mode=property(transition.params[1],'nextMode').value;
-  if(mode.type!=='Identifier')throw Error('Unsupported product mode transition binding');
-  const edits=[
-    [state.body.start+1,state.body.start+1,`${stateMarker}if(__codexOwnApiMode())return "codex";`],
-    [transition.body.start+1,transition.body.start+1,`${switchMarker}if(__codexOwnApiMode()&&${mode.name}!=="codex")return;`],
-  ];
+  const optional=(items,name)=>partial&&!items.length?null:one(items,name);
+  const state=optional(states,'state'),transition=optional(switches,'transition'),selector=optional(selectors,'selector');
+  const edits=[];
+  if(state)edits.push([state.body.start+1,state.body.start+1,`${stateMarker}if(__codexOwnApiMode())return "codex";`]);
+  if(transition){const mode=property(transition.params[1],'nextMode').value;if(mode.type!=='Identifier')throw Error('Unsupported product mode transition binding');edits.push([transition.body.start+1,transition.body.start+1,`${switchMarker}if(__codexOwnApiMode()&&${mode.name}!=="codex")return;`]);}
+  if(selector){
   const bindings=[];walk(selector.body,n=>{if(n.type==='VariableDeclaration')for(const d of n.declarations)if(d.id.type==='ObjectPattern'&&property(d.id,'codexAvailable')&&property(d.id,'onModeSelect'))bindings.push({declaration:n,pattern:d.id});});
   const {declaration,pattern}=one(bindings,'selector bindings');
   const [available,selected,newChat]=['codexAvailable','mode','onNewChat'].map(k=>property(pattern,k)?.value);
   if([available,selected,newChat].some(n=>n?.type!=='Identifier'))throw Error('Unsupported product mode selector bindings');
   edits.push([declaration.end,declaration.end,`${menuMarker}if(__codexOwnApiMode()){${available.name}=true;${selected.name}="codex";${newChat.name}=void 0;}`]);
-  if(source.includes('backendOnboardingCompleted:')){
-    const gate=one(onboarding,'onboarding route gate'),auth=property(gate.params[0],'auth').value,completed=property(gate.params[0],'backendOnboardingCompleted').value;
-    if(auth.type!=='Identifier'||completed.type!=='Identifier')throw Error('Unsupported onboarding route bindings');
-    edits.push([gate.body.start+1,gate.body.start+1,`${onboardingMarker}if(__codexOwnApiMode()&&(${auth.name}.authMethod==="apikey"||(${auth.name}.authMethod==null&&${auth.name}.requiresAuth===false)))${completed.name}=true;`]);
-  }
   const items=[];walk(selector.body,n=>{
     if(n.type==='ObjectExpression'&&property(n,'onSelect')?.value.type==='Identifier'&&property(n,'SubText')?.value.type==='Identifier'&&property(n,'rightIconAsset')?.value.type==='Identifier')items.push(n);
   });
@@ -53,9 +51,16 @@ export function patchProductModeSource(source){
   edits.push([item.start+1,item.start+1,'disabled:__codexOwnApiMode(),"aria-disabled":__codexOwnApiMode(),']);
   edits.push([select.start,select.end,`__codexOwnApiMode()?void 0:(${text(source,select)})`]);
   edits.push([classes.start,classes.end,`(${text(source,classes)})+(__codexOwnApiMode()?" opacity-50 cursor-not-allowed":"")`]);
+  }
+  if(source.includes('backendOnboardingCompleted:')){
+    const gate=optional(onboarding,'onboarding route gate');if(gate){const auth=property(gate.params[0],'auth').value,completed=property(gate.params[0],'backendOnboardingCompleted').value;
+    if(auth.type!=='Identifier'||completed.type!=='Identifier')throw Error('Unsupported onboarding route bindings');
+    edits.push([gate.body.start+1,gate.body.start+1,`${onboardingMarker}if(__codexOwnApiMode()&&(${auth.name}.authMethod==="apikey"||(${auth.name}.authMethod==null&&${auth.name}.requiresAuth===false)))${completed.name}=true;`]);}
+  }
+  if(!edits.length)return {source,patched:false,counts:counts()};
   for(const [a,b,value]of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,a)+value+source.slice(b);
-  if(!source.includes(helper.trim()))source=helper+source;acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});verifyProductModeSource(source);
-  return {source,patched:true};
+  if(!source.includes(helper.trim()))source=helper+source;acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});if(!partial)verifyProductModeSource(source);
+  return {source,patched:true,counts:counts()};
 }
 export function verifyProductModeSource(source){
   for(const marker of [helper.trim(),stateMarker,switchMarker,menuMarker])if(source.split(marker).length!==2)throw Error('API product mode patch missing or duplicated');
@@ -66,6 +71,7 @@ export function verifyProductModeSource(source){
 export function patchProductModePreload(source){
   if(source.includes(policyPreload))return source;
   if(!source.includes('exposeInMainWorld'))throw Error('Main preload contract changed');
+  if(source.includes(productBridge))return source.replace(productBridge,policyPreload);
   return policyPreload+source;
 }
 export function patchProductModeShared(source){
@@ -90,21 +96,24 @@ export function patchProductModeShared(source){
 function verifyProductModeShared(source){for(const marker of [helper.trim(),detailMarker,preferenceMarker])if(source.split(marker).length!==2)throw Error('API execution mode patch missing or duplicated');}
 export function productModeChanges(asar,archive,{priorChanges=new Map()}={}){
   const changes=new Map();let renderers=0,preloads=0,shared=0;
+  const split=asar.listPackage(archive).some(n=>n.replaceAll('\\','/').endsWith('/early-bootstrap.js'));
+  const totals={state:0,transition:0,selector:0,onboarding:0};
   for(const file of asar.listPackage(archive).map(n=>n.replaceAll('\\','/').replace(/^\//,''))){
     if(file.startsWith('webview/assets/')&&file.endsWith('.js')){
       const original=(priorChanges.get(file)||asar.extractFile(archive,file.replaceAll('/',path.sep))).toString();let source=original;
-      if(source.includes('sidebarElectron.productMode.trigger')&&source.includes('sidebarElectron.productMode.work.description.recommended')&&source.includes('codexLocalAccessStatus:')){
-        const result=patchProductModeSource(source);if(result.patched||result.already){renderers++;source=result.source;}
+      if(split?(source.includes('codexLocalAccessStatus:')||(source.includes('codexAvailable:')&&source.includes('sidebarElectron.productMode.trigger'))||(source.includes('conversationDetailMode')&&source.includes('({get:'))||source.includes('backendOnboardingCompleted:')):(source.includes('sidebarElectron.productMode.trigger')&&source.includes('sidebarElectron.productMode.work.description.recommended')&&source.includes('codexLocalAccessStatus:'))){
+        const result=patchProductModeSource(source,{partial:split});if(result.patched||result.already){renderers++;source=result.source;}if(split)for(const k of Object.keys(totals))totals[k]+=result.counts?.[k]||0;
       }
       // Follow the implementation rather than a bundler's current chunk name.
       if(source.includes('previousWorkMode:')&&source.includes('selectedThreadDetailLevel:')){const result=patchProductModeShared(source);shared++;source=result.source;}
+      if(source.includes('GeneralSettings:'))source=patchNativeImageSettings(source).source;
       if(source!==original)changes.set(file,Buffer.from(source));
     }
     if(file==='.vite/build/preload.js'){
       const source=(priorChanges.get(file)||asar.extractFile(archive,file.replaceAll('/',path.sep))).toString(),updated=patchProductModePreload(source);preloads++;if(updated!==source)changes.set(file,Buffer.from(updated));
     }
   }
-  if(renderers!==1||preloads!==1||shared!==1)throw Error(`API product mode entry points missing: renderer=${renderers}, preload=${preloads}, shared=${shared}`);
+  if((split?Object.values(totals).some(n=>n!==1):renderers!==1)||preloads!==1||shared!==1)throw Error(`API product mode entry points missing: renderer=${renderers}, preload=${preloads}, shared=${shared}, split=${JSON.stringify(totals)}`);
   return changes;
 }
 export function verifyProductMode(app,asar){

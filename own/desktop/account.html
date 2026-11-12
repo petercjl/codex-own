@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'">
+<title>codex-own 账户</title><style>
+:root{color-scheme:light dark;font:15px system-ui}body{padding:28px;margin:0;background:light-dark(#f8f9fc,#1c1e22);color:light-dark(#20242c,#edf0f5)}h1{font-size:25px;margin:0 0 18px}p{line-height:1.7}.muted{font-size:13px;opacity:.75}button{font:inherit;padding:10px 16px;margin:8px 8px 0 0;border:1px solid #8790a3;border-radius:8px;cursor:pointer}#login,#restart{background:#3769df;color:white}button:disabled{opacity:.5}#status{min-height:48px}#code{font:700 25px monospace;letter-spacing:3px}[hidden]{display:none!important}
+</style></head><body>
+<h1>东轩AI授权</h1><p>使用公司钉钉账号登录，自动加载获授权的模型。</p>
+<p id="identity" class="muted"></p><p id="status" aria-live="polite">正在检查登录状态…</p>
+<p id="code" hidden></p><div><button id="login">使用东轩AI授权</button><button id="cancel" hidden>取消</button><button id="logout" hidden>退出登录</button><button id="restart" hidden>重启应用</button></div>
+<p class="muted">浏览器授权页会显示校验码，请与本窗口核对。应用更新保留登录状态，凭证过期后重新登录。</p><script src="account-ui.js"></script></body></html>
