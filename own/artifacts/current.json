@@ -3,20 +3,20 @@
   "manifest": {
     "schema": 2,
     "repository": "petercjl/codex-own",
-    "version": "0.6.12",
+    "version": "0.6.13",
     "platforms": {
       "win32-x64": {
         "entry": "app",
         "probe": {
           "path": "app/resources/codex.exe",
-          "offset": 1097692672,
+          "offset": 1097678848,
           "size": 373698352,
           "sha256": "83f5c2dd2ac2902e0d96ba5d8ccdd27d513f57df4a9ab73e06a5a518028e9a2f",
           "version": "codex-cli 0.167.0-alpha.4.1"
         },
         "transport": "canonical-tar-cdc-v1",
-        "size": 1938030592,
-        "sha256": "704d11b6d17f6671808330ceebf65be2b1010d0daab18239a1551b2992718d5c",
+        "size": 1938018816,
+        "sha256": "747e9cf4229523500f6d49ab0054467d91a1252e5b509fb57141d774824a3eed",
         "parts": [
           {
             "sha256": "fd5becb4ee09a9b72f26cfeef80b3b662703c116dd526931da25a838868fd8fd",
@@ -82,11 +82,11 @@
             "archiveSha256": "20f8f758798cfdf4562329de5dda5f1a3d29f6e5adf9f1c11fa8a3212b18cebf"
           },
           {
-            "sha256": "fc2464be542defb6fbf5a04088ff481c8e3fc5dfc2cd9ff148bf0149589d7d94",
-            "size": 21776896,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.hfc2464be542defb6fbf5a04088ff481c8e3fc5dfc2cd9ff148bf0149589d7d94.tgz",
-            "archiveSize": 11011916,
-            "archiveSha256": "4e4aa99303038cbfe3672108934a9113ba13e515557065127eca76a6acba8352"
+            "sha256": "4570fb8b77e9c8daceb5b8da3df57ab8ef1771e21f0d03f216dd731f3a1b3ee9",
+            "size": 21763072,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h4570fb8b77e9c8daceb5b8da3df57ab8ef1771e21f0d03f216dd731f3a1b3ee9.tgz",
+            "archiveSize": 11009270,
+            "archiveSha256": "727637828733067397243a9eef4e6568a96c2e749bcc2c669119dad082cd808c"
           },
           {
             "sha256": "362627c33b1b80a649d0dffe42dbfb14dc88cb92ceb7bc32108cbd5499a9e4cd",
@@ -376,11 +376,11 @@
             "archiveSha256": "8995b3520ffe2a110e371d350a3d74ef6061b28a78283c136c7d0436f082cb31"
           },
           {
-            "sha256": "396a2a8549a6e02874ff1c583f30bf2a82a9913494d2ef9ed0a1cbe55831ce27",
-            "size": 24807516,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h396a2a8549a6e02874ff1c583f30bf2a82a9913494d2ef9ed0a1cbe55831ce27.tgz",
-            "archiveSize": 8332671,
-            "archiveSha256": "ea0169c1d88476644730b94d3cb112eef6a05401522a5f9d69f02019f624c8c2"
+            "sha256": "0b62112648122bf5ce6b171ec191d9d56fc3facd976955952fd98876cabd7a54",
+            "size": 24809564,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h0b62112648122bf5ce6b171ec191d9d56fc3facd976955952fd98876cabd7a54.tgz",
+            "archiveSize": 8333210,
+            "archiveSha256": "e251c7accc9e47652a45ed839753c60311521766832a127923326c21e677b997"
           },
           {
             "sha256": "55f2f328ee74939a767834a8ecac7ec984d405685910c61e6df426fd4d173146",
@@ -422,37 +422,53 @@
     },
     "provenance": {
       "win32-x64": {
-        "upstreamCommit": null,
-        "ownSourceRef": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+        "nativeBase": {
+          "version": "0.6.12",
+          "identity": "704d11b6d17f6671808330ceebf65be2b1010d0daab18239a1551b2992718d5c",
+          "source": {
+            "win32-x64": {
+              "upstreamCommit": null,
+              "ownSourceRef": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+              "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+              "toolchain": {
+                "node": "v24.15.0",
+                "platform": "win32-x64",
+                "image": "20261103.298.1"
+              },
+              "originalProgramTree": {
+                "sha256": "1c42ce6c006fe9e2eb40931f102edc1b029c07d194a8ffab06b7fe3c1d432ec1",
+                "fileCount": 3679
+              },
+              "originalAsarSha256": "54b74a9131680fc9eead711ed5d9f718f6127c22222ca60d2e3b577a707e2485",
+              "cliSource": "upstream-bundled",
+              "cliSha256": "83f5c2dd2ac2902e0d96ba5d8ccdd27d513f57df4a9ab73e06a5a518028e9a2f",
+              "missingUnpackedBindings": [],
+              "msixPathRestorations": [
+                {
+                  "path": "node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node",
+                  "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/%40serialport/bindings-cpp/build/Release/bindings.node",
+                  "sha256": "bc934030390b886e8f21e5c5be37dc66a43e0fe7f541d4ef95992997e575a969",
+                  "size": 803120
+                },
+                {
+                  "path": "node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
+                  "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
+                  "sha256": "292274a65e72e88737f411075677f2c6ba47e6f725a66329c89f5de2ccb098df",
+                  "size": 1591088
+                }
+              ],
+              "cliVersion": "codex-cli 0.167.0-alpha.4.1"
+            }
+          }
+        },
+        "upgradeNpmUpdater": true,
+        "overlaySource": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
         "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
         "toolchain": {
           "node": "v24.15.0",
           "platform": "win32-x64",
           "image": "20261103.298.1"
-        },
-        "originalProgramTree": {
-          "sha256": "1c42ce6c006fe9e2eb40931f102edc1b029c07d194a8ffab06b7fe3c1d432ec1",
-          "fileCount": 3679
-        },
-        "originalAsarSha256": "54b74a9131680fc9eead711ed5d9f718f6127c22222ca60d2e3b577a707e2485",
-        "cliSource": "upstream-bundled",
-        "cliSha256": "83f5c2dd2ac2902e0d96ba5d8ccdd27d513f57df4a9ab73e06a5a518028e9a2f",
-        "missingUnpackedBindings": [],
-        "msixPathRestorations": [
-          {
-            "path": "node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node",
-            "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/%40serialport/bindings-cpp/build/Release/bindings.node",
-            "sha256": "bc934030390b886e8f21e5c5be37dc66a43e0fe7f541d4ef95992997e575a969",
-            "size": 803120
-          },
-          {
-            "path": "node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
-            "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
-            "sha256": "292274a65e72e88737f411075677f2c6ba47e6f725a66329c89f5de2ccb098df",
-            "size": 1591088
-          }
-        ],
-        "cliVersion": "codex-cli 0.167.0-alpha.4.1"
+        }
       }
     },
     "runtimes": {
@@ -509,26 +525,26 @@
     },
     "binding": {
       "schema": 1,
-      "managerVersion": "0.6.12",
+      "managerVersion": "0.6.13",
       "managerSource": {
         "repository": "petercjl/codex-own",
-        "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
-        "run": "43246580025",
+        "ref": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
+        "run": "43268403752",
         "workflow": ".github/workflows/own-release.yml"
       },
       "managerContract": 2,
       "releasePolicyFingerprint": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
       "desktop": {
-        "artifactVersion": "0.6.12",
-        "publishedIn": "0.6.12",
-        "identity": "df95460907458e6d49b9c7863d1852f6fa128c637c1f9fb15793d543113ca2eb",
-        "inputFingerprint": "6bebf96698c386d00821544e344a3e42c33f02af64ba06f8eaab4bbd120d3cdc",
-        "declaredFingerprint": "3db99d0d505be78cd336b5e7d2c28b09bf1dfbf2cc67e39e44c1aaec40fc9cd7",
+        "artifactVersion": "0.6.13",
+        "publishedIn": "0.6.13",
+        "identity": "2f04aba15282dbf472ce992d3b44623401b897a9e46206dbd9c65445e2067202",
+        "inputFingerprint": "624cdf58fcbe9a996df02b0a94ffcca63967d49021b78dc80c17a91c050a4945",
+        "declaredFingerprint": "5d8ab856ebd4a40f3f16e58f1da60cd6422e99247edb21340c3d356545fa82de",
         "upstreamFingerprint": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
         "source": {
           "repository": "petercjl/codex-own",
-          "ref": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
-          "run": "43246580025",
+          "ref": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
+          "run": "43268403752",
           "workflow": ".github/workflows/own-release.yml"
         },
         "updaterContract": 2,
@@ -682,7 +698,7 @@
       },
       "own/README.md": {
         "kind": "manager",
-        "sha256": "64d112a59a25b1f2ef4e63240edaca25c52d3f921dad3420d85992a84aefcb86"
+        "sha256": "1ad2fc4fbb9e97ecb891f5e1d18cbe97f9f11c02dd903a21d21adb915559fd04"
       },
       "own/TUDA-INTEGRATION-HANDOFF.md": {
         "kind": "release",
@@ -782,7 +798,7 @@
       },
       "own/builders/upgrade-updater.mjs": {
         "kind": "native",
-        "sha256": "39b0c3539820d5ec163859781c444e23d322e683e44da539b9e1de299bcd637a"
+        "sha256": "a84514e4beaf9b1830e35ed19bb10ec6d25d57f5cb3881084d5e916a2a6e8caf"
       },
       "own/builders/upstream-resolver.mjs": {
         "kind": "native",
@@ -810,7 +826,7 @@
       },
       "own/capabilities.json": {
         "kind": "manager",
-        "sha256": "4024bb93cee56b6ea234cfa5e9215308de300e77f0fdf1c7366f499030829251"
+        "sha256": "55920d8db3696b8db1b6175366970b6b29bbca7d6d39941bd8f26857be097097"
       },
       "own/ci/artifact-inputs.mjs": {
         "kind": "release",
@@ -1034,7 +1050,7 @@
       },
       "own/desktop/controller.cjs": {
         "kind": "native",
-        "sha256": "7c6158e2b8ee38da80222adc405869945b45b92f0c8d1226f7ac77c7ad6ee4a8"
+        "sha256": "42567cf806dbc2bc914516ca7ae30dcd85c35ee2619c94d6f9e119bdc9cf5ab5"
       },
       "own/desktop/image-settings-component.js": {
         "kind": "native",
@@ -1066,7 +1082,7 @@
       },
       "own/desktop/update-ui.js": {
         "kind": "native",
-        "sha256": "3d7569356e6ed5b0018a1f3888252c0480a7ff2844d18ad1ee3c77677d443576"
+        "sha256": "6154cbd35c934a6245d47419e4c14804079ad3cedd5866322b0231c83dd09bb9"
       },
       "own/desktop/update.html": {
         "kind": "native",
@@ -1078,7 +1094,7 @@
       },
       "own/desktop/worker.mjs": {
         "kind": "native",
-        "sha256": "b0ddd56f92feb39379526bfa8354b1ec69191b4c431fe392b14a308e4d8fb30d"
+        "sha256": "6f5acd965fdd6677ebfe421596f6197f7905e36183005f4a92706980d84ece8c"
       },
       "own/dev.mjs": {
         "kind": "release",
@@ -1146,7 +1162,7 @@
       },
       "own/lib/app-update.mjs": {
         "kind": "native",
-        "sha256": "1326a1c2e85a012a3480da22aa6c30dc5843ddb015a6b8454c1b773273661a93"
+        "sha256": "0d7a70798a95ecb5d556df793abfd87efe3ad0d20ff2c44b2f0266272b9d098c"
       },
       "own/lib/archive-inventory.mjs": {
         "kind": "native",
@@ -1250,7 +1266,7 @@
       },
       "own/lib/tool-runtime.mjs": {
         "kind": "native",
-        "sha256": "16a79f2da9be658e2c023c0336b1cbcce1853badc93af9f734913a8962128d72"
+        "sha256": "1bc220b0943986115387b91e379e5fe7463aeac871fddc5b53ed101802642c9b"
       },
       "own/lib/tool-search-compat.cjs": {
         "kind": "native",
@@ -1306,7 +1322,7 @@
       },
       "own/skills/codex-own/SKILL.md": {
         "kind": "manager",
-        "sha256": "0c21e38ff7e90b40e0e9857357ae33f184410c4162cdd7cb3490b4a7691e8940"
+        "sha256": "bc6b94b19bbabf95a32c326de6d27052f4359088fc80f66b5078d0ff7293ecf0"
       },
       "own/skills/codex-own/adapters/codex.json": {
         "kind": "manager",
@@ -1338,7 +1354,7 @@
       },
       "own/test/app-update.test.mjs": {
         "kind": "manager",
-        "sha256": "97110f6c2333d958758aabe124930ee79aeeeced161751b58dcce0a077bfe31a"
+        "sha256": "cc56be75ad18a8282bb7167ce5b93eab443f42226e841c11d3df25885d383ec1"
       },
       "own/test/binding.test.mjs": {
         "kind": "manager",
@@ -1462,7 +1478,7 @@
       },
       "own/test/overlay-migration.test.mjs": {
         "kind": "manager",
-        "sha256": "0af301d652744d5df08c108501a61861b72f0992369f328feadafe238443910d"
+        "sha256": "96724dd2c51cac408f7c6a3db98b9bf8fdf290e41c63d1cd68670145e6eb87be"
       },
       "own/test/patch-compat.test.mjs": {
         "kind": "manager",
@@ -1530,7 +1546,7 @@
       },
       "own/test/tool-runtime.test.mjs": {
         "kind": "manager",
-        "sha256": "5aa9caf460e4d0ce194b9db70916e8ba1e00fb4da50b45b466fc205795d6d979"
+        "sha256": "1a131708f9fb8d02ba1c8901f904df6b5683ee89a0ba329d3a1379db679cd283"
       },
       "own/test/tuda-connection.test.mjs": {
         "kind": "manager",
@@ -1550,7 +1566,7 @@
       },
       "own/test/update-ui.test.mjs": {
         "kind": "manager",
-        "sha256": "70bf8ea47c6754a703370e7747a50130a6c4ab3aed870d39ded57634b65b8d74"
+        "sha256": "2cf71c2be5e191718fef51bb546c68b699a8987f9027002d7ae018ea061d2ed1"
       },
       "own/test/updater-dependency.test.mjs": {
         "kind": "manager",
@@ -1745,15 +1761,15 @@
         "sha256": "27699310c7ef6845c7dff004bc74280d7c7ff623c0d484f3c0280402a296b600"
       }
     },
-    "native": "3db99d0d505be78cd336b5e7d2c28b09bf1dfbf2cc67e39e44c1aaec40fc9cd7",
+    "native": "5d8ab856ebd4a40f3f16e58f1da60cd6422e99247edb21340c3d356545fa82de",
     "runtime": "81338f447b406bc0d274f748557b32bfe2959925ab301b57fc5c5bea6656b53c",
     "release": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
     "upstream": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
     "unknown": []
   },
   "registry": {
-    "version": "0.6.12",
-    "integrity": "sha512-RuFtRKIorDeF1xuPKVlsjokoVRzLnKUIumAA4TFamSJiq4M0lfOImqIftTdfBJ7JCGfuTi+vjX0JbAifuc9Qvg==",
-    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.12.tgz"
+    "version": "0.6.13",
+    "integrity": "sha512-JU0QmjDbFLJduhixxSNvAZPj0kQHqbQ/yz0Jra5IxCsIl9Zhwv7tMxu0NNdOcazPHv6ZBwka8uCw1zmJUPU1mQ==",
+    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.13.tgz"
   }
 }
