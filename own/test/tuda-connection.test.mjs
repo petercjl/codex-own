@@ -4,8 +4,8 @@ const caps=JSON.parse(fs.readFileSync(new URL('./fixtures/tuda-capabilities.json
 function fixture(t){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-connection-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;}
 test('independent connection resolves standard or explicit existing Dev data without creating an App',t=>{
  const root=fixture(t),before=fs.readdirSync(root);assert.equal(connectionOptions(root,{platform:'darwin',home:root}).userDataPath,path.join(root,'Library/Application Support/Tuda'));assert.deepEqual(fs.readdirSync(root),before);
- const file=path.join(root,'tuda-connection.json');fs.writeFileSync(file,JSON.stringify({contract:1,userDataPath:root+'/dev-data'}),{flag:'wx',mode:0o600});assert.equal(connectionOptions(root).userDataPath,root+'/dev-data');assert(!fs.existsSync(root+'/dev-data'));
- fs.chmodSync(file,0o644);assert.throws(()=>connectionOptions(root),/INVALID/);
+ const dataPath=path.join(root,'dev-data'),file=path.join(root,'tuda-connection.json');fs.writeFileSync(file,JSON.stringify({contract:1,userDataPath:dataPath}),{flag:'wx',mode:0o600});assert.equal(connectionOptions(root).userDataPath,dataPath);assert(!fs.existsSync(dataPath));
+ fs.chmodSync(file,0o644);if(process.platform==='win32')assert.doesNotThrow(()=>connectionOptions(root));else assert.throws(()=>connectionOptions(root),/INVALID/);
  fs.chmodSync(file,0o600);fs.writeFileSync(file,JSON.stringify({contract:1,userDataPath:root,appPath:'/unexpected.app'}));assert.throws(()=>connectionOptions(root),/INVALID/);
 });
 test('legacy shared authorization is rejected before credentials can be handed off; live versions are checked',t=>{
