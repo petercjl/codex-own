@@ -1,6 +1,6 @@
 {
   "name": "@petercjl/codex-own",
-  "version": "0.6.15",
+  "version": "0.6.16",
   "description": "Independent codex-own desktop installation and update manager",
   "type": "module",
   "bin": {
