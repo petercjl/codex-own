@@ -56,4 +56,4 @@ app.whenReady().then(() => {
     app.dock.setIcon = () => setIcon(icon);
   }
 });
-module.exports = {apply, paths,ensureTools:()=>require(path.join(resources,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply)};
+module.exports = {apply, paths,ensureTools:async()=>{await require(path.join(resources,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply);return require(path.join(resources,'own-updater','desktop','company-tools.cjs')).ensure(require('electron'),root,apply);}};

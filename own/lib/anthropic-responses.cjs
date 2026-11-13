@@ -130,7 +130,7 @@ async function serve({body, route, response, signal, fetch: fetchApi}) {
   const {request, tools} = toMessages(body, route);
   const Anthropic = require('@anthropic-ai/sdk').default;
   // The official SDK appends /v1/messages; SealWork's baseURL includes /v1.
-  const client = new Anthropic({apiKey: route.apiKey, baseURL: route.baseURL.replace(/\/v1\/?$/, ''), defaultHeaders: {'x-api-key': route.apiKey}, fetch: fetchApi, maxRetries: 0, timeout: 180000});
+  const client = new Anthropic({apiKey: route.apiKey, baseURL: route.baseURL.replace(/\/v1\/?$/, ''), defaultHeaders: {'x-api-key': route.apiKey}, fetch: fetchApi, maxRetries: 0, timeout: 600000});
   const stream = await client.messages.create(request, {signal});
   const id = 'resp_' + crypto.randomUUID(), output = [], blocks = new Map();
   let usage = {}, stopped = false, stopReason;

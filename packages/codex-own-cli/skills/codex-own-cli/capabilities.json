@@ -1,0 +1,40 @@
+{
+  "schema": "portable-skill-capabilities",
+  "schema_version": "1.0.0",
+  "skill": "codex-own-cli",
+  "target_platforms": [
+    "generic"
+  ],
+  "host_resolution": {
+    "fallback_adapter": "generic"
+  },
+  "capabilities": [
+    {
+      "id": "command.execute",
+      "purpose": "Run the bundled CLI against the selected desktop",
+      "required": true,
+      "required_features": [
+        "node22",
+        "local-files",
+        "process-execution"
+      ],
+      "input_fields": [
+        "argv"
+      ],
+      "output_fields": [
+        "json",
+        "exitCode"
+      ],
+      "side_effects": {
+        "external_mutation": true,
+        "may_cost_money": true,
+        "authorization": "Explicit user conversation instructions; desktop approvals preserved"
+      },
+      "standard_errors": [
+        "DESKTOP_CONTROL_UNAVAILABLE",
+        "CONTROL_OUTCOME_UNKNOWN",
+        "EVENT_CURSOR_EXPIRED"
+      ]
+    }
+  ]
+}

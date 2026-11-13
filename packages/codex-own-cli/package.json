@@ -1,0 +1,37 @@
+{
+  "name": "@petercjl/codex-own-cli",
+  "version": "0.1.0",
+  "description": "Local conversation control for the running codex-own development desktop",
+  "type": "module",
+  "bin": {
+    "codex-own-cli": "bin/codex-own-cli.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skills",
+    "capabilities.json",
+    "README.md",
+    "INSTALL.md",
+    "UPDATE.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "prepack": "node bin/validate-package.mjs"
+  },
+  "agentPackage": {
+    "kind": "cli-skill",
+    "installationLifecycle": {
+      "skillRequired": true,
+      "updateRequiresSkillSync": true
+    }
+  }
+}

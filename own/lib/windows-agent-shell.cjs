@@ -41,17 +41,11 @@ function request(message,selection,baseline=''){
  if(typeof original!=='string')throw Object.assign(Error('Session developer instructions must be a string'),{code:'SHELL_POLICY_INVALID'});
  return {...message,params:{...message.params,developerInstructions:compose(original,selection)}};
 }
-function inputStream(selection,{baseline=()=>'',maxFrameBytes=64*1024*1024}={}){
- let pending=Buffer.alloc(0);
- return new Transform({transform(chunk,_encoding,done){
-  try{pending=Buffer.concat([pending,chunk]);let end;
-   while((end=pending.indexOf(10))>=0){const frame=pending.subarray(0,end),rest=pending.subarray(end+1);if(frame.length>maxFrameBytes)throw Object.assign(Error('Agent request exceeds shell-policy framing limit'),{code:'SHELL_POLICY_FRAME_TOO_LARGE'});let message;try{message=JSON.parse(frame.toString('utf8'));}catch{this.push(pending.subarray(0,end+1));pending=rest;continue;}
-    const session=selection.supported&&['thread/start','thread/resume','thread/fork'].includes(message?.method)&&message.params&&typeof message.params==='object'&&!Array.isArray(message.params);
-    if(!session)this.push(pending.subarray(0,end+1));else this.push(JSON.stringify(request(message,selection,baseline()))+'\n');pending=rest;
-   }
-   if(pending.length>maxFrameBytes)throw Object.assign(Error('Agent request exceeds shell-policy framing limit'),{code:'SHELL_POLICY_FRAME_TOO_LARGE'});done();
-  }catch(error){done(error);}
- },flush(done){if(pending.length)this.push(pending);done();}});
+function inputStream(selection,{baseline=()=>'',maxFrameBytes=require('./request-budget.cjs').maxRequestBytes()}={}){
+ return require('./request-budget.cjs').frames({maxFrameBytes,allowIncomplete:true,code:'SHELL_POLICY_FRAME_TOO_LARGE',adapt:message=>{
+  const session=selection.supported&&['thread/start','thread/resume','thread/fork'].includes(message?.method)&&message.params&&typeof message.params==='object'&&!Array.isArray(message.params);
+  return session?request(message,selection,baseline()):message;
+ }});
 }
 function serverInvocation(file,args,cli){
  if(typeof file!=='string'||!Array.isArray(args)||path.resolve(file).toLowerCase()!==path.resolve(cli).toLowerCase())return false;

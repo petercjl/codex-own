@@ -35,7 +35,8 @@
     "scripts/",
     "forge.config.js",
     "package.json",
-    "package-lock.json"
+    "package-lock.json",
+    "own/native/"
   ],
   "runtime": [
     "own/runtime/sources.json",
@@ -55,7 +56,12 @@
     ".npmignore",
     "README.md",
     "LICENSE",
-    "own/TUDA-INTEGRATION-HANDOFF.md"
+    "own/TUDA-INTEGRATION-HANDOFF.md",
+    "service/",
+    "packages/",
+    "own/development-retention.mjs",
+    "own/COMPANY-TOOLS.md",
+    "own/TUDA-INTEGRATION-HISTORY.md"
   ],
   "generated": [
     "own/release.json",

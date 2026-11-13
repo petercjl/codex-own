@@ -15,25 +15,8 @@ function request(message,active){
  delete params.toolOutput;
  return {...message,params};
 }
-function inputStream({active=()=>false,adapt=request,maxFrameBytes=64*1024*1024}={}){
- let pending=Buffer.alloc(0);
- return new Transform({
-  transform(chunk,_encoding,done){
-   try{
-    pending=Buffer.concat([pending,chunk]);let end;
-    while((end=pending.indexOf(10))>=0){
-     if(end>maxFrameBytes)throw Object.assign(Error('API input frame exceeds limit'),{code:'API_INPUT_FRAME_TOO_LARGE'});
-     const frame=pending.subarray(0,end),bytes=pending.subarray(0,end+1);pending=pending.subarray(end+1);
-     let message;try{message=JSON.parse(frame.toString('utf8'));}catch{this.push(bytes);continue;}
-     const next=adapt(message,active(message));
-     this.push(next===message?bytes:Buffer.from(JSON.stringify(next)+'\n'));
-    }
-    if(pending.length>maxFrameBytes)throw Object.assign(Error('API input frame exceeds limit'),{code:'API_INPUT_FRAME_TOO_LARGE'});
-    done();
-   }catch(e){done(e);}
-  },
-  flush(done){if(pending.length){done(Object.assign(Error('Incomplete app-server input frame'),{code:'API_INPUT_INCOMPLETE_FRAME'}));return;}done();}
- });
+function inputStream({active=()=>false,adapt=request,maxFrameBytes=require('./request-budget.cjs').maxRequestBytes()}={}){
+ return require('./request-budget.cjs').frames({maxFrameBytes,adapt:message=>adapt(message,active(message))});
 }
 function serverInvocation(file,args,cli){
  if(typeof file!=='string'||!Array.isArray(args)||path.resolve(file).toLowerCase()!==path.resolve(cli).toLowerCase())return false;
@@ -46,6 +29,8 @@ function install({cli,core,processApi=childProcess}={}){
  if(processApi[HOOK])return processApi[HOOK];
  const original=processApi.spawn;
  processApi.spawn=function(file,args,options){
+  // Desktop startup probes use bare flags; the selected CLI owns these under app-server.
+  if(typeof file==='string'&&Array.isArray(args)&&path.resolve(file).toLowerCase()===path.resolve(cli).toLowerCase()&&args[0]==='--print-startup-config')return original.call(this,file,['app-server',...args],options);
   if(!serverInvocation(file,args,cli))return original.apply(this,arguments);
   args=require('./tuda-plugin.cjs').argumentsFor(args,path.resolve(__dirname,'..'),core);
   const tools=require('./tool-env.cjs');
@@ -59,8 +44,23 @@ function install({cli,core,processApi=childProcess}={}){
   // This decision belongs to the spawned backend's provider, which is fixed
   // for its lifetime. A per-session override can only turn the adapter off.
   const baseActive=enabled(baseline);
+  const vault=require('./direct-credentials.cjs'),bootstrap=baseActive&&vault.required(core);
+  let bootstrapFD;
+  if(bootstrap){
+   const stdio=options?.stdio??'pipe',streams=Array.isArray(stdio)?[...stdio]:stdio==='pipe'?['pipe','pipe','pipe']:null;
+   if(!streams)throw Error('Managed credentials require a dedicated backend pipe');
+   while(streams.length<3)streams.push('pipe');bootstrapFD=streams.length;streams.push('pipe');
+   options={...options,stdio:streams,env:{...(options?.env||process.env),OWN_MANAGED_BOOTSTRAP_FD:String(bootstrapFD)}};
+  }
   const invocation=baseActive?require('./subagent-bridge.cjs').invocation({cli:file,args,options,core,config:baseline}):null;
   const child=invocation?original.call(this,invocation.file,invocation.args,invocation.options):original.call(this,file,args,options);
+  if(bootstrap){
+   if(!invocation||!child.stdio?.[bootstrapFD]){child.kill();throw Error('Protected backend pipe is unavailable');}
+   const pipe=child.stdio[bootstrapFD];pipe.on('error',()=>child.kill());
+   // The Windows OS credential store becomes available after Electron is ready.
+   // Queue the private bootstrap without blocking the desktop's startup handshake.
+   Promise.resolve().then(()=>{if(process.versions.electron||process.type==='browser'){const app=require('electron').app;return app?.whenReady?.();}}).then(()=>vault.bootstrap(core)).then(value=>pipe.end(JSON.stringify(value))).catch(()=>pipe.end(JSON.stringify({schema:1,unavailable:true})));
+  }
   if(!baseActive||!child.stdin)return require('./desktop-control.cjs').attach(child,core);
   const active=message=>{
    const c=message?.params?.config;

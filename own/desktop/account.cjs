@@ -20,8 +20,8 @@ function start({app,BrowserWindow,Menu,MenuItem,ipcMain,shell},root,{loadClient}
  async function status(){
   if(busy)return state;if(statusPromise)return statusPromise;const started=revision;
   statusPromise=(async()=>{
-   try{const result=await(await client()).loginStatus(p);if(started===revision&&!busy)emit({...result,phase:result.authenticated?'signed-in':'signed-out',restartRequired:state.restartRequired===true,message:result.expired?'登录已过期或权限已变化，请重新登录。':''});}
-   catch(e){if(started===revision&&!busy)emit({phase:'error',authenticated:false,name:'',message:e.code==='SESSION_INVALID'?e.message:'暂时无法连接登录服务，请检查网络后重试。'});}
+   try{const result=await(await client()).loginStatus(p);if(started===revision&&!busy)emit({...result,phase:result.authenticated?'signed-in':'signed-out',restartRequired:result.restartRequired===true||state.restartRequired===true,message:result.expired?'登录已过期或权限已变化，请重新登录。':''});}
+   catch(e){console.error('[codex-own-account] '+(/^[A-Z_]{1,64}$/.test(e.code||'')?e.code:'ACCOUNT_CHECK_FAILED'));if(started===revision&&!busy)emit({phase:'error',authenticated:false,name:'',message:e.code==='SESSION_INVALID'?e.message:/^CREDENTIAL_/.test(e.code||'')?'无法安全读取或保存模型凭据，请检查系统凭据存储后重试。':'暂时无法连接登录服务，请检查网络后重试。'});}
    finally{lastChecked=Date.now();statusPromise=null;}return state;
   })();return statusPromise;
  }
@@ -78,7 +78,7 @@ function start({app,BrowserWindow,Menu,MenuItem,ipcMain,shell},root,{loadClient}
   const menu=Menu.getApplicationMenu();if(menu)Menu.setApplicationMenu(menu);
   status();
  });
- const timer=setInterval(()=>{if(!busy)status();},15*60*1000);timer.unref();
+ const timer=setInterval(()=>{if(!busy)status();},2*60*1000);timer.unref();
  app.on('browser-window-focus',()=>{if(!busy&&Date.now()-lastChecked>30000)status();});
  app.on('before-quit',()=>clearInterval(timer));
  app.on('before-quit',cancel);

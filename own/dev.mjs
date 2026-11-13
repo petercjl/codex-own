@@ -8,12 +8,13 @@ import {execFileSync, spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
 import {prepareOfficialCli, validateCliVersion} from './builders/official-cli.mjs';
+import {planDevelopmentCleanup, runDevelopmentCleanup} from './development-retention.mjs';
 
 const repository = path.resolve(import.meta.dirname, '..');
 const appName = 'codex-own 开发版.app';
 const identifier = 'local.codex-own.development';
 const require = createRequire(import.meta.url);
-const extraSources = ['own/dev.mjs', 'own/test/dev.test.mjs', 'own/DEVELOPMENT.md'];
+const extraSources = ['own/dev.mjs', 'own/test/dev.test.mjs', 'own/DEVELOPMENT.md', 'own/development-retention.mjs', 'own/test/development-retention.test.mjs'];
 const writeNew = (file, value) => {
   if (fs.existsSync(file)) throw Error('Evidence already exists: ' + file);
   fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', {flag: 'wx', mode: 0o600});
@@ -153,7 +154,23 @@ export function developmentOptions(args) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const cleanupOptions = {repository, target: path.join('/Applications', appName),
+    liveData: path.join(os.userInfo().homedir, '.codex-own-dev/Library/Application Support/codex-own-independent')};
+  if (args[0] === 'cleanup') {
+    if (args.length === 4 && args[1] === 'resume' && args[3] === '--yes') {
+      console.log(JSON.stringify(await runDevelopmentCleanup({...cleanupOptions, resumeAudit: path.resolve(args[2])}))); return;
+    }
+    if (!((args.length === 2 && args[1] === 'plan') || (args.length === 3 && args[1] === 'run' && args[2] === '--yes')))
+      throw Error('Usage: node own/dev.mjs cleanup plan | cleanup run --yes | cleanup resume AUDIT --yes');
+    const plan = planDevelopmentCleanup(cleanupOptions);
+    if (args[1] === 'plan') {
+      const targets = plan.targets.map(t => ({...t, allocatedBytes: Number(run('du', ['-sk', t.path]).split(/\s/)[0]) * 1024}));
+      console.log(JSON.stringify({retained: plan.retained, installedFingerprint: plan.installedFingerprint, warnings: plan.warnings, targets}));
+    } else console.log(JSON.stringify(await runDevelopmentCleanup({...cleanupOptions, plan})));
+    return;
+  }
   if (args.includes('--help')) {
+    console.log('Retention: cleanup plan | cleanup run --yes. Builds automatically retain the installed recovery point and its latest successful predecessor; divergent source/data are archived before pruning.');
     console.log('Usage: node own/dev.mjs [--install] [--launch] [--cli-version X.Y.Z] [--upstream-app APP]\nBuilds a frozen source snapshot, runs native/GUI checks, then optionally backs up and installs the fixed development app. Explicit upstream input must have the official OpenAI signature. --launch requires --install. Reports are in out/dev-build-*.noindex.');
     return;
   }
@@ -202,7 +219,22 @@ async function main() {
     report.stages.push({stage, ok: result.status === 0, log});
     if (result.status !== 0) throw Error('Stage failed: ' + stage + '; see ' + log);
   };
+  const cleanup = async phase => {
+    try {
+      const retentionOptions = {...cleanupOptions, allowedLock: lock};
+      const plan = planDevelopmentCleanup(retentionOptions);
+      if (!plan.targets.length) return;
+      console.error('[codex-own-dev] ' + phase + ' retention: ' + plan.targets.length + ' obsolete directories');
+      const result = await runDevelopmentCleanup({...retentionOptions, plan});
+      writeNew(path.join(output, 'retention-' + phase + '.json'), result);
+    } catch (error) {
+      // Missing recovery evidence defers deletion and never undoes a valid install.
+      writeNew(path.join(output, 'retention-' + phase + '.json'), {deferred: true, reason: error.message});
+      console.error('[codex-own-dev] Retention deferred: ' + error.message);
+    }
+  };
   try {
+    await cleanup('before');
     report.sourceRef = run('git', ['rev-parse', 'HEAD']).trim();
     report.branch = run('git', ['branch', '--show-current']).trim();
     const inventory = sourceInventory(repository); report.sourceFingerprint = inventory.sha256;
@@ -233,7 +265,7 @@ async function main() {
     const needle = "automaticUpdates:false,sourceRef:";
     if (original.split(needle).length !== 2) throw Error('Unknown development marker contract');
     fs.writeFileSync(builder, original.replace(needle, `automaticUpdates:false,sourceFingerprint:${JSON.stringify(inventory.sha256)},sourceRef:`));
-    execute('unit', runtime.node, ['--test', '--test-concurrency=2', 'test/dev.test.mjs', 'test/official-cli.test.mjs', 'test/instance-isolation.test.mjs', 'test/mac-signing.test.mjs', 'test/model-access.test.mjs', 'test/model-router.test.mjs', 'test/model-configuration.test.mjs', 'test/updater-dependency.test.mjs', 'test/tuda-plugin.test.mjs', 'test/tuda-package.test.mjs', 'test/tuda-connection.test.mjs', 'test/desktop-control.test.mjs'], path.join(snapshot, 'own'));
+    execute('unit', runtime.node, ['--test', '--test-concurrency=2', 'test/company-tools.test.mjs', 'test/company-tools-ui.test.mjs', 'test/product-mode.test.mjs', 'test/dev.test.mjs', 'test/development-retention.test.mjs', 'test/official-cli.test.mjs', 'test/instance-isolation.test.mjs', 'test/mac-signing.test.mjs', 'test/model-access.test.mjs', 'test/model-router.test.mjs', 'test/model-configuration.test.mjs', 'test/updater-dependency.test.mjs', 'test/tuda-plugin.test.mjs', 'test/tuda-package.test.mjs', 'test/tuda-connection.test.mjs', 'test/desktop-control.test.mjs'], path.join(snapshot, 'own'));
     const build = path.join(output, 'candidate');
     if (cliVersion) report.officialCli = await prepareOfficialCli(cliVersion, path.join(output, 'official-cli'), {cacheRoot: path.join(outputRoot, 'official-cli-cache')});
     execute('official-version', runtime.node, ['scripts/sync-upstream.js', '--check-only', '--platform', 'mac-arm64'], snapshot);
@@ -315,6 +347,7 @@ async function main() {
   } finally {
     report.finished = new Date().toISOString();
     writeNew(path.join(output, 'result.json'), report);
+    await cleanup('after');
     fs.unlinkSync(path.join(lock, 'owner.json')); fs.rmdirSync(lock);
     console.error('[codex-own-dev] Report: ' + path.join(output, 'result.json'));
   }

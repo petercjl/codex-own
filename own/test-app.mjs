@@ -30,8 +30,15 @@ const cli=path.join(app,mac?'Contents/Resources/codex-own-cli':'resources/codex.
 if(!mac)console.log(JSON.stringify({agentShell:await verifyWindowsAgentShell({cli,adapterPath:path.join(app,'resources','own-updater','lib','windows-agent-shell.cjs'),catalog:path.join(import.meta.dirname,'defaults','models.json')})}));
 if(!mac)console.log(JSON.stringify({apiAgentShell:await verifyWindowsAgentShell({cli,adapterPath:path.join(app,'resources','own-updater','lib','windows-agent-shell.cjs'),apiCompatPath:path.join(app,'resources','own-updater','lib','api-input-compat.cjs'),catalog:path.join(import.meta.dirname,'defaults','models.json')})}));
 const child=spawn(cli,['app-server','--stdio'],{env,stdio:['pipe','pipe','pipe']});let buffer='',id=0;const pending=new Map();
+const closed=new Promise(resolve=>child.once('close',()=>resolve(true)));
 child.stdout.on('data',b=>{buffer+=b;for(;;){const i=buffer.indexOf('\n');if(i<0)break;const line=buffer.slice(0,i);buffer=buffer.slice(i+1);try{const m=JSON.parse(line),p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}}catch{}}});
 child.stderr.on('data',()=>{});child.on('error',e=>{for(const p of pending.values())p.reject(e)});child.on('exit',()=>{for(const p of pending.values())p.reject(Error('CLI exited'))});
 const timer=setTimeout(()=>{for(const p of pending.values())p.reject(Error('CLI timeout'));child.kill();},30000);
 const call=(method,params)=>new Promise((resolve,reject)=>{pending.set(++id,{resolve,reject});child.stdin.write(JSON.stringify({id,method,params})+'\n');});
-try{await call('initialize',{clientInfo:{name:'own-release-test',title:'own release test',version:'1.0.0'},capabilities:{experimentalApi:true}});child.stdin.write('{"method":"initialized"}\n');const threads=await call('thread/list',{limit:10});assert.deepEqual(threads.data,[]);const account=await call('account/read',{refreshToken:false});assert.equal(account.account,null);console.log(JSON.stringify({ok:true,isolatedThreads:0,account:null}));}finally{clearTimeout(timer);child.kill();}
+try{await call('initialize',{clientInfo:{name:'own-release-test',title:'own release test',version:'1.0.0'},capabilities:{experimentalApi:true}});child.stdin.write('{"method":"initialized"}\n');const threads=await call('thread/list',{limit:10});assert.deepEqual(threads.data,[]);const account=await call('account/read',{refreshToken:false});assert.equal(account.account,null);console.log(JSON.stringify({ok:true,isolatedThreads:0,account:null}));}finally{
+ clearTimeout(timer);child.kill();
+ const wait=async ms=>{let timeout;try{return await Promise.race([closed,new Promise(resolve=>{timeout=setTimeout(()=>resolve(false),ms);})]);}finally{clearTimeout(timeout);}};
+ let stopped=await wait(5000);if(!stopped){child.kill('SIGKILL');stopped=await wait(5000);}
+ if(stopped)fs.rmSync(home,{recursive:true});
+ else throw Error('Isolation process has not exited; profile retained at '+home);
+}

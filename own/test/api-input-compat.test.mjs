@@ -8,6 +8,11 @@ import os from 'node:os';
 import path from 'node:path';
 const require=createRequire(import.meta.url);
 const a=require(process.env.OWN_API_COMPAT_MODULE||'../lib/api-input-compat.cjs');
+test('startup policy probes use the selected CLI app-server command and retain sign-out and client identity flags',t=>{
+ const calls=[],api={spawn(...args){calls.push(args);return {};}};a.install({cli:'/own/codex',core:'/unused',processApi:api});t.after(()=>api[a.HOOK].restore());
+ const args=['--print-startup-config','--startup-client-info','{"name":"codex_desktop"}','--startup-sign-out'],options={stdio:['ignore','pipe','pipe']};api.spawn('/own/codex',args,options);
+ assert.deepEqual(calls[0],['/own/codex',['app-server',...args],options]);assert.equal(args[0],'--print-startup-config');api.spawn('/other/codex',args,options);assert.equal(calls[1][1],args);
+});
 const msg=(name='create_thread')=>({id:1,method:'turn/start',params:{threadId:'test',input:[],toolOutput:{name,namespace:'codex_app',output:'<codex_delegation>\n<input>中文测试：17×23</input>\n</codex_delegation>'}}});
 test('synthetic desktop messages become ordinary input without changing their text',()=>{
  for(const name of ['create_thread','send_message_to_thread','handoff_thread']){

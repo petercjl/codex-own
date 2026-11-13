@@ -37,3 +37,22 @@ codex-own 不拥有独立 Tuda 的进程；退出仅结束自身 MCP 和清理�
 接收端13项针对性测试、宿主12项针对性回归与开发构建检查通过。测试覆盖桌面A与插件B/C并发作用域、独立工作区、父会话撤销拒绝和桌面配置保留。真实验收及构建身份位于 `out/tuda-auto-auth-xKOESK/acceptance.json`，最终开发构建为 `out/dev-build-r5mwBu.noindex`。本文件为构建后的说明更新，运行时代码以该构建快照为准；独立的codex-own-cli包按其实际安装收据核验。
 
 当前发布按 AGENTS.md 的内部软件流程执行：Mac dev 实测通过后，执行 Windows 自动构建和基础检查，再发布 npm；peter-new 按需做安装后抽查。完整离线安装包和 NAS 分发按用户单独要求执行。
+
+## NAS 授权内省限流（2026-11-13）
+
+共享授权服务已将通过服务凭据验证的 NAS 内省请求独立计数：每组织/audience 每 60 秒 6,000 次；公共接口及错误服务凭据保持每 IP 每 60 秒 150 次。超限返回 429 RATE_LIMIT 与 Retry-After:60。每次内省继续查询数据库，核对组织、scope、父会话及撤销状态，授权结果不缓存。客户端应区分 429、401 与传输/上游错误，诊断仅记录 HTTP 状态和错误码。
+
+类型检查和7项服务测试通过；真实 NAS 连续160次内省均200，无效测试存储token全部 active:false；缺少服务凭据为401。云端新镜像为 `sha256:16a8edd9d86ae098fbb30051ee8dfd9275a37fe8bee17e6b9e4e2ce6d9b28993`。私有备份、源码及回滚镜像已核验，员工会话未撤销。完整证据：`out/nas-introspection-rate-jkl61dms/acceptance.json`、`deployment-receipt.json`。本次未操作 Tuda 桌面、未发布 npm；本节为云端部署后的交接记录。
+
+
+## 钉钉姓名与头像合同（2026-11-13）
+
+共享授权服务在已核验企业的 OAuth profile 中读取 nick/name 与 avatarUrl，并按同一 `(CorpId, UnionId)` 更新员工。`auth_users.avatar_url` 使用可重复执行的兼容迁移，历史用户初始为空。头像仅接受有主机名、无用户名密码、最长2048字符的 HTTPS URL；无头像或无效地址时省略返回字段，员工仍可登录并获得共享文本能力。
+
+`GET /api/company/v1/session`、`GET /bootstrap`、`POST /auth/poll` 和 `POST /handoff/exchange` 统一返回 `member:{id,name,avatarUrl?}`；bootstrap（含 board-only）另保留 role。姓名和头像变化会更新 configVersion。组织、appId、员工和父会话校验继续执行；设备凭证保持有效，每次身份读取查询最新员工资料。Tuda 主进程负责从新 member 刷新姓名头像，图片请求不附带公司凭据。
+
+`POST /api/company/v1/auth/start` 支持可选 `refreshProfile:true`。返回的 verificationUrl 增加 `&refreshProfile=1`，客户端 URL 校验允许此服务端参数。授权页即使已有浏览器登录态也转到真实钉钉 OAuth，交换 code 并重新获取 profile；回调只保留 request 后进入确认页。确认页提供“刷新钉钉姓名与头像”入口。历史员工补齐头像需完成一次 OAuth；也可访问 `https://codex.lumyne.cn/api/auth/dingtalk/start`，完成后让应用刷新 session/bootstrap。现有浏览器确认授权本身不会重新获取资料。
+
+类型检查与8项服务测试通过，覆盖旧表迁移、合法与无效头像、OAuth 更新同一员工、统一 member、无生图Key登录、应用/企业隔离及父会话撤销。线上合成身份通过 session/bootstrap、资料刷新、app隔离、已有浏览器重新进入真实 OAuth 入口和公网 HTTPS 健康检查；临时身份与状态已清理。真实员工的重新 OAuth、钉钉实际头像返回与 Tuda 界面显示由 Tuda 主对话继续验收。
+
+云端镜像为 `sha256:5014042531e5752981398a8b86c1e76177df14f90a02d1f1778d8c6a5b1092a9`。部署前保留数据库、私有配置和旧镜像；数据库归档可读、配置备份逐字节核验，运行源码摘要与本地一致。证据为 `out/company-avatar-cq7rfs7i/acceptance.json`、`deployment-receipt.json` 与 `before-inventory.json`。未撤销真实员工会话，未修改或操作 Tuda 桌面，未发布 npm；本节是云端变更后的交接记录。

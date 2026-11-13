@@ -45,7 +45,7 @@ function environment(base=runtimeRoot(),inherited=process.env,platform=process.p
   PYTHONUTF8:'1',PYTHONIOENCODING:'utf-8',PYTHONPYCACHEPREFIX:path.join(base,'python-bytecode',r.version),PYTHONNOUSERSITE:'1',PYTHONUSERBASE:path.join(base,'python-user'),PIP_CACHE_DIR:path.join(base,'pip-cache'),PIP_CONFIG_FILE:win?'NUL':'/dev/null',PIP_REQUIRE_VIRTUALENV:'true'});
  if(win)Object.assign(env,{APPDATA:path.join(home,'AppData','Roaming'),LOCALAPPDATA:path.join(home,'AppData','Local')});
  else Object.assign(env,{ZDOTDIR:path.join(r.directory,'shell'),BASH_ENV:path.join(r.directory,'shell','bash-env.sh')});
- return require('./bundled-image.cjs').environment(root,env);
+ return require('./bundled-image.cjs').environment(root,require('./company-tools-env.cjs').environment(root,env,platform));
 }
 function shellFiles(base,version){
  const r=active(base,process.platform,version),env=environment(base,{PATH:''},process.platform,version),quote=s=>"'"+s.replaceAll("'","'\"'\"'")+"'";

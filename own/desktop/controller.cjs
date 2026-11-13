@@ -7,6 +7,7 @@ const {pathToFileURL}=require('node:url');
 const {resolveBundledNode,materializeBundledNode}=require('../lib/bundled-node.cjs');
 const CHANNEL='codex-own:update';
 module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog,Notification},root){
+  require('./company-tools-manager.cjs').start({app,ipcMain},root);
   require('./tuda-host.cjs').install({app,dialog},root);
   const identity=require('../lib/instance.cjs').identity(process.resourcesPath);
   if(identity.channel==='development'){

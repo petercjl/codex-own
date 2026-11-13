@@ -26,4 +26,4 @@ require(path.join(process.resourcesPath,'own-updater','desktop','controller.cjs'
 require(path.join(process.resourcesPath,'own-updater','desktop','account.cjs')).start(require('electron'),root);
 require(path.join(process.resourcesPath,'own-updater','desktop','product-mode.cjs')).install(require('electron'),paths.core);
 require(path.join(process.resourcesPath,'own-updater','desktop','thread-titles.cjs')).install(require('electron'),paths.core);
-module.exports={apply,paths,ensureTools:()=>require(path.join(process.resourcesPath,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply)};
+module.exports={apply,paths,ensureTools:async()=>{await require(path.join(process.resourcesPath,'own-updater','desktop','tool-bootstrap.cjs')).ensureTools(require('electron'),root,apply);return require(path.join(process.resourcesPath,'own-updater','desktop','company-tools.cjs')).ensure(require('electron'),root,apply);}};

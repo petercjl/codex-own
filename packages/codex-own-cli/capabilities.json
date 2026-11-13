@@ -1,0 +1,585 @@
+{
+  "schemaVersion": 1,
+  "package": "@petercjl/codex-own-cli",
+  "version": "0.1.0",
+  "kind": "cli-skill",
+  "runtime": {
+    "node": ">=22",
+    "dependencies": [],
+    "service": "running codex-own development desktop, local control contract 1",
+    "platforms": {
+      "darwin-arm64": "implemented",
+      "win32-x64": "unverified"
+    }
+  },
+  "skills": [
+    "codex-own-cli"
+  ],
+  "installationLifecycle": {
+    "skillRequired": true,
+    "updateRequiresSkillSync": true,
+    "required_components": [
+      "cli",
+      "skill"
+    ],
+    "targetMeaning": "parent directory in which the current Agent discovers skills",
+    "physicalIsolation": true,
+    "hostDiscoveryAuthority": "calling Agent",
+    "bootstrap": "INSTALL.md",
+    "update": "UPDATE.md: selected target resolved before replacement; sync runtime and Skill",
+    "agentNeutral": true,
+    "targetRequired": true,
+    "hostRegistrationRequired": true,
+    "installerIntegration": "README and INSTALL.md require package-managed selected-target Skill/runtime installation after scripts-disabled npm installation",
+    "installationMode": "copy",
+    "sharedLinksAllowed": false,
+    "isolatedRuntimeRequired": true,
+    "install": "INSTALL.md: install package then resolve and synchronize current Agent Skill target",
+    "verification": "CLI version, Skill status hashes, target-owned entry and host discovery"
+  },
+  "adapters": {
+    "generic": {
+      "required": [
+        "command execution",
+        "Node.js 22+",
+        "local file access",
+        "access to a running codex-own development desktop"
+      ]
+    }
+  },
+  "business": {
+    "chat.create": {
+      "requires": [
+        "cwd"
+      ],
+      "optional": [
+        "title",
+        "model",
+        "operationId"
+      ],
+      "sideEffect": "persistent desktop conversation"
+    },
+    "chat.send": {
+      "requires": [
+        "threadId",
+        "text"
+      ],
+      "optional": [
+        "operationId"
+      ],
+      "sideEffect": "real model/tool execution under desktop policy"
+    },
+    "chat.events": {
+      "requires": [
+        "threadId"
+      ],
+      "optional": [
+        "after"
+      ],
+      "output": [
+        "events",
+        "cursor"
+      ]
+    },
+    "chat.status": {},
+    "chat.read": {},
+    "chat.result": {},
+    "chat.wait": {
+      "maximumSeconds": 60
+    },
+    "chat.interrupt": {
+      "sideEffect": "interrupt active turn"
+    },
+    "chat.resume": {
+      "requires": [
+        "threadId"
+      ],
+      "sideEffect": "load persisted desktop chat using existing backend"
+    },
+    "chat.respond": {
+      "requires": [
+        "threadId",
+        "requestId",
+        "decision",
+        "confirmed"
+      ],
+      "sideEffect": "explicit one-time MCP tool request response after user authorization; no persisted approvals"
+    }
+  },
+  "authorization": {
+    "transport": "127.0.0.1 with owner-private bearer descriptor",
+    "browserOrigin": "denied",
+    "approvalPolicy": "desktop-owned; requests reported as needs_attention",
+    "originalCodex": "never targeted by default"
+  },
+  "recovery": {
+    "writes": "operation receipt persisted before dispatch; reuse the same operationId; unknown outcomes require query",
+    "events": "bounded 4000-event process ring; cursors expire on restart or eviction; recover final content via chat read",
+    "desktopExit": "no independent backend launched"
+  },
+  "updates": {
+    "trigger": "doctor",
+    "channel": "latest",
+    "timeoutMs": 1200,
+    "mode": "advisory; explicit update install replaces only the selected Skill-owned runtime",
+    "failure": "keep-installed",
+    "activation": "next invocation",
+    "backup": "previous selected Skill and complete runtime",
+    "rollback": "restore returned backup path after preserving the active installation"
+  },
+  "publication": {
+    "status": "local-candidate",
+    "registryRelease": false
+  },
+  "skillSources": [
+    {
+      "name": "codex-own-cli",
+      "source": "skills/codex-own-cli"
+    }
+  ],
+  "commandContracts": {
+    "version": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "capabilities": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "doctor": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--target-root": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "skill source": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--skill": {
+          "type": "string"
+        },
+        "--agent": {
+          "type": "string",
+          "meaning": "validated host label; generic adapter; requires explicit target for installation"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "skill status": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--target-root": {
+          "type": "string"
+        },
+        "--skill": {
+          "type": "string"
+        },
+        "--agent": {
+          "type": "string",
+          "meaning": "validated host label; generic adapter; requires explicit target for installation"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "skill install": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--target-root": {
+          "type": "string"
+        },
+        "--skill": {
+          "type": "string"
+        },
+        "--agent": {
+          "type": "string",
+          "meaning": "validated host label; generic adapter; requires explicit target for installation"
+        }
+      },
+      "sideEffects": "local-write"
+    },
+    "skill update": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--target-root": {
+          "type": "string"
+        },
+        "--skill": {
+          "type": "string"
+        },
+        "--agent": {
+          "type": "string",
+          "meaning": "validated host label; generic adapter; requires explicit target for installation"
+        }
+      },
+      "sideEffects": "local-write"
+    },
+    "update check": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "update install": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--target-root": {
+          "type": "string"
+        },
+        "--yes": {
+          "type": "boolean"
+        }
+      },
+      "sideEffects": "package-and-skill-update"
+    },
+    "chat create": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--cwd": {
+          "type": "string"
+        },
+        "--title": {
+          "type": "string"
+        },
+        "--model": {
+          "type": "string"
+        },
+        "--operation-id": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "local-write"
+    },
+    "chat list": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--limit": {
+          "type": "string"
+        },
+        "--cursor": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat send": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--text": {
+          "type": "string"
+        },
+        "--message-file": {
+          "type": "string"
+        },
+        "--operation-id": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "local-write"
+    },
+    "chat read": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat events": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--after": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat status": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat wait": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--timeout": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat result": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat interrupt": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "local-write"
+    },
+    "operations read": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        },
+        "--operation-id": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "none"
+    },
+    "chat resume": {
+      "options": {
+        "--json": {
+          "type": "boolean"
+        },
+        "--root": {
+          "type": "string"
+        }
+      },
+      "sideEffects": "local-write"
+    },
+    "chat respond": {
+      "options": {
+        "--root": {
+          "type": "string"
+        },
+        "--request-id": {
+          "type": "string"
+        },
+        "--decision": {
+          "type": "string"
+        },
+        "--operation-id": {
+          "type": "string"
+        },
+        "--json": {
+          "type": "boolean"
+        },
+        "--yes": {
+          "type": "boolean"
+        }
+      },
+      "sideEffects": "local-write"
+    }
+  },
+  "discoveryContract": {
+    "schemaVersion": 1,
+    "entryPoints": [
+      {
+        "argv": [
+          "capabilities",
+          "--json"
+        ],
+        "result": "manifest"
+      },
+      {
+        "argv": [
+          "skill",
+          "source",
+          "--json"
+        ],
+        "result": "source"
+      }
+    ],
+    "commandsField": "commandContracts",
+    "version": {
+      "command": "version",
+      "argv": [
+        "version",
+        "--json"
+      ],
+      "fields": {
+        "package": {
+          "field": "package",
+          "type": "string"
+        },
+        "version": {
+          "field": "version",
+          "type": "string"
+        }
+      }
+    },
+    "skillCollection": {
+      "namesField": "skills",
+      "default": "codex-own-cli",
+      "selector": {
+        "option": "--skill",
+        "type": "string"
+      },
+      "enumeration": {
+        "argv": [
+          "skill",
+          "source",
+          "--json"
+        ],
+        "itemsField": "items",
+        "completeField": "complete"
+      },
+      "namedSource": [
+        "skill",
+        "source",
+        "--skill",
+        "{skill}",
+        "--json"
+      ]
+    }
+  },
+  "maintenanceContract": {
+    "schemaVersion": 1,
+    "source": {
+      "name": {
+        "field": "name",
+        "type": "string"
+      },
+      "package": {
+        "field": "package",
+        "type": "string"
+      },
+      "version": {
+        "field": "version",
+        "type": "string"
+      },
+      "path": {
+        "field": "path",
+        "type": "string"
+      }
+    },
+    "status": {
+      "name": {
+        "field": "name",
+        "type": "string"
+      },
+      "package": {
+        "field": "package",
+        "type": "string"
+      },
+      "version": {
+        "field": "version",
+        "type": "string"
+      },
+      "target": {
+        "field": "target",
+        "type": "string"
+      },
+      "installed": {
+        "field": "installed",
+        "type": "boolean"
+      },
+      "managed": {
+        "field": "managed",
+        "type": "boolean"
+      },
+      "current": {
+        "field": "current",
+        "type": "boolean"
+      },
+      "edited": {
+        "field": "edited",
+        "type": "boolean"
+      },
+      "verification": {
+        "field": "verification",
+        "type": "object"
+      },
+      "recovery": {
+        "field": "recovery",
+        "type": "object"
+      }
+    },
+    "targetOptions": {
+      "--target-root": {
+        "kind": "skill-parent"
+      }
+    },
+    "agentEligibility": "valid-name-with-generic-fallback",
+    "hostDiscoveryAuthority": "host"
+  },
+  "automaticUpdates": {
+    "enabledByDefault": true,
+    "intervalHours": 24,
+    "timeoutMs": 1200,
+    "trigger": "doctor at Skill task entry",
+    "configuration": "generic user cache; advisory latest channel",
+    "disable": "CODEX_OWN_CLI_UPDATE_CHECK=0",
+    "recovery": "offline preserves installation; explicit update selects one Skill/runtime target",
+    "defaultMode": "advisory"
+  }
+}

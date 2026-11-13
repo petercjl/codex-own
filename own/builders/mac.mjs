@@ -34,6 +34,9 @@ execFileSync('ditto',[source,app]);
 const resources=path.join(app,'Contents/Resources');
 const payloadOptimization=slimMacPayload(resources);
 bundleUpdater(resources);
+const credentialHelper=path.join(resources,'own-updater/native/credential-store');
+if(fs.existsSync(credentialHelper))throw Error('Credential helper target already exists');
+execFileSync('/usr/bin/xcrun',['swiftc','-O','-framework','Security',path.join(resources,'own-updater/native/credential-store.swift'),'-o',credentialHelper],{stdio:'inherit'});
 if(development)fs.writeFileSync(path.join(resources,'own-development.json'),JSON.stringify({schema:1,channel:'development',name:productName,automaticUpdates:false,sourceRef:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()}),{flag:'wx'});
 fs.writeFileSync(path.join(resources,'codex-own-cli'),'#!/bin/sh\nset -eu\nown_resources="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$own_resources/codex" "$@"\n',{flag:'wx',mode:0o755});
 const work=path.join(output,'asar-source');
@@ -92,6 +95,8 @@ fs.writeFileSync(framework,bytes);
 // standalone CLI needs its own signature before sealing the parent app.
 const standaloneCli=path.join(resources,'codex');
 withMacSigning(development,signing=>{
+execFileSync('codesign',['--force',...signing,'--identifier',development?'local.codex-own.development.credential-store':'local.codex-own.credential-store',credentialHelper],{stdio:'pipe'});
+execFileSync('codesign',['--verify','--strict',credentialHelper],{stdio:'pipe'});
 execFileSync('codesign',['--force',...signing,standaloneCli],{stdio:'inherit'});
 execFileSync('codesign',['--verify','--strict',standaloneCli],{stdio:'inherit'});
 sealMacBundle(app,signing,{development});

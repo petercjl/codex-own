@@ -35,20 +35,8 @@ function pinRequest(message,url,provider='dashscope_deepseek'){
  if(c?.model_providers?.[provider])config.model_providers={...c.model_providers,[provider]:{...c.model_providers[provider],base_url:url}};
  return {...message,params:{...p,config}};
 }
-function rpcInput(url,{maxFrameBytes=64*1024*1024,provider='dashscope_deepseek'}={}){
- let pending=Buffer.alloc(0);
- return new Transform({transform(chunk,_encoding,done){
-  try{
-   pending=Buffer.concat([pending,chunk]);let i;
-   while((i=pending.indexOf(10))>=0){
-    if(i>maxFrameBytes)throw Error('Backend input frame exceeds limit');
-    const bytes=pending.subarray(0,i+1);pending=pending.subarray(i+1);let m;
-    try{m=JSON.parse(bytes.toString('utf8'));}catch{this.push(bytes);continue;}
-    const next=pinRequest(m,url,provider);this.push(next===m?bytes:Buffer.from(JSON.stringify(next)+'\n'));
-   }
-   if(pending.length>maxFrameBytes)throw Error('Backend input frame exceeds limit');done();
-  }catch(e){done(e);}
- },flush(done){if(pending.length)return done(Error('Incomplete backend input frame'));done();}});
+function rpcInput(url,{maxFrameBytes=require('./request-budget.cjs').maxRequestBytes(),provider='dashscope_deepseek'}={}){
+ return require('./request-budget.cjs').frames({maxFrameBytes,adapt:message=>pinRequest(message,url,provider)});
 }
 function invocation({cli,args,options,core,config,platform=process.platform}){
  if(!selected(config))return null;
@@ -56,7 +44,15 @@ function invocation({cli,args,options,core,config,platform=process.platform}){
  if(!fs.existsSync(node)||!fs.existsSync(runner))throw Object.assign(Error('Bundled API compatibility runtime is missing'),{code:'AGENT_BRIDGE_MISSING'});
  return {file:node,args:[runner,core,cli,...args],options};
 }
-async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1024*1024,resolveRoute,authorization,prepareBody=body=>body}){
+function bridgeFailure(error){
+ const status=Number.isInteger(error.status)&&error.status>=400&&error.status<=599?error.status:null;
+ const providerError=error.error?.error||error.error;
+ if(status===400&&(providerError?.code==='context_length_exceeded'||providerError?.type==='invalid_request_error'&&/prompt is too long|maximum context length|context length.*exceed/i.test(providerError.message||'')))return {status:400,error:{type:'invalid_request_error',code:'context_length_exceeded',message:'The model context window was exceeded.'}};
+ const local={AGENT_BRIDGE_TOO_LARGE:413,ANTHROPIC_INPUT_UNSUPPORTED:400,ANTHROPIC_COMPACTION_UNSUPPORTED:400,AUTH_REQUIRED:401,ACCESS_DENIED:403};
+ const code=error.code||(status?'UPSTREAM_HTTP_'+status:'AGENT_BRIDGE_FAILED');
+ return {status:local[code]||status||502,error:{code,message:code==='ANTHROPIC_INPUT_UNSUPPORTED'?error.message:code==='AGENT_BRIDGE_TOO_LARGE'?'Request exceeds the available local JSON memory budget.':'The local model request could not be completed ('+code+').'}};
+}
+async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=require('./request-budget.cjs').maxRequestBytes(),resolveRoute,authorization,beforeRequest,prepareBody=body=>body}){
  const http=require('node:http'),base=new URL(upstream||'http://127.0.0.1');
  if(!['http:','https:'].includes(base.protocol)||base.username||base.password)throw Error('Invalid configured API endpoint');
  const active=new Set();
@@ -71,10 +67,11 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1
    if(req.headers['content-encoding']&&req.headers['content-encoding']!=='identity')throw Object.assign(Error('Compressed request is unsupported'),{code:'AGENT_BRIDGE_ENCODING'});
    const chunks=[];let length=0;
    for await(const chunk of req){length+=chunk.length;if(length>maxBodyBytes)throw Object.assign(Error('API request exceeds limit'),{code:'AGENT_BRIDGE_TOO_LARGE'});chunks.push(chunk);}
-   const bytes=Buffer.concat(chunks),originalBody=JSON.parse(bytes.toString('utf8')),route=resolveRoute?.(originalBody.model),body=prepareBody(route?{...originalBody,model:route.model}:originalBody);
+   const bytes=Buffer.concat(chunks),originalBody=JSON.parse(bytes.toString('utf8')),route=resolveRoute?.(originalBody.model),body=await prepareBody(route?{...originalBody,model:route.model}:originalBody);
+   const permissionSignal=await beforeRequest?.(body),signal=permissionSignal?AbortSignal.any([abort.signal,permissionSignal]):abort.signal;
    if(route?.protocol==='anthropic'){
     if(pathname.pathname!=='/responses')throw Object.assign(Error('Messages API does not support remote compaction'),{code:'ANTHROPIC_COMPACTION_UNSUPPORTED'});
-    await require('./anthropic-responses.cjs').serve({body,route,response:res,signal:abort.signal,fetch:(url,options)=>fetchApi(url,{...options,...dispatcher?{dispatcher}:{}})});return;
+    await require('./anthropic-responses.cjs').serve({body,route,response:res,signal,fetch:(url,options)=>fetchApi(url,{...options,...dispatcher?{dispatcher}:{}})});return;
    }
    const normalized=normalizeBody(body);
    const payload=normalized===originalBody?bytes:Buffer.from(JSON.stringify(normalized));
@@ -83,7 +80,7 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1
    const headers={};
    for(const [k,v] of Object.entries(req.headers))if(!['host','connection','content-length','content-encoding','accept-encoding','transfer-encoding','proxy-authorization'].includes(k)&&v!==undefined)headers[k]=v;
    if(route)headers.authorization='Bearer '+route.apiKey;
-   const response=await fetchApi(target,{method:'POST',headers,body:payload,signal:abort.signal,...dispatcher?{dispatcher}:{}});
+   const response=await fetchApi(target,{method:'POST',headers,body:payload,signal,...dispatcher?{dispatcher}:{}});
    res.writeHead(response.status,{'content-type':response.headers.get('content-type')||'application/json','cache-control':'no-store'});
    if(response.body&&response.ok&&body.model?.startsWith('deepseek-')&&(response.headers.get('content-type')||'').includes('application/json')){
     res.end(JSON.stringify(toolSearch.response(patchCompat.response(await response.json()))));
@@ -94,7 +91,7 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=64*1
    });
    else res.end();
   }catch(error){
-   if(!res.headersSent&&!res.destroyed){res.writeHead(502,{'content-type':'application/json'});res.end(JSON.stringify({error:{code:error.code||'AGENT_BRIDGE_FAILED',message:error.code==='ANTHROPIC_INPUT_UNSUPPORTED'?error.message:'The local API compatibility request could not be completed ('+(error.code||'AGENT_BRIDGE_FAILED')+')'}}));}
+   if(!res.headersSent&&!res.destroyed){const failure=bridgeFailure(error);res.writeHead(failure.status,{'content-type':'application/json'});res.end(JSON.stringify({error:failure.error}));}
    else res.destroy();
   }finally{active.delete(abort);}
  });

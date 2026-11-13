@@ -34,7 +34,7 @@ fs.writeFileSync(path.join(core,'auth.json'),JSON.stringify({auth_mode:'apikey',
 fs.writeFileSync(path.join(core,'config.toml'),`cli_auth_credentials_store = "file"\nforced_login_method = "api"\nmodel = "deepseek-v4.1-flash"\nmodel_provider = "offline_fixture"\nmodel_catalog_json = ${JSON.stringify(path.resolve('own/defaults/models.json'))}\n[model_providers.offline_fixture]\nname = "Offline GUI fixture"\nbase_url = "http://127.0.0.1:9/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n`,{flag:'wx',mode:0o600});
 const reservation=net.createServer();await new Promise(r=>reservation.listen(0,'127.0.0.1',r));const port=reservation.address().port;await new Promise(r=>reservation.close(r));
 const env={...process.env};for(const k of Object.keys(env))if(/^(CODEX_|OPENAI_|CHATGPT_|ELECTRON_|NODE_REPL_|DASHSCOPE_|ANTHROPIC_|AZURE_OPENAI_|GH_TOKEN$|GITHUB_TOKEN$)/.test(k))delete env[k];
-Object.assign(env,{HOME:home,CFFIXED_USER_HOME:home,USERPROFILE:home,LOCALAPPDATA:local,APPDATA:path.join(home,'AppData/Roaming'),ELECTRON_ENABLE_LOGGING:'1'});
+Object.assign(env,{HOME:home,CFFIXED_USER_HOME:home,USERPROFILE:home,LOCALAPPDATA:local,APPDATA:path.join(home,'AppData/Roaming'),ELECTRON_ENABLE_LOGGING:'1',OWN_COMPANY_TOOLS_AUTO_UPDATE:'0'});
 for(const directory of [env.APPDATA,env.LOCALAPPDATA])fs.mkdirSync(directory,{recursive:true});
 // The distribution launcher intentionally resolves the real OS account home.
 // Enter Owl directly for this fixture so it cannot open a user's live profile.

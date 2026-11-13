@@ -38,7 +38,7 @@
   avatar.style.background=authenticated?'#21734a':'#3769df';
   overlay.hidden=authenticated&&!state.restartRequired;
   title.textContent=authenticated?'登录成功':checking?'正在检查登录状态':'请先登录 codex-own';
-  description.textContent=authenticated?'企业账号已验证，请从账户窗口重启应用，加载云端模型和个人工具。':checking?'正在验证东轩企业账号。':waiting?'请在浏览器中完成东轩AI授权，然后返回应用。':failed?'暂时无法验证登录状态，请检查网络后重试。':'使用东轩企业钉钉账号登录，自动获取公司文本模型和个人生图授权。';
+  description.textContent=authenticated?'企业账号已验证，请重启应用，使用本机直连模型和个人工具。':checking?'正在验证东轩企业账号。':waiting?'请在浏览器中完成东轩AI授权，然后返回应用。':failed?'暂时无法验证登录状态，请检查网络后重试。':'使用东轩企业钉钉账号登录，自动配置文本模型直连和个人生图授权。';
   code.hidden=!waiting||!state.userCode;code.textContent=waiting?'校验码：'+String(state.userCode||''):'';cancel.hidden=!waiting;
   action.textContent=authenticated?'重启并使用':checking?'正在验证…':waiting?'等待浏览器授权…':'使用东轩AI授权登录';action.disabled=checking||waiting;
   place();

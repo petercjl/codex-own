@@ -9,6 +9,7 @@
   "files": [
     "bin",
     "lib",
+    "native",
     "skills",
     "capabilities.json",
     "release.json",

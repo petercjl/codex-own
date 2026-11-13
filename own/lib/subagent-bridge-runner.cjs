@@ -7,10 +7,16 @@ async function main(){
  const [core,cli,...args]=process.argv.slice(2);
  const config=parse(fs.readFileSync(path.join(core,'config.toml'),'utf8'));
  if(!bridge.selected(config))throw Error('API compatibility configuration changed');
- const provider=config.model_provider,dispatcher=new EnvHttpProxyAgent(),server=provider==='codex_own_imported'?await require('./model-router.cjs').start({core,config,fetch,dispatcher}):await bridge.startServer({upstream:config.model_providers[provider].base_url,fetch,dispatcher,prepareBody:body=>require('./image-provider.cjs').apply(body,core)});
+ let bootstrap=null;
+ if(process.env.OWN_MANAGED_BOOTSTRAP_FD!==undefined){
+  const fd=Number(process.env.OWN_MANAGED_BOOTSTRAP_FD);if(!Number.isInteger(fd)||fd<3||fd>32)throw Error('Invalid protected bootstrap descriptor');
+  const chunks=[];let length=0;for await(const chunk of fs.createReadStream(null,{fd,autoClose:true})){length+=chunk.length;if(length>1024*1024)throw Error('Protected bootstrap exceeds limit');chunks.push(chunk);}bootstrap=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+ }
+ const provider=config.model_provider,dispatcher=new EnvHttpProxyAgent({headersTimeout:600000,bodyTimeout:600000}),server=provider==='codex_own_imported'?await require('./model-router.cjs').start({core,config,fetch,dispatcher,bootstrap}):await bridge.startServer({upstream:config.model_providers[provider].base_url,fetch,dispatcher,prepareBody:body=>require('./image-provider.cjs').apply(require('./company-tools-env.cjs').apply(body,core),core)});
  const i=args.indexOf('app-server');if(i<0)throw Error('Expected owned app-server invocation');
  const backend=[...args.slice(0,i),'-c','model_providers.'+provider+'.base_url='+JSON.stringify(server.url),...args.slice(i)];
- const child=spawn(cli,backend,{env:{...process.env,CODEX_HOME:core},stdio:['pipe','pipe','inherit'],windowsHide:true});
+ const env={...process.env,CODEX_HOME:core};delete env.OWN_MANAGED_BOOTSTRAP_FD;
+ const child=spawn(cli,backend,{env,stdio:['pipe','pipe','inherit'],windowsHide:true});
  const input=bridge.rpcInput(server.url,{provider});process.stdin.pipe(input).pipe(child.stdin);child.stdout.pipe(process.stdout);
  let stopping=false;
  const close=async(code)=>{if(stopping)return;stopping=true;input.destroy();process.stdin.destroy();await server.close();await dispatcher.close();process.exit(code??1);};

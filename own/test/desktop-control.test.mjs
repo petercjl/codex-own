@@ -9,3 +9,16 @@ test('creation inherits provider and model and result preserves final text; back
 test('desktop handshake becomes ready from initialize response without an initialized notification',async t=>{const {b,child,nativeOut}=await fixture(t);b.ready=false;child.stdin.write(JSON.stringify({id:99,method:'initialize',params:{}})+'\n');nativeOut.write(JSON.stringify({id:99,result:{userAgent:'fixture'}})+'\n');assert.equal(b.ready,true);});
 
 test('MCP elicitation exposes needs_attention and request identity; explicit response is one-time and forwarded normally',async t=>{const {b,child,nativeOut,requests}=await fixture(t);nativeOut.write(JSON.stringify({id:42,method:'mcpServer/elicitation/request',params:{threadId:'thread-fixture-001',turnId:'turn-1',message:'Allow list?',_meta:{codex_approval_kind:'mcp_tool_call',tool_name:'list_boards'}}})+'\n');assert.equal((await b.dispatch('chat.status',{threadId:'thread-fixture-001'})).status,'needs_attention');const events=await b.dispatch('chat.events',{threadId:'thread-fixture-001'});assert.equal(events.events.at(-1).requestId,42);await assert.rejects(b.dispatch('chat.respond',{threadId:'thread-fixture-001',requestId:42,decision:'accept',operationId:'respond-refuse-1'}),{code:'EXPLICIT_RESPONSE_REQUIRED'});const result=await b.dispatch('chat.respond',{threadId:'thread-fixture-001',requestId:42,decision:'accept',confirmed:true,operationId:'respond-approved-1'});assert.equal(result.persistence,'once');assert.deepEqual(requests.find(r=>r.id===42).result,{action:'accept',content:{}});assert.equal(b.turns.get('thread-fixture-001').status,'running');});
+
+test('create, resume and send inherit the current desktop selection and respect later downgrades',async t=>{
+ const {b,requests,root}=await fixture(t),file=path.join(root,'core','.codex-global-state.json');
+ const choose=mode=>fs.writeFileSync(file,JSON.stringify({'electron-owner-atoms:signed-out':{'permission-selection-by-host-id:local':{kind:'agent-mode',agentMode:mode}}}));
+ choose('full-access');
+ await b.dispatch('chat.create',{cwd:root,operationId:'permissions-create'});
+ await b.dispatch('chat.resume',{threadId:'thread-fixture-001'});
+ await b.dispatch('chat.send',{threadId:'thread-fixture-001',text:'test',operationId:'permissions-send'});
+ for(const method of ['thread/start','thread/resume','turn/start']){const p=requests.find(r=>r.method===method).params;assert.equal(p.permissions,':danger-full-access');assert.equal(p.approvalPolicy,'never');assert.equal(p.approvalsReviewer,'user');}
+ choose('read-only');await b.dispatch('chat.send',{threadId:'thread-fixture-001',text:'read',operationId:'permissions-downgrade'});
+ assert.equal(requests.at(-1).params.permissions,':read-only');assert.equal(requests.at(-1).params.approvalPolicy,'on-request');
+ choose('unknown');await assert.rejects(b.dispatch('chat.resume',{threadId:'thread-fixture-001'}),{code:'PERMISSION_SELECTION_UNSUPPORTED'});
+});

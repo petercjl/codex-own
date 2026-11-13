@@ -1,0 +1,22 @@
+{
+  "schema": "portable-skill-adapter",
+  "schema_version": "1.0.0",
+  "platform": "generic",
+  "mappings": [
+    {
+      "capability_id": "command.execute",
+      "status": "implemented",
+      "features": [
+        "node22",
+        "local-files",
+        "process-execution"
+      ],
+      "implementation": {
+        "kind": "cli",
+        "entry": ".runtime/bin/codex-own-cli.mjs",
+        "discovery": "version and capabilities --json",
+        "runtime": "current Agent resolves Node.js 22+"
+      }
+    }
+  ]
+}

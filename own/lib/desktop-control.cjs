@@ -3,6 +3,32 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto');
 const {Transform}=require('node:stream');
 const brokers=new Map();
+const activityStates=new Map();
+function activity(root){const s=activityStates.get(path.resolve(root));return {ready:s?.ready===true,busy:!!s&&(s.active.size>0||s.pending.size>0),activeTasks:s?.active.size||0};}
+function observeActivity(child,root){
+ root=path.resolve(root);if(!child.stdin||!child.stdout)return;
+ const state={ready:false,active:new Set(),pending:new Map(),refreshes:new Map()},old=activityStates.get(root);if(old?.child===child)return;
+ state.child=child;activityStates.set(root,state);let initializeId;
+ const input=frames(m=>{
+  if(m.method==='initialize')initializeId=m.id;
+  if(m.method==='initialized')state.ready=true;
+  if(m.method==='turn/start'&&m.params?.threadId){state.active.add(m.params.threadId);if(m.id!==undefined)state.pending.set(m.id,m.params.threadId);}
+ });
+ const output=frames(m=>{
+  if(state.refreshes.has(m.id)&&!m.method){const request=state.refreshes.get(m.id);state.refreshes.delete(m.id);clearTimeout(request.timer);if(m.error)request.reject(error('SKILL_REFRESH_FAILED'));else{request.resolve(m.result);output.push(Buffer.from(JSON.stringify({method:'skills/changed',params:{}})+'\n'));}return false;}
+  if(m.id===initializeId&&!m.method&&!m.error&&m.result)state.ready=true;
+  if(state.pending.has(m.id)&&!m.method){const id=state.pending.get(m.id);state.pending.delete(m.id);if(m.error)state.active.delete(id);}
+  if(m.method==='turn/started'&&m.params?.threadId)state.active.add(m.params.threadId);
+  if(m.method==='turn/completed'&&m.params?.threadId)state.active.delete(m.params.threadId);
+ });
+ const stdin=child.stdin,stdout=child.stdout;input.on('error',()=>{});output.on('error',()=>{});stdin.on('error',()=>{});stdout.on('error',()=>{});
+ input.pipe(stdin);stdout.pipe(output);child.stdin=input;child.stdout=output;state.input=input;
+ child.once('exit',()=>{state.ready=false;state.active.clear();state.pending.clear();for(const r of state.refreshes.values()){clearTimeout(r.timer);r.reject(error('BACKEND_DISCONNECTED'));}state.refreshes.clear();input.destroy();output.destroy();});
+}
+async function refreshSkills(root){
+ const state=activityStates.get(path.resolve(root));if(!state?.ready)return {status:'deferred'};
+ const id='company-skills-'+crypto.randomUUID();await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{state.refreshes.delete(id);reject(error('SKILL_REFRESH_TIMEOUT'));},10000);timer.unref();state.refreshes.set(id,{resolve,reject,timer});state.input.write(JSON.stringify({id,method:'skills/list',params:{forceReload:true}})+'\n');});return {status:'refreshed'};
+}
 const error=(code,message=code)=>Object.assign(Error(message),{code});
 function privateDirectory(dir){
  if(!fs.existsSync(dir))fs.mkdirSync(dir,{mode:0o700});
@@ -10,7 +36,7 @@ function privateDirectory(dir){
 }
 function readPrivate(file){const s=fs.lstatSync(file);if(!s.isFile()||s.isSymbolicLink()||(process.platform!=='win32'&&(s.mode&0o077)))throw error('UNSAFE_CONTROL_FILE');return JSON.parse(fs.readFileSync(file,'utf8'));}
 function writeNew(file,data){fs.writeFileSync(file,JSON.stringify(data)+'\n',{flag:'wx',mode:0o600});}
-function frames(consume){let bytes=Buffer.alloc(0);return new Transform({transform(chunk,_enc,done){try{bytes=Buffer.concat([bytes,chunk]);let i;while((i=bytes.indexOf(10))>=0){const raw=bytes.subarray(0,i+1);bytes=bytes.subarray(i+1);let m;try{m=JSON.parse(raw.toString('utf8'));}catch{}if(!m||consume(m)!==false)this.push(raw);}if(bytes.length>64*1024*1024)throw error('CONTROL_FRAME_TOO_LARGE');done();}catch(e){done(e);}},flush(done){if(bytes.length)this.push(bytes);done();}});}
+function frames(consume){return require('./request-budget.cjs').frames({allowIncomplete:true,code:'CONTROL_FRAME_TOO_LARGE',adapt:message=>consume(message)===false?false:message});}
 class Broker{
  constructor(root){
   this.root=root;this.dir=path.join(root,'control');privateDirectory(this.dir);this.operations=path.join(this.dir,'operations');privateDirectory(this.operations);
@@ -71,14 +97,35 @@ class Broker{
   const promise=(async()=>{const result=await run();const tmp=file+'.'+crypto.randomUUID();writeNew(tmp,{contract:1,hash,status:'completed',action,result});fs.renameSync(tmp,file);return result;})();this.inflight.set(p.operationId,{hash,promise});
   try{return await promise;}finally{this.inflight.delete(p.operationId);}
  }
+ permissionParams(){
+  const file=path.join(this.root,'core','.codex-global-state.json');
+  if(!fs.existsSync(file))return {};
+  const state=JSON.parse(fs.readFileSync(file,'utf8'));
+  const selections=Object.entries(state).filter(([key])=>key.startsWith('electron-owner-atoms:')).map(([,atoms])=>atoms?.['permission-selection-by-host-id:local']).filter(Boolean);
+  if(!selections.length)return {};
+  if(selections.some(s=>JSON.stringify(s)!==JSON.stringify(selections[0])))throw error('PERMISSION_SELECTION_AMBIGUOUS');
+  const selection=selections[0];
+  if(selection.kind==='server-default'||selection.kind==='custom')return {};
+  if(selection.kind==='profile'&&typeof selection.profileId==='string'&&selection.profileId)return {permissions:selection.profileId};
+  const modes={
+   'full-access':{permissions:':danger-full-access',approvalPolicy:'never',approvalsReviewer:'user'},
+   'read-only':{permissions:':read-only',approvalPolicy:'on-request',approvalsReviewer:'user'},
+   auto:{permissions:':workspace',approvalPolicy:'on-request',approvalsReviewer:'user'},
+   'guardian-approvals':{permissions:':workspace',approvalPolicy:'on-request',approvalsReviewer:'guardian_subagent'},
+   granular:{permissions:':workspace',approvalPolicy:{granular:{sandbox_approval:false,rules:false,skill_approval:false,request_permissions:true,mcp_elicitations:true}},approvalsReviewer:'user'}
+  };
+  if(selection.kind!=='agent-mode'||!Object.hasOwn(modes,selection.agentMode))throw error('PERMISSION_SELECTION_UNSUPPORTED');
+  return modes[selection.agentMode];
+ }
  async dispatch(action,p){
+  if(['company.identity','company.handoff'].includes(action))return require('./company-session.cjs').invoke(this.root,action,p);
   if(action==='doctor')return {contract:1,desktopPid:process.pid,backendAttached:!!this.backend,ready:this.ready,epoch:this.epoch,transport:'desktop-owned-app-server',root:this.root};
   if(action==='operations.read'){if(!/^[-a-zA-Z0-9]{8,100}$/.test(p.operationId))throw error('INVALID_OPERATION_ID');return readPrivate(path.join(this.operations,p.operationId+'.json'));}
   if(action==='chat.list')return this.rpc('thread/list',{limit:Math.min(100,p.limit||20),cursor:p.cursor||null});
   if(action==='chat.create')return this.once(action,p,async()=>{
    const config=require('smol-toml').parse(fs.readFileSync(path.join(this.root,'core','config.toml'),'utf8'));
    if(typeof p.cwd!=='string'||!path.isAbsolute(p.cwd)||!fs.statSync(p.cwd).isDirectory())throw error('WORKSPACE_REQUIRED');
-   const result=await this.rpc('thread/start',{cwd:p.cwd,model:p.model||config.model,modelProvider:config.model_provider});
+   const result=await this.rpc('thread/start',{cwd:p.cwd,model:p.model||config.model,modelProvider:config.model_provider,...this.permissionParams()});
    if(p.title)await this.rpc('thread/name/set',{threadId:result.thread.id,name:p.title});
    return result;
   });
@@ -89,7 +136,7 @@ class Broker{
    const selected=this.events.filter(e=>e.threadId===p.threadId&&Number(e.cursor.slice(e.cursor.lastIndexOf(':')+1))>since).slice(0,100);
    return {events:selected,cursor:selected.at(-1)?.cursor||this.epoch+':'+this.sequence,epoch:this.epoch};
   }
-  if(action==='chat.resume')return this.rpc('thread/resume',{threadId:p.threadId});
+  if(action==='chat.resume')return this.rpc('thread/resume',{threadId:p.threadId,...this.permissionParams()});
   if(action==='chat.respond')return this.once(action,p,async()=>{
    const attention=this.attention.get(String(p.requestId));if(!attention||attention.threadId!==p.threadId)throw error('REQUEST_NOT_PENDING');
    if(attention.method!=='mcpServer/elicitation/request'||attention.params._meta?.codex_approval_kind!=='mcp_tool_call')throw error('RESPONSE_KIND_UNSUPPORTED','Resolve this request in the desktop');
@@ -100,7 +147,7 @@ class Broker{
   if(action==='chat.send')return this.once(action,p,async()=>{
    if(typeof p.text!=='string'||!p.text.trim()||p.text.length>500000)throw error('MESSAGE_REQUIRED');
    const current=this.turns.get(p.threadId);if(current&&['running','needs_attention'].includes(current.status))throw error('CHAT_BUSY');
-   return this.rpc('turn/start',{threadId:p.threadId,input:[{type:'text',text:p.text,text_elements:[]}]});
+   return this.rpc('turn/start',{threadId:p.threadId,input:[{type:'text',text:p.text,text_elements:[]}],...this.permissionParams()});
   });
   if(action==='chat.interrupt'){const t=this.turns.get(p.threadId);if(!t?.turnId)throw error('NO_ACTIVE_TURN');return this.rpc('turn/interrupt',{threadId:p.threadId,turnId:t.turnId});}
   const result=await this.rpc('thread/read',{threadId:p.threadId,includeTurns:true});
@@ -115,5 +162,11 @@ class Broker{
  async close(){if(this.server)await new Promise(r=>this.server.close(r));const file=path.join(this.dir,'bridge.json');if(fs.existsSync(file)&&readPrivate(file).token===this.token)fs.unlinkSync(file);brokers.delete(this.root);}
 }
 function start(root){root=path.resolve(root);if(brokers.has(root))return brokers.get(root);const b=new Broker(root);brokers.set(root,b);b.listening=b.listen().catch(e=>{brokers.delete(root);throw e;});b.listening.catch(()=>{});return b;}
-function attach(child,core){brokers.get(path.resolve(core,'..'))?.attach(child);return child;}
-module.exports={Broker,start,attach,frames};
+function attach(child,core){const root=path.resolve(core,'..');observeActivity(child,root);brokers.get(root)?.attach(child);return child;}
+async function request(root,action,params={}){
+ const descriptor=readPrivate(path.join(root,'control','bridge.json'));
+ if(descriptor.contract!==1||descriptor.kind!=='codex-own-desktop-control'||!Number.isInteger(descriptor.port)||descriptor.port<1||descriptor.port>65535||! /^[a-f0-9]{64}$/.test(descriptor.token||''))throw error('UNSAFE_CONTROL_ENDPOINT');
+ const response=await fetch('http://127.0.0.1:'+descriptor.port+'/v1',{method:'POST',headers:{authorization:'Bearer '+descriptor.token,'content-type':'application/json'},body:JSON.stringify({action,params}),signal:AbortSignal.timeout(20000),redirect:'error'});
+ const value=await response.json();if(!response.ok||value.ok!==true)throw error(value.error?.code||'CONTROL_FAILED');return value.data;
+}
+module.exports={Broker,start,attach,frames,activity,observeActivity,request,refreshSkills};

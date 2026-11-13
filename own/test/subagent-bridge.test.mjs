@@ -54,7 +54,7 @@ test('API errors retain status and body; forbidden paths never reach upstream',a
 });
 test('invalid or oversized requests fail explicitly without exposing request data',async t=>{
  const server=await b.startServer({upstream:'http://127.0.0.1:1/v1',fetch,maxBodyBytes:32});t.after(()=>server.close());
- const response=await fetch(server.url+'/responses',{method:'POST',body:'private-fixture-data'.repeat(4)});assert.equal(response.status,502);const text=await response.text();assert.ok(!text.includes('private-fixture-data'));assert.match(text,/AGENT_BRIDGE_TOO_LARGE/);
+ const response=await fetch(server.url+'/responses',{method:'POST',body:'private-fixture-data'.repeat(4)});assert.equal(response.status,413);const text=await response.text();assert.ok(!text.includes('private-fixture-data'));assert.match(text,/AGENT_BRIDGE_TOO_LARGE/);
 });
 
 test('bridged Windows backend retains the Git Bash session policy',async t=>{

@@ -1,0 +1,3 @@
+interface:
+  display_name: "codex-own 对话控制"
+  short_description: "创建和调试 codex-own 桌面对话，读取工具过程和最终结果"

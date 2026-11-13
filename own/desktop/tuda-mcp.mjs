@@ -9,19 +9,22 @@ import {rejectLinks} from '../lib/manager.mjs';
 import tudaPlugin from '../lib/tuda-plugin.cjs';
 import {selectTudaRuntime,updateTudaRuntime} from '../lib/tuda-package.mjs';
 import {connectionOptions,verifyIndependentReady,connectionError} from '../lib/tuda-connection.mjs';
+import control from '../lib/desktop-control.cjs';
 const bundle=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const core=path.resolve(process.argv[2]),root=path.dirname(core);
 const companyOrigin=serviceOrigin(JSON.parse(fs.readFileSync(path.join(bundle,'defaults/company-auth.json'),'utf8')).origin);
 const shutdown=new AbortController();
 let scratch,child,hostIdentity,previousHandoff;
 const runFile=promisify(execFile);
-const identity=s=>s&&Date.parse(s.expiresAt)>Date.now()?crypto.createHash('sha256').update(s.origin+'\n'+s.token).digest('hex'):null;
+const identity=s=>s&&Date.parse(s.expiresAt)>Date.now()?(s.identity||crypto.createHash('sha256').update(s.origin+'\n'+s.token).digest('hex')):null;
+async function hostSession(){const file=path.join(core,'managed-login.json');if(fs.existsSync(file)&&JSON.parse(fs.readFileSync(file,'utf8')).contract===2)return control.request(root,'company.identity');return storedSession({core});}
 function cleanup(){if(scratch)fs.rmSync(scratch,{recursive:true,force:true});}
 async function prepare(file,instanceId,grant){
  hostIdentity=identity(grant);
  const origin=serviceOrigin(grant.origin,{allowHttp:grant.allowHttp===true}),verifier=crypto.randomBytes(32).toString('base64url');
  if(origin!==companyOrigin)throw Error('TUDA_COMPANY_ORIGIN_MISMATCH');
- const response=await networkFetch(origin+'/api/company/v1/handoff/issue',{method:'POST',redirect:'error',signal:AbortSignal.any([shutdown.signal,AbortSignal.timeout(15000)]),headers:{'content-type':'application/json',authorization:'Bearer '+grant.token,'x-company-app-id':'codex-own'},body:JSON.stringify({targetAppId:'tuda',verifierHash:crypto.createHash('sha256').update(verifier).digest('hex')})});
+ const verifierHash=crypto.createHash('sha256').update(verifier).digest('hex');
+ const response=grant.identity?{ok:true,json:async()=>({ok:true,data:await control.request(root,'company.handoff',{identity:grant.identity,verifierHash})})}:await networkFetch(origin+'/api/company/v1/handoff/issue',{method:'POST',redirect:'error',signal:AbortSignal.any([shutdown.signal,AbortSignal.timeout(15000)]),headers:{'content-type':'application/json',authorization:'Bearer '+grant.token,'x-company-app-id':'codex-own'},body:JSON.stringify({targetAppId:'tuda',verifierHash})});
  const result=await response.json(),data=result?.data;
  if(!response.ok||!result.ok||data?.contract!==1||data.sourceAppId!=='codex-own'||data.targetAppId!=='tuda'||! /^[A-Za-z0-9_-]{43}$/.test(data.code)||data.expiresIn!==60)throw Error('TUDA_HANDOFF_FAILED');
  const contents=JSON.stringify({contract:1,origin,appId:'tuda',instanceId,code:data.code,verifier,expiresAt:new Date(Date.now()+60000).toISOString()});
@@ -64,12 +67,12 @@ try{
   if(message.method==='tools/call'){
    try{
     if(!tudaPlugin.TOOLS.includes(message.params?.name))throw Error('TUDA_CAPABILITY_DENIED');
-    const grant=storedSession({core}),current=identity(grant);if(!current)throw Error('TUDA_HOST_LOGIN_REQUIRED');
+    const grant=await hostSession(),current=identity(grant);if(!current)throw Error('TUDA_HOST_LOGIN_REQUIRED');
     if(preparedInstance&&current!==hostIdentity)throw Error('TUDA_HOST_LOGIN_CHANGED');
     if(!lastUpdateCheck||Date.now()-lastUpdateCheck>=24*3600000){lastUpdateCheck=Date.now();void updateTudaRuntime(runtime,{signal:shutdown.signal}).catch(()=>{});}
     const instance=await desktopReady(env,runtime);
-    if(identity(storedSession({core}))!==current)throw Error('TUDA_HOST_LOGIN_CHANGED');
-    if(instance!==preparedInstance||Date.now()-lastHandoff>=5*60*1000){await prepare(file,instance,grant);if(identity(storedSession({core}))!==current)throw Error('TUDA_HOST_LOGIN_CHANGED');preparedInstance=instance;lastHandoff=Date.now();}
+    if(identity(await hostSession())!==current)throw Error('TUDA_HOST_LOGIN_CHANGED');
+    if(instance!==preparedInstance||Date.now()-lastHandoff>=5*60*1000){await prepare(file,instance,grant);if(identity(await hostSession())!==current)throw Error('TUDA_HOST_LOGIN_CHANGED');preparedInstance=instance;lastHandoff=Date.now();}
    }catch(error){
     if(shutdown.signal.aborted)break;
     const text=connectionError(error);

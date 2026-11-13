@@ -60,7 +60,7 @@ export function bundleUpdater(resources,{version=process.env.OWN_VERSION||JSON.p
     if(libraries.some(line=>!/^\s*\/(usr\/lib|System\/Library)\//.test(line)))throw Error('Updater needs a standalone Node distribution; set OWN_UPDATER_NODE to an official Node binary');
   }
   fs.mkdirSync(dest,{recursive:true});
-  for(const folder of ['desktop','lib','defaults'])fs.cpSync(path.join(root,folder),path.join(dest,folder),{recursive:true,force:false,errorOnExist:true});
+  for(const folder of ['desktop','lib','defaults','native'])fs.cpSync(path.join(root,folder),path.join(dest,folder),{recursive:true,force:false,errorOnExist:true});
   const dependencies=copyRuntimeDependencies(['undici','smol-toml','tar','adm-zip','@anthropic-ai/sdk','@petercjl/toapiscli'],require,dest);
   const tuda=bundleTuda(dest,{copyDependencies:copyRuntimeDependencies});
   if(sharedRuntime)fs.writeFileSync(path.join(dest,'node-runtime.json'),JSON.stringify({schema:1,source:'application-cua-node',binary:'../cua_node/bin/'+(process.platform==='win32'?'node.exe':'node'),version:actual.version}),{flag:'wx'});
@@ -79,6 +79,9 @@ export function verifyUpdater(resources){
   fs.statSync(path.join(dest,'desktop/product-mode.cjs'));
   fs.statSync(path.join(dest,'lib/ui-locale.cjs'));
   fs.statSync(path.join(dest,'lib/image-provider.cjs'));
+  for(const file of ['lib/direct-credentials.cjs','lib/company-authorization.cjs','lib/company-session.cjs','lib/request-budget.cjs','lib/os-credential-storage.cjs','native/credential-store.ps1'])fs.statSync(path.join(dest,file));
+  if(process.platform==='darwin')fs.statSync(path.join(dest,'native/credential-store'));
+  for(const file of ['lib/company-tools.mjs','lib/company-tools-env.cjs','lib/company-tools-dispatch.cjs','desktop/company-tools.cjs','desktop/company-tools.mjs','desktop/company-tools-manager.cjs','desktop/company-tools-preload.js','desktop/company-tools-page.js'])fs.statSync(path.join(dest,file));
   for(const file of ['desktop/tuda-host.cjs','lib/tuda-plugin.cjs','lib/tuda-package.mjs','lib/tuda-connection.mjs','lib/tuda-contract.cjs','defaults/tuda-inputs.json'])fs.statSync(path.join(dest,file));
   const scan=dir=>{for(const name of fs.readdirSync(dir)){const file=path.join(dir,name);if(/\.app$|^Tuda\.exe$|^tuda-desktop$/i.test(name))throw Error('Tuda desktop found in connector bundle');if(fs.lstatSync(file).isDirectory())scan(file);}};scan(dest);
   if(!require('../lib/tuda-plugin.cjs').registration(dest,path.join(dest,'verification-core')))throw Error('Bundled Tuda registration missing');

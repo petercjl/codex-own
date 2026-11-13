@@ -1,0 +1,30 @@
+import express from "express";
+import pg from "pg";
+import {gatewayConfig,initGateway,installGateway,validateModels} from "./gateway.ts";
+import {initAuth,installOAuth} from "./auth.ts";
+import {initCompany,installCompany} from './company.ts';
+import {privateApplications} from './applications.ts';
+import fs from "node:fs/promises";
+import {rejectRetiredCodexProxy} from './retired-proxy.ts';
+
+const config=gatewayConfig();
+if(!config||!process.env.DATABASE_URL||!process.env.DINGTALK_CLIENT_ID||!process.env.DINGTALK_CLIENT_SECRET||!process.env.DINGTALK_ADMIN_UNION_ID)throw Error("Authentication, administrator, database and model configuration are required");
+await fs.readFile(config.modelFile,"utf8").then(s=>validateModels(JSON.parse(s)));
+const db=new pg.Pool({connectionString:process.env.DATABASE_URL,max:12});
+await initAuth(db);await initGateway(db);await initCompany(db);
+const app=express();app.disable("x-powered-by");app.set("trust proxy",1);
+app.use((req,res,next)=>{res.set({"cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer"});if(req.headers.origin&&req.headers.origin!==config.origin){res.status(403).json({ok:false,error:{code:"ORIGIN",message:"请求来源无效"}});return;}next();});
+app.use(rejectRetiredCodexProxy);
+app.use(express.json({limit:"16mb"}));app.use(express.urlencoded({extended:false,limit:"16kb"}));
+const browserIdentity=installOAuth(app,{db,config:{...config,clientId:process.env.DINGTALK_CLIENT_ID,clientSecret:process.env.DINGTALK_CLIENT_SECRET,adminUnionId:process.env.DINGTALK_ADMIN_UNION_ID,appId:"dongxuan-ai"}});
+installGateway(app,{db,config,browserIdentity});
+const privateConfig=await privateApplications();
+const companyApps=privateConfig.applications.map(a=>({...a,oauthStart:'/api/auth/dingtalk/start',identity:browserIdentity}));
+installCompany(app,{db,origin:config.origin,apps:companyApps,loadModels:async()=>validateModels(JSON.parse(await fs.readFile(config.modelFile,'utf8'))),imageFile:config.imageFile,nas:privateConfig.nas});
+
+app.get("/health",async(_req,res)=>{try{await db.query("SELECT 1");res.json({ok:true,service:"codex-own",version:"0.1.0",contract:1});}catch{res.status(503).json({ok:false});}});
+app.get("/",(_req,res)=>res.type("html").send('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>东轩AI授权</title><body style="font:16px system-ui;max-width:600px;margin:12vh auto;padding:24px"><h1>东轩AI授权</h1><p>请从需要使用的应用发起登录，使用东轩企业钉钉账号完成授权。</p><p><a href="/api/codex-own/admin">管理员：管理员工使用权限</a></p></body></html>'));
+app.use((_req,res)=>res.status(404).json({ok:false}));
+app.use((error:any,_req:any,res:any,_next:any)=>res.status(error.status===413?413:500).json({ok:false,error:{code:error.status===413?"REQUEST_TOO_LARGE":"SERVICE_FAILED",message:"请求未完成"}}));
+const server=app.listen(Number(process.env.PORT||4318),process.env.HOST||"127.0.0.1",()=>console.log("codex-own service ready"));
+for(const signal of ["SIGINT","SIGTERM"])process.once(signal,()=>{server.close(()=>db.end().then(()=>process.exit(0)));setTimeout(()=>{server.closeAllConnections();process.exit(1);},10000).unref();});
