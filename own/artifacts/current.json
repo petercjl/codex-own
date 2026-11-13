@@ -3,7 +3,7 @@
   "manifest": {
     "schema": 2,
     "repository": "petercjl/codex-own",
-    "version": "0.6.13",
+    "version": "0.6.14",
     "platforms": {
       "win32-x64": {
         "entry": "app",
@@ -15,8 +15,8 @@
           "version": "codex-cli 0.167.0-alpha.4.1"
         },
         "transport": "canonical-tar-cdc-v1",
-        "size": 1938018816,
-        "sha256": "747e9cf4229523500f6d49ab0054467d91a1252e5b509fb57141d774824a3eed",
+        "size": 1938023936,
+        "sha256": "399258c1cdedc250d09499e71a2b0710906ff23ec546bff832016a069cf0c0d6",
         "parts": [
           {
             "sha256": "fd5becb4ee09a9b72f26cfeef80b3b662703c116dd526931da25a838868fd8fd",
@@ -376,11 +376,11 @@
             "archiveSha256": "8995b3520ffe2a110e371d350a3d74ef6061b28a78283c136c7d0436f082cb31"
           },
           {
-            "sha256": "0b62112648122bf5ce6b171ec191d9d56fc3facd976955952fd98876cabd7a54",
-            "size": 24809564,
-            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.h0b62112648122bf5ce6b171ec191d9d56fc3facd976955952fd98876cabd7a54.tgz",
-            "archiveSize": 8333210,
-            "archiveSha256": "e251c7accc9e47652a45ed839753c60311521766832a127923326c21e677b997"
+            "sha256": "a3d94b1021c5c347814540c0284fdb3f5162a65d2eabfbe9e188078deffacedc",
+            "size": 24814684,
+            "url": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.0.0-payload.ha3d94b1021c5c347814540c0284fdb3f5162a65d2eabfbe9e188078deffacedc.tgz",
+            "archiveSize": 8334566,
+            "archiveSha256": "d82ac1240f4e1a04ce30260f7b9ea33a75620cd1add3b4ab2ef0db8e1f804bc9"
           },
           {
             "sha256": "55f2f328ee74939a767834a8ecac7ec984d405685910c61e6df426fd4d173146",
@@ -423,46 +423,62 @@
     "provenance": {
       "win32-x64": {
         "nativeBase": {
-          "version": "0.6.12",
-          "identity": "704d11b6d17f6671808330ceebf65be2b1010d0daab18239a1551b2992718d5c",
+          "version": "0.6.13",
+          "identity": "747e9cf4229523500f6d49ab0054467d91a1252e5b509fb57141d774824a3eed",
           "source": {
             "win32-x64": {
-              "upstreamCommit": null,
-              "ownSourceRef": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+              "nativeBase": {
+                "version": "0.6.12",
+                "identity": "704d11b6d17f6671808330ceebf65be2b1010d0daab18239a1551b2992718d5c",
+                "source": {
+                  "win32-x64": {
+                    "upstreamCommit": null,
+                    "ownSourceRef": "19e9cd2420cc09b153bd15a85f716a9f2764507e",
+                    "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+                    "toolchain": {
+                      "node": "v24.15.0",
+                      "platform": "win32-x64",
+                      "image": "20261103.298.1"
+                    },
+                    "originalProgramTree": {
+                      "sha256": "1c42ce6c006fe9e2eb40931f102edc1b029c07d194a8ffab06b7fe3c1d432ec1",
+                      "fileCount": 3679
+                    },
+                    "originalAsarSha256": "54b74a9131680fc9eead711ed5d9f718f6127c22222ca60d2e3b577a707e2485",
+                    "cliSource": "upstream-bundled",
+                    "cliSha256": "83f5c2dd2ac2902e0d96ba5d8ccdd27d513f57df4a9ab73e06a5a518028e9a2f",
+                    "missingUnpackedBindings": [],
+                    "msixPathRestorations": [
+                      {
+                        "path": "node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node",
+                        "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/%40serialport/bindings-cpp/build/Release/bindings.node",
+                        "sha256": "bc934030390b886e8f21e5c5be37dc66a43e0fe7f541d4ef95992997e575a969",
+                        "size": 803120
+                      },
+                      {
+                        "path": "node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
+                        "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
+                        "sha256": "292274a65e72e88737f411075677f2c6ba47e6f725a66329c89f5de2ccb098df",
+                        "size": 1591088
+                      }
+                    ],
+                    "cliVersion": "codex-cli 0.167.0-alpha.4.1"
+                  }
+                }
+              },
+              "upgradeNpmUpdater": true,
+              "overlaySource": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
               "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
               "toolchain": {
                 "node": "v24.15.0",
                 "platform": "win32-x64",
                 "image": "20261103.298.1"
-              },
-              "originalProgramTree": {
-                "sha256": "1c42ce6c006fe9e2eb40931f102edc1b029c07d194a8ffab06b7fe3c1d432ec1",
-                "fileCount": 3679
-              },
-              "originalAsarSha256": "54b74a9131680fc9eead711ed5d9f718f6127c22222ca60d2e3b577a707e2485",
-              "cliSource": "upstream-bundled",
-              "cliSha256": "83f5c2dd2ac2902e0d96ba5d8ccdd27d513f57df4a9ab73e06a5a518028e9a2f",
-              "missingUnpackedBindings": [],
-              "msixPathRestorations": [
-                {
-                  "path": "node_modules/@worklouder/device-kit-oai/node_modules/@serialport/bindings-cpp/build/Release/bindings.node",
-                  "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/%40serialport/bindings-cpp/build/Release/bindings.node",
-                  "sha256": "bc934030390b886e8f21e5c5be37dc66a43e0fe7f541d4ef95992997e575a969",
-                  "size": 803120
-                },
-                {
-                  "path": "node_modules/@worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
-                  "msixPath": "node_modules/%40worklouder/device-kit-oai/node_modules/node-hid/build/Release/HID.node",
-                  "sha256": "292274a65e72e88737f411075677f2c6ba47e6f725a66329c89f5de2ccb098df",
-                  "size": 1591088
-                }
-              ],
-              "cliVersion": "codex-cli 0.167.0-alpha.4.1"
+              }
             }
           }
         },
         "upgradeNpmUpdater": true,
-        "overlaySource": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
+        "overlaySource": "80094afc81d5e6748e4c1bca437988206426f2a3",
         "updaterNodeSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
         "toolchain": {
           "node": "v24.15.0",
@@ -525,26 +541,26 @@
     },
     "binding": {
       "schema": 1,
-      "managerVersion": "0.6.13",
+      "managerVersion": "0.6.14",
       "managerSource": {
         "repository": "petercjl/codex-own",
-        "ref": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
-        "run": "43268403752",
+        "ref": "80094afc81d5e6748e4c1bca437988206426f2a3",
+        "run": "43346826932",
         "workflow": ".github/workflows/own-release.yml"
       },
       "managerContract": 2,
       "releasePolicyFingerprint": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
       "desktop": {
-        "artifactVersion": "0.6.13",
-        "publishedIn": "0.6.13",
-        "identity": "2f04aba15282dbf472ce992d3b44623401b897a9e46206dbd9c65445e2067202",
-        "inputFingerprint": "624cdf58fcbe9a996df02b0a94ffcca63967d49021b78dc80c17a91c050a4945",
-        "declaredFingerprint": "5d8ab856ebd4a40f3f16e58f1da60cd6422e99247edb21340c3d356545fa82de",
+        "artifactVersion": "0.6.14",
+        "publishedIn": "0.6.14",
+        "identity": "2b859a471385b1a3e47bb62352eb20db754d36eb2eeec011eb52746531524ee3",
+        "inputFingerprint": "5bd76e02602ec902154be4d26af5db838baa6e521af16bd7b1b15420508288cd",
+        "declaredFingerprint": "d2339f4f16db09719dc7ba2f816b0e0cb16e6d501d4264f0038f885a496843cf",
         "upstreamFingerprint": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
         "source": {
           "repository": "petercjl/codex-own",
-          "ref": "6dbfe999369bf501fad4dc9eee12ba4d5319ccf4",
-          "run": "43268403752",
+          "ref": "80094afc81d5e6748e4c1bca437988206426f2a3",
+          "run": "43346826932",
           "workflow": ".github/workflows/own-release.yml"
         },
         "updaterContract": 2,
@@ -698,7 +714,7 @@
       },
       "own/README.md": {
         "kind": "manager",
-        "sha256": "1ad2fc4fbb9e97ecb891f5e1d18cbe97f9f11c02dd903a21d21adb915559fd04"
+        "sha256": "b9b3352168a1869b8333bfbd0021629e2c1cc6b6971c74ad9de936d39557adeb"
       },
       "own/TUDA-INTEGRATION-HANDOFF.md": {
         "kind": "release",
@@ -826,7 +842,7 @@
       },
       "own/capabilities.json": {
         "kind": "manager",
-        "sha256": "55920d8db3696b8db1b6175366970b6b29bbca7d6d39941bd8f26857be097097"
+        "sha256": "92300cc0c2db98b42649e5b7f2dca81ccbd62acdbc86594a581a59944d7bc1d8"
       },
       "own/ci/artifact-inputs.mjs": {
         "kind": "release",
@@ -1050,7 +1066,7 @@
       },
       "own/desktop/controller.cjs": {
         "kind": "native",
-        "sha256": "42567cf806dbc2bc914516ca7ae30dcd85c35ee2619c94d6f9e119bdc9cf5ab5"
+        "sha256": "7a116a27ab1e0ad11564bd4c42d597bfa8bfd090bdc1f945100fe92711ce37c9"
       },
       "own/desktop/image-settings-component.js": {
         "kind": "native",
@@ -1186,7 +1202,7 @@
       },
       "own/lib/cli.mjs": {
         "kind": "native",
-        "sha256": "167bc7e25bc0102d4ca1a70430e450d6e9383ad95331919713b05d821f0db955"
+        "sha256": "6ef300f789ae2bd4e849314166bd837e4656db1226b125a345d6aa7b95075342"
       },
       "own/lib/content-blocks.mjs": {
         "kind": "native",
@@ -1238,7 +1254,7 @@
       },
       "own/lib/network.mjs": {
         "kind": "native",
-        "sha256": "e4a9bad12b947e3b4054232d1ecc618fe04458b9aad342d9b716c2f6c2def540"
+        "sha256": "751c05e61bab6a68cf45efec519e45fc1783b4c16bf19af157851cc1baa06f42"
       },
       "own/lib/npm-assets.mjs": {
         "kind": "native",
@@ -1247,6 +1263,10 @@
       "own/lib/patch-compat.cjs": {
         "kind": "native",
         "sha256": "80c9395fc8ad87f260758b044d745c6c407e0d8f4863c3db32039d8b7414f192"
+      },
+      "own/lib/registry-network.mjs": {
+        "kind": "native",
+        "sha256": "041eaad7473e75a0ae5b82fb6b2c89f96d42115ea1dbb4aa18b8217154ee8a7d"
       },
       "own/lib/subagent-bridge-runner.cjs": {
         "kind": "native",
@@ -1322,7 +1342,7 @@
       },
       "own/skills/codex-own/SKILL.md": {
         "kind": "manager",
-        "sha256": "bc6b94b19bbabf95a32c326de6d27052f4359088fc80f66b5078d0ff7293ecf0"
+        "sha256": "192cbd16639a339b6e19f1538e085cc5409b4dfcc0fdfbe7f74a37d834bd8faa"
       },
       "own/skills/codex-own/adapters/codex.json": {
         "kind": "manager",
@@ -1508,6 +1528,10 @@
         "kind": "manager",
         "sha256": "6b572d70e0af5e5701e7f56ba65d32d47b61987d3b76dc87b703ac14a5e4d608"
       },
+      "own/test/registry-network.test.mjs": {
+        "kind": "manager",
+        "sha256": "81a8edde7deeb2d675bc7401bf702c42686db4e3baec61a60238009cd4c869d7"
+      },
       "own/test/release-plan.test.mjs": {
         "kind": "manager",
         "sha256": "f58f4cea8855d23ebc784447a2ae34ada649c56d216d73598a2dc72ac8be5137"
@@ -1563,6 +1587,10 @@
       "own/test/update-menu.test.mjs": {
         "kind": "manager",
         "sha256": "184825d6f6f8e0b959e240b3d530d33fa306801f32145eb0d5210e9cfaf3a72d"
+      },
+      "own/test/update-prepare.test.mjs": {
+        "kind": "manager",
+        "sha256": "69f867ea301f3a0c38977fa1437fa914d6ed5efb32663e3ff57b4164ee5b1544"
       },
       "own/test/update-ui.test.mjs": {
         "kind": "manager",
@@ -1761,15 +1789,15 @@
         "sha256": "27699310c7ef6845c7dff004bc74280d7c7ff623c0d484f3c0280402a296b600"
       }
     },
-    "native": "5d8ab856ebd4a40f3f16e58f1da60cd6422e99247edb21340c3d356545fa82de",
+    "native": "d2339f4f16db09719dc7ba2f816b0e0cb16e6d501d4264f0038f885a496843cf",
     "runtime": "81338f447b406bc0d274f748557b32bfe2959925ab301b57fc5c5bea6656b53c",
     "release": "3f8cbd0c449721de301c80d1ee9f423cb7d5199d7fc4d8d62d392e5fbb671199",
     "upstream": "ca939e8952a7795fac2683bdf483e4e3cb4c841613da10c452c877966b53d06a",
     "unknown": []
   },
   "registry": {
-    "version": "0.6.13",
-    "integrity": "sha512-JU0QmjDbFLJduhixxSNvAZPj0kQHqbQ/yz0Jra5IxCsIl9Zhwv7tMxu0NNdOcazPHv6ZBwka8uCw1zmJUPU1mQ==",
-    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.13.tgz"
+    "version": "0.6.14",
+    "integrity": "sha512-FQsvqT0jSt14Z9D+H2y8QTsMJsFeuaAFCTfv61PgsUJghh1fWnxiF2J+WptOTu+wFFyEpaLXubFb0iuNqrbCTg==",
+    "tarball": "https://registry.npmjs.org/@petercjl/codex-own/-/codex-own-0.6.14.tgz"
   }
 }
