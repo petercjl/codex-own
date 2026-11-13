@@ -4,6 +4,22 @@ const opaquePrefix = 'codex-own-anthropic-v1:';
 const fail = message => { throw Object.assign(Error(message), {code: 'ANTHROPIC_INPUT_UNSUPPORTED'}); };
 const toolId = value => 'own_' + crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 40);
 
+// Messages requires an object schema without a top-level composition. Keep the
+// native schema intact inside an argument envelope, including local references.
+function envelopeSchema(schema) {
+  const nested = structuredClone(schema);
+  const visit = value => {
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      if (['$ref', '$dynamicRef'].includes(key) && typeof child === 'string' && (child === '#' || child.startsWith('#/')))
+        value[key] = '#/properties/arguments' + child.slice(1);
+      else visit(child);
+    }
+  };
+  visit(nested);
+  return {type: 'object', properties: {arguments: nested}, required: ['arguments'], additionalProperties: false};
+}
+
 function toolDefinitions(tools = [], namespace, result = []) {
   for (const tool of tools) {
     if (tool.type === 'namespace') { toolDefinitions(tool.tools, tool.name, result); continue; }
@@ -13,8 +29,10 @@ function toolDefinitions(tools = [], namespace, result = []) {
     if (!name) fail('Tool name is missing');
     const alias = namespace ? namespace + '__' + name : name;
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(alias) || result.some(t => t.alias === alias)) fail('Unsupported or ambiguous tool name');
-    result.push({alias, name, namespace, search: tool.type === 'tool_search', custom: tool.type === 'custom', definition: {name: alias, description: tool.description || tool.function?.description || '',
-      input_schema: tool.type === 'custom' ? {type: 'object', properties: {input: {type: 'string', description: 'Exact literal tool input, preserving all line breaks'}}, required: ['input'], additionalProperties: false} : tool.parameters || tool.function?.parameters || {type: 'object', properties: {}}}});
+    const schema = tool.type === 'custom' ? {type: 'object', properties: {input: {type: 'string', description: 'Exact literal tool input, preserving all line breaks'}}, required: ['input'], additionalProperties: false} : tool.parameters || tool.function?.parameters || {type: 'object', properties: {}};
+    const enveloped = tool.type !== 'custom' && ['oneOf', 'anyOf', 'allOf'].some(key => Array.isArray(schema[key]));
+    result.push({alias, name, namespace, search: tool.type === 'tool_search', custom: tool.type === 'custom', enveloped, definition: {name: alias, description: tool.description || tool.function?.description || '',
+      input_schema: enveloped ? envelopeSchema(schema) : schema}});
   }
   return result;
 }
@@ -50,7 +68,8 @@ function toMessages(body, route) {
     if (item.type === 'additional_tools') continue;
     if (item.type === 'tool_search_call') {
       if (item.execution !== 'client') fail('Only client-executed tool search history is supported');
-      add('assistant', [{type: 'tool_use', id: toolId(item.call_id), name: 'tool_search', input: item.arguments}]); continue;
+      const tool = tools.find(t => t.search);
+      add('assistant', [{type: 'tool_use', id: toolId(item.call_id), name: 'tool_search', input: tool?.enveloped ? {arguments: item.arguments} : item.arguments}]); continue;
     }
     if (item.type === 'tool_search_output') {
       if (item.execution !== 'client') fail('Only client-executed tool search history is supported');
@@ -71,7 +90,7 @@ function toMessages(body, route) {
       const tool = tools.find(t => t.name === item.name && t.namespace === item.namespace) || tools.find(t => t.name === item.name && !t.namespace);
       if (!tool) fail('Historical tool is absent from the active tool contract: ' + item.name);
       let value; try { value = tool.custom ? {input: item.input} : JSON.parse(item.arguments || '{}'); } catch { fail('Invalid historical tool arguments'); }
-      add('assistant', [{type: 'tool_use', id: toolId(item.call_id), name: tool.alias, input: value}]); continue;
+      add('assistant', [{type: 'tool_use', id: toolId(item.call_id), name: tool.alias, input: tool.enveloped ? {arguments: value} : value}]); continue;
     }
     if (['function_call_output', 'custom_tool_call_output'].includes(item.type)) {
       add('user', [{type: 'tool_result', tool_use_id: toolId(item.call_id), content: typeof item.output === 'string' ? item.output : contentParts(item.output)}]); continue;
@@ -152,6 +171,10 @@ async function serve({body, route, response, signal, fetch: fetchApi}) {
         send('response.content_part.done', {item_id: item.id, output_index: index, content_index: 0, part: item.content[0]});
       } else if (block.type === 'tool_use') {
         let args; try { args = state.partial ? JSON.parse(state.partial) : block.input; } catch { fail('Incomplete Claude tool arguments'); }
+        if (tool.enveloped) {
+          if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length !== 1 || !Object.hasOwn(args, 'arguments')) fail('Claude tool requires its argument envelope');
+          args = args.arguments;
+        }
         if (tool.search) { item.arguments = args; item.status = 'completed'; }
         const value = tool.custom ? args.input : JSON.stringify(args);
         if (typeof value !== 'string') fail('Claude custom tool requires an input string');

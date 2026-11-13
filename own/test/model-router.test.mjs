@@ -6,6 +6,53 @@ import {parseModelAccess} from '../lib/model-access.mjs';
 const require = createRequire(import.meta.url), bridge = require('../lib/subagent-bridge.cjs'), {routing} = require('../lib/model-router.cjs'), anthropic = require('../lib/anthropic-responses.cjs');
 const searchCompat = require('../lib/tool-search-compat.cjs');
 
+test('Claude envelopes composed native schemas and restores their history without changing the caller contract', () => {
+  for (const composition of ['oneOf', 'anyOf', 'allOf']) {
+    const schema = {type: 'object', $defs: {code: {type: 'string'}}, properties: {code: {$ref: '#/$defs/code'}}, [composition]: [{required: ['code']}]};
+    const tool = {type: 'function', name: 'js', parameters: schema}, before = structuredClone(tool);
+    const body = {tools: [{type: 'namespace', name: 'mcp__cua_repl', tools: [tool]}], input: [{role: 'user', content: 'Check'},
+      {type: 'function_call', call_id: 'call1', name: 'js', namespace: 'mcp__cua_repl', arguments: '{"code":"中文\\n"}'},
+      {type: 'function_call_output', call_id: 'call1', output: 'OK'}]};
+    const {request} = anthropic.toMessages(body, {model: 'claude-fixture', spec: {maxOutput: 1000}});
+    assert.equal(request.tools[0].input_schema[composition], undefined);
+    assert.deepEqual(request.tools[0].input_schema.properties.arguments[composition], schema[composition]);
+    assert.equal(request.tools[0].input_schema.properties.arguments.properties.code.$ref, '#/properties/arguments/$defs/code');
+    assert.deepEqual(request.messages[1].content[0].input, {arguments: {code: '中文\n'}});
+    assert.deepEqual(tool, before, 'Native tool definition remains unchanged');
+  }
+});
+
+test('Claude streams both computer-use union branches back as exact native arguments', async t => {
+  const inputs = [{code: 'console.log("中文\\n")', title: '检查'}, {completion_summary: '已完成界面检查'}];
+  let calls = 0;
+  const upstream = http.createServer(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    const body = JSON.parse(raw), schema = body.tools[0].input_schema;
+    assert.equal(schema.oneOf, undefined); assert.equal(schema.properties.arguments.oneOf.length, 2);
+    const input = inputs[calls++];
+    res.writeHead(200, {'content-type': 'text/event-stream'});
+    const send = (type, value) => res.write('event: ' + type + '\ndata: ' + JSON.stringify({type, ...value}) + '\n\n');
+    send('message_start', {message: {usage: {input_tokens: 1}}});
+    send('content_block_start', {index: 0, content_block: {type: 'tool_use', id: 'toolu_union', name: 'mcp__cua_repl__js', input: {}}});
+    const json = JSON.stringify({arguments: input}), middle = Math.floor(json.length / 2);
+    for (const partial_json of [json.slice(0, middle), json.slice(middle)]) send('content_block_delta', {index: 0, delta: {type: 'input_json_delta', partial_json}});
+    send('content_block_stop', {index: 0}); send('message_delta', {delta: {stop_reason: 'tool_use'}, usage: {output_tokens: 1}}); send('message_stop', {}); res.end();
+  });
+  await new Promise(r => upstream.listen(0, '127.0.0.1', r)); t.after(() => {upstream.closeAllConnections(); upstream.close();});
+  const server = await bridge.startServer({fetch, resolveRoute: () => ({model: 'claude-fixture', apiKey: 'fixture-key', protocol: 'anthropic', baseURL: `http://127.0.0.1:${upstream.address().port}/v1`, spec: {maxOutput: 1000}})});
+  t.after(() => server.close());
+  for (const input of inputs) {
+    const result = await fetch(server.url + '/responses', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({model: 'fixture', input: 'Check', tools: [{type: 'namespace', name: 'mcp__cua_repl', tools: [{type: 'function', name: 'js', parameters: {type: 'object', oneOf: [{required: ['code']}, {required: ['completion_summary']}], properties: {code: {type: 'string'}, completion_summary: {type: 'string'}, title: {type: 'string'}}}}]}]})});
+    assert.equal(result.status, 200);
+    const events = (await result.text()).split('\n').filter(line => line.startsWith('data: ')).map(line => JSON.parse(line.slice(6)));
+    const item = events.find(e => e.type === 'response.output_item.done').item;
+    assert.equal(item.name, 'js'); assert.equal(item.namespace, 'mcp__cua_repl');
+    assert.deepEqual(JSON.parse(item.arguments), input, 'Envelope stays within the provider adapter');
+    assert.equal(events.at(-1).type, 'response.completed');
+  }
+  assert.equal(calls, 2);
+});
+
 test('Responses-compatible providers receive ordinary search functions and merged loaded schemas', () => {
   const fn = name => ({type: 'function', name, parameters: {type: 'object', properties: {}}});
   const ns = tool => ({type: 'namespace', name: 'mcp__fixture', tools: [fn(tool)]});
