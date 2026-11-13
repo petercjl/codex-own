@@ -8,6 +8,7 @@ import {components} from '../lib/binding.mjs';
 import {planCleanup,runCleanup} from '../lib/cleanup.mjs';
 import {repairPlan,repairRun} from './maintenance.mjs';
 import {setProgressMode} from './network.mjs';
+import {prepareUpdate,restorePrepared} from './app-update.mjs';
 const args=process.argv.slice(2),[command,sub]=args;
 const flag=n=>args.includes('--'+n),value=n=>{const i=args.indexOf('--'+n);return i<0?undefined:args[i+1];};
 const yes=()=>{if(!flag('yes'))fail('CONFIRMATION_REQUIRED','Mutating commands require --yes');};
@@ -18,7 +19,7 @@ async function main(){
  if(flag('json')&&value('progress')==='stdout')fail('INVALID_ARGUMENT','JSON mode requires progress on stderr or quiet');
  setProgressMode(flag('quiet')?'quiet':value('progress')||'stderr');
  if(command==='repair'){if(sub==='plan')return repairPlan();if(sub==='run'){yes();return repairRun();}fail('INVALID_COMMAND','repair plan or repair run --yes');}
- if(!command||command==='help'||command==='--help')return {commands:['version','capabilities','doctor','repair plan','repair run --yes','install --yes [--adopt]','configure --config-file <file> --yes','configure --api-key-file <file> --yes','models list','models select --model provider/model --yes','update check','update install --yes','cleanup plan [--cache-limit-mib <0..16384>]','cleanup run --yes [--cache-limit-mib <0..16384>]','runtime install|update|doctor|env|run|rollback','launch','rollback --restore-data --yes','skill source|status|install|update'],note:'Node >=22; doctor.bootstrap reports the actual executable. Default stdout is JSON; --progress stdout is for human terminals; --quiet disables progress. Repair preserves application/user data and refuses active or incomplete transactions.'};
+ if(!command||command==='help'||command==='--help')return {commands:['version','capabilities','doctor','repair plan','repair run --yes','install --yes [--adopt]','configure --config-file <file> --yes','configure --api-key-file <file> --yes','models list','models select --model provider/model --yes','update check','update prepare --yes','update install --yes','cleanup plan [--cache-limit-mib <0..16384>]','cleanup run --yes [--cache-limit-mib <0..16384>]','runtime install|update|doctor|env|run|rollback','launch','rollback --restore-data --yes','skill source|status|install|update'],note:'Node >=22; doctor.bootstrap reports the actual executable. Default stdout is JSON; --progress stdout is for human terminals; --quiet disables progress. Repair preserves application/user data and refuses active or incomplete transactions.'};
  if(command==='version'||command==='--version')return {manager:pkg.version,desktop:state()?.version||null,desktopIdentity:state()?.desktop?.identity||null,runtime:toolEnv.active()?.version||null};
  if(command==='capabilities')return read(path.join(packageRoot,'capabilities.json'));
  if(command==='doctor')return {...doctor(),runtime:runtimeDoctor()};
@@ -41,7 +42,14 @@ async function main(){
  if(command==='configure'){yes();if(value('config-file')&&value('api-key-file'))fail('INVALID_ARGUMENT','Choose --config-file or --api-key-file');return configure(value('config-file')||value('api-key-file'));}
  if(command==='models'){if(sub==='list')return configuredModels();if(sub==='select'){yes();if(!value('model'))fail('INVALID_ARGUMENT','Provide --model provider/model');return selectConfiguredModel(value('model'));}fail('INVALID_COMMAND','models list or models select --model provider/model --yes');}
  if(command==='install'){yes();return install({adopt:flag('adopt'),version:value('version'),archive:value('archive'),manifest:value('manifest')?read(value('manifest')):undefined});}
- if(command==='update'){const v=await latest();if(sub==='check'){const m=await manifestFor(v),c=components(state(),m,paths().platform,toolEnv.active()?.version);return {ok:true,manager:pkg.version,desktop:state()?.version||null,available:v,...c,managerUpdate:pkg.version!==v,updateAvailable:c.desktopUpdate||c.runtimeUpdate};}if(sub==='install'){yes();return install({version:v});}}
+ if(command==='update'){
+  if(sub==='prepare'){
+   yes();const current=state()?.version;if(!current)fail('UNMANAGED_TARGET','A managed desktop is required');
+   try{os.setPriority(0,os.constants.priority.PRIORITY_BELOW_NORMAL);}catch{}
+   return await restorePrepared(current)||await prepareUpdate(current,{concurrency:2});
+  }
+  const v=await latest();if(sub==='check'){const m=await manifestFor(v),c=components(state(),m,paths().platform,toolEnv.active()?.version);return {ok:true,manager:pkg.version,desktop:state()?.version||null,available:v,...c,managerUpdate:pkg.version!==v,updateAvailable:c.desktopUpdate||c.runtimeUpdate};}if(sub==='install'){yes();return install({version:v});}
+ }
  if(command==='rollback'){yes();return rollback({restoreData:flag('restore-data')});}
  fail('INVALID_COMMAND','See codex-own help');
 }

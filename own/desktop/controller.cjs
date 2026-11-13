@@ -50,7 +50,7 @@ module.exports.start=function({app,BrowserWindow,Menu,MenuItem,ipcMain,dialog,No
     for(const w of BrowserWindow.getAllWindows?.()||[])if(!w.isDestroyed())syncBadge(w.webContents);
   }
   const emit=patch=>{state={...state,...patch};if(notice()!==lastNotice){lastNotice=notice();syncNotice();}if(window&&!window.isDestroyed())window.webContents.send('codex-own:update-state',state);};
-  const errors={APP_RUNNING:'应用尚未完全退出，安装已取消。请结束任务后重试。',UNMANAGED_TARGET:'当前 App 尚未由 codex-own 安装器管理，请先完成一次命令行安装。',BUSY:'另一项安装或更新正在运行，请稍后重试。',CHECKSUM_MISMATCH:'下载文件校验失败，当前版本保持不变，请重试。',INSTALLATION_CHANGED:'安装版本已经改变，请重新检查更新。'};
+  const errors={REGISTRY_NETWORK_UNAVAILABLE:'更新服务暂不可达，官方源及国内下载源均未连接成功。稍后重试即可，当前版本保持不变。',DOWNLOAD_FAILED:'下载暂未完成，请稍后重试；已校验的内容会保留。',APP_RUNNING:'应用尚未完全退出，安装已取消。请结束任务后重试。',UNMANAGED_TARGET:'当前 App 尚未由 codex-own 安装器管理，请先完成一次命令行安装。',BUSY:'另一项安装或更新正在运行，请稍后重试。',CHECKSUM_MISMATCH:'下载文件校验失败，当前版本保持不变，请重试。',INSTALLATION_CHANGED:'安装版本已经改变，请重新检查更新。'};
   function run(action){return new Promise((resolve,reject)=>{
     const child=spawn(resolveBundledNode(bundle),[path.join(bundle,'desktop','worker.mjs'),action,meta.version],{env,cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
     if(action==='download')downloadWorker=child;

@@ -1,13 +1,15 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {EnvHttpProxyAgent, fetch} from 'undici';
+import {createRegistryFetch} from './registry-network.mjs';
 
 const dispatcher = new EnvHttpProxyAgent();
+const registryFetch=createRegistryFetch((url,options)=>fetch(url,{dispatcher,redirect:'error',...options}));
 let progressMode='stderr';
 export function setProgressMode(mode){if(!['stderr','stdout','quiet'].includes(mode))throw Object.assign(new Error('Progress must be stderr, stdout or quiet'),{code:'INVALID_ARGUMENT'});progressMode=mode;}
 export const progress = message => {if(progressMode!=='quiet')(progressMode==='stdout'?process.stdout:process.stderr).write(`[codex-own] ${message}\n`);};
 export function networkFetch(url, options = {}) {
-  return fetch(url, {dispatcher, redirect: 'error', ...options});
+  return registryFetch(url, options);
 }
 export async function fileHash(file) {
   const h = crypto.createHash('sha256');

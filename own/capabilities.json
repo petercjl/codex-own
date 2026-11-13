@@ -7,6 +7,7 @@
     "models list",
     "models select",
     "update check",
+    "update prepare",
     "update install",
     "cleanup plan",
     "cleanup run",
@@ -184,5 +185,21 @@
     "installation": "user confirmation and graceful app exit",
     "tools": "prepare immutable versions without changing active selection",
     "recovery": "verified prepared updates survive restart; failed downloads retain verified content blocks"
+  },
+  "updateDistribution": {
+    "contract": 1,
+    "introducedIn": "0.6.14",
+    "logicalRegistry": "https://registry.npmjs.org",
+    "transportSources": [
+      "https://registry.npmjs.org",
+      "https://registry.npmmirror.com",
+      "https://mirrors.cloud.tencent.com/npm"
+    ],
+    "headerTimeoutMs": 3000,
+    "selection": "official first; bounded failure switches to a domestic mirror; reuse successful source within worker",
+    "scope": "public @petercjl/codex-own metadata and immutable payloads only; authenticated requests stay on original host",
+    "integrity": "canonical manifest URLs retained; verify tarball SHA256, extracted block SHA256 and complete archive SHA256",
+    "proxyRequired": false,
+    "legacyPreparation": "update prepare --yes stages a verified receipt for an existing managed desktop without quitting or installing; legacy desktop restores it through its update window"
   }
 }
