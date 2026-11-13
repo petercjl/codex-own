@@ -55,7 +55,7 @@ else if(prepared){
  source=path.join(built,development?'codex-own 开发版.app':'codex-own.app');
 }
 else{
- if(!upstreamApp)run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform]);
+ if(!upstreamApp)run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform,...mac?[]:['--windows-source',path.join(root,'own/builders/windows-store-input.json')]]);
  if(!mac){
   const recorded=JSON.parse(fs.readFileSync(path.join(root,'scripts/.versions.json'))).win;
   if(windowsUpstream.schema!==1||recorded?.version!==windowsUpstream.desktop.storeVersion)throw Error('Windows Store input differs from selected release baseline');

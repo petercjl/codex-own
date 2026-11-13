@@ -14,6 +14,21 @@ function selectWindowsX64Package(packages){
  if(peers.some(c=>c.pkg.name!==best.pkg.name||c.pkg.digest!==best.pkg.digest))throw Error('Ambiguous official Windows x64 MSIX packages');
  return best.pkg;
 }
+function validateWindowsSource(source){
+ const name=/^OpenAI\.Codex_(\d+\.\d+\.\d+\.\d+)_x64__[A-Za-z0-9]+\.msix$/.exec(source?.packageName||'');
+ if(source?.schema!==1||!name||name[1]!==source.version||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(source.updateID||'')||
+    !/^\d{1,10}$/.test(source.revisionNumber||'')||typeof source.digest!=='string'||Buffer.from(source.digest,'base64').length!==20||Buffer.from(source.digest,'base64').toString('base64')!==source.digest||
+    !Number.isSafeInteger(source.size)||source.size<=0||source.size>10*1024**3)throw Error('Invalid pinned official Windows source');
+ return Object.fromEntries(['version','packageName','updateID','revisionNumber','digest','size'].map(key=>[key,source[key]]));
+}
+function windowsSourceArgument(args){
+ const positions=args.flatMap((arg,index)=>arg==='--windows-source'?[index]:[]);
+ if(!positions.length)return null;
+ const file=args[positions[0]+1];
+ if(positions.length!==1||!file||file.startsWith('--'))throw Error('Expected one --windows-source JSON file');
+ return validateWindowsSource(JSON.parse(fs.readFileSync(file,'utf8')));
+}
 function selectPlatforms(args){
  const all=['mac-arm64','mac-x64','win'],i=args.indexOf('--platform');
  if(i>=0&&!all.includes(args[i+1]))throw Error('Unknown --platform');
@@ -93,4 +108,4 @@ function patchMacFramework(app,headerHash){
  if(i<0||b.lastIndexOf(marker)!==i||b[i+32]!==1||b[i+33]!==1)throw Error('Unknown framework integrity contract');
  crypto.createHash('sha256').update('Resources/app.asarSHA256'+headerHash).digest().copy(b,i+34);fs.writeFileSync(file,b);
 }
-module.exports={selectWindowsX64Package,selectPlatforms,findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,extractAsar,repackAsar,patchWindowsIntegrity,patchMacFramework};
+module.exports={selectWindowsX64Package,validateWindowsSource,windowsSourceArgument,selectPlatforms,findMacApplication,missingUnpacked,restoreMsixUnpackedPaths,extractAsar,repackAsar,patchWindowsIntegrity,patchMacFramework};

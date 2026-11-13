@@ -10,6 +10,16 @@ const {selectWindowsX64Package,findMacApplication,missingUnpacked,restoreMsixUnp
 const {hasNativeArchiveDelete}=require('../patch-archive-native.js');
 const {copyrightPatches}=require('../patch-copyright-rule.js');
 const asar=require('@electron/asar');
+test('pinned Microsoft Store inputs retain exact official package identity across rollout regions',()=>{
+ const {validateWindowsSource,windowsSourceArgument}=require('../upstream-compat.js');
+ const source={schema:1,version:'26.1106.6628.0',packageName:'OpenAI.Codex_26.1106.6628.0_x64__2p2nqsd0c76g0.msix',updateID:'92376b62-0d7b-4dff-8fde-a2cb27d80616',revisionNumber:'1',digest:'1sGEY2TqJoLDkAy7h13pAk2nT2I=',size:1057680859};
+ assert.equal(validateWindowsSource(source).version,source.version);
+ for(const patch of [{schema:2},{version:'26.1111.1.0'},{packageName:'../app.msix'},{packageName:source.packageName.replace('_x64_','_arm64_')},{updateID:'untrusted'},{revisionNumber:'1;id'},{digest:'bad'},{size:-1}])assert.throws(()=>validateWindowsSource({...source,...patch}));
+ assert.equal(windowsSourceArgument([]),null);
+ assert.throws(()=>windowsSourceArgument(['--windows-source']));
+ assert.throws(()=>windowsSourceArgument(['--windows-source','--force']));
+ assert.throws(()=>windowsSourceArgument(['--windows-source','a','--windows-source','b']));
+});
 const fixture=()=>fs.mkdtempSync(path.join(os.tmpdir(),'own-official-contract-'));
 test('Mac locator supports either official bundle name and refuses ambiguous applications',()=>{
  const root=fixture();for(const name of ['Codex.app','ChatGPT.app']){const app=path.join(root,name);fs.mkdirSync(path.join(app,'Contents/Resources'),{recursive:true});fs.writeFileSync(path.join(app,'Contents/Resources/app.asar'),'');assert.equal(findMacApplication(root),app);fs.rmSync(app,{recursive:true});}

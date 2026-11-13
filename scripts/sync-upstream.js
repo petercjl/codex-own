@@ -14,6 +14,7 @@
  *
  * Usage:
  *   node scripts/sync-upstream.js [--force] [--skip-mac] [--skip-win]
+ *   node scripts/sync-upstream.js --platform win --windows-source SOURCE.json
  */
 
 const https = require("https");
@@ -22,7 +23,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const {selectWindowsX64Package,selectPlatforms,extractAsar,restoreMsixUnpackedPaths}=require('./upstream-compat');
+const {selectWindowsX64Package,windowsSourceArgument,selectPlatforms,extractAsar,restoreMsixUnpackedPaths}=require('./upstream-compat');
 const crypto=require('node:crypto');
 
 // TLS certs for MS delivery CDN
@@ -48,6 +49,8 @@ const CHECK_ONLY = args.includes("--check-only");
 const SKIP_MAC = args.includes("--skip-mac");
 const SKIP_WIN = args.includes("--skip-win");
 const SELECTED=selectPlatforms(args);
+const WINDOWS_SOURCE=windowsSourceArgument(args);
+if(WINDOWS_SOURCE&&!SELECTED.includes('win'))throw Error('--windows-source requires Windows selection');
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -147,6 +150,12 @@ async function getAppcastVersion(url) {
 
 async function getWindowsVersion() {
   const msstore = require("./fetch-msstore");
+  if(WINDOWS_SOURCE){
+    const url=await msstore.getDownloadUrl(WINDOWS_SOURCE.updateID,WINDOWS_SOURCE.revisionNumber,'Retail',WINDOWS_SOURCE.digest);
+    const parsed=new URL(url);
+    if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname.endsWith('.delivery.mp.microsoft.com')||parsed.username||parsed.password)throw Error('Pinned Windows source requires an official Microsoft delivery URL');
+    return {...WINDOWS_SOURCE,url};
+  }
   const cookie = await msstore.getCookie();
   const info = await msstore.getAppInfo("9plm9xgg6vks", "US");
   if (!info.categoryId) throw new Error("No CategoryID");
