@@ -33,7 +33,7 @@ test('physical Skill discovery tree and runtime environment switch together; new
  assert(env.PATH.startsWith(path.join(root,'company-tools/bin')));
  assert.equal(env.NODE_USE_ENV_PROXY,'1','private Node adopts the host proxy for collection and member fetch calls');
  const body=envContract.apply({instructions:'Existing instructions'},path.join(root,'core'));
- assert(body.instructions.includes(path.join(root,'core/skills/company-tools')));assert(body.instructions.includes('same Skill name'));assert(body.instructions.includes('CODEX_OWN_NODE'));assert(body.instructions.startsWith('Existing instructions'));
+ assert(body.instructions.includes(JSON.stringify(path.join(root,'core/skills/company-tools'))));assert(body.instructions.includes('same Skill name'));assert(body.instructions.includes('CODEX_OWN_NODE'));assert(body.instructions.startsWith('Existing instructions'));
  assert(envContract.environment(root,{PATH:'system'},'win32').PATH.includes(';system'));
 });
 test('the same inherited PATH resolves updated and newly added CLIs; removed commands do not fall back to an old generation',t=>{
