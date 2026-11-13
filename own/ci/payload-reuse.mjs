@@ -1,3 +1,4 @@
+import {mapLimited} from './publication-pool.mjs';
 import {identity} from '../lib/binding.mjs';
 import {validateParts,payloadVersion,payloadURL} from '../lib/npm-assets.mjs';
 
@@ -32,4 +33,9 @@ export async function preparePayload({block,known,metadata,prepare}){
   }
  }
  return prepare();
+}
+
+export async function planPayloadJobs(jobs,known,metadata){
+ const checked=await mapLimited(jobs,4,async job=>({job,result:await preparePayload({block:job.block,known,metadata,prepare:async()=>null})}));
+ return {reused:checked.filter(x=>x.result).map(({job,result})=>({platform:job.platform,...result})),needed:checked.filter(x=>!x.result).map(x=>x.job)};
 }

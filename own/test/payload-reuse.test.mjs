@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {trustedPayloads,preparePayload} from '../ci/payload-reuse.mjs';
+import {trustedPayloads,preparePayload,planPayloadJobs} from '../ci/payload-reuse.mjs';
 import {payloadURL,payloadVersion} from '../lib/npm-assets.mjs';
 const sha='a'.repeat(64),part={sha256:sha,size:12,archiveSize:100,archiveSha256:'b'.repeat(64),url:payloadURL(sha)};
 function fixture(){
@@ -25,4 +25,11 @@ test('contradictory provenance, block size and registry identities fail before p
  const known=trustedPayloads(previous,plan),prepare=async()=>{throw Error('packing must not run');};
  await assert.rejects(preparePayload({block:{...part,size:13},known,metadata:async()=>null,prepare}),/size mismatch/);
  for(const metadata of [{name:'other',version:payloadVersion(sha),dist:{tarball:part.url}},{name:'@petercjl/codex-own',version:'other',dist:{tarball:part.url}},{name:'@petercjl/codex-own',version:payloadVersion(sha),dist:{tarball:'https://example.com/bad'}}])await assert.rejects(preparePayload({block:part,known,metadata:async()=>metadata,prepare}),/identity mismatch/);
+});
+
+test('reused blocks do not consume submission windows or delay remaining new blocks',async()=>{
+ const jobs=Array.from({length:54},(_,i)=>({platform:'win32-x64',block:{...part,sha256:i.toString(16).padStart(64,'0')}}));
+ const known=new Map(jobs.slice(0,52).map(({block})=>[block.sha256,{...block,url:payloadURL(block.sha256)}]));
+ const queue=await planPayloadJobs(jobs,known,async version=>({name:'@petercjl/codex-own',version,dist:{tarball:payloadURL(version.slice('0.0.0-payload.h'.length))}}));
+ assert.equal(queue.reused.length,52);assert.deepEqual(queue.needed,jobs.slice(52));
 });
