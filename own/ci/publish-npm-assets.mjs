@@ -11,6 +11,7 @@ import {payloadVersion, payloadURL, validateParts} from '../lib/npm-assets.mjs';
 import {packResult} from './npm-pack-result.mjs';
 import {TRANSPORT} from '../lib/content-blocks.mjs';
 import {mapPublicationWindows,submitPayload} from './publication-pool.mjs';
+import {trustedPayloads,preparePayload} from './payload-reuse.mjs';
 
 if(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
   throw Error('Payload publication requires GitHub Actions OIDC');
@@ -27,6 +28,7 @@ async function metadata(version){
 }
 function find(root,name){for(const e of fs.readdirSync(root,{withFileTypes:true})){const p=path.join(root,e.name);if(e.isFile()&&e.name===name)return p;if(e.isDirectory()){const found=find(p,name);if(found)return found;}}}
 const pending=[],jobs=[],seen=new Map(),publication=[],plans=[];
+const known=trustedPayloads(fs.existsSync('own/artifacts/current.json')?JSON.parse(fs.readFileSync('own/artifacts/current.json')):null,fs.existsSync('release-plan.json')?JSON.parse(fs.readFileSync('release-plan.json')):null);
 const runtimeFile=path.join(dir,'runtime-input.json');
 if(fs.existsSync(runtimeFile))manifest.runtimes=JSON.parse(fs.readFileSync(runtimeFile));
 assertReleaseTargets(manifest);
@@ -73,6 +75,7 @@ async function settlePending(){
   }
 }
 const results=await mapPublicationWindows(jobs,async({platform,archive,block,index})=>{
+  const result=await preparePayload({block,known,metadata,prepare:async()=>{
   const sha256=block.sha256,version=payloadVersion(sha256),packageDir=fs.mkdtempSync(path.join(dir,'payload-'));
   try{
       fs.writeFileSync(path.join(packageDir,'payload.bin'),readBlock(archive,block),{flag:'wx'});
@@ -86,8 +89,10 @@ const results=await mapPublicationWindows(jobs,async({platform,archive,block,ind
       }
       if(existing && (existing.dist?.integrity!==packed.integrity||existing.dist?.tarball!==payloadURL(sha256)))throw Error('Existing payload identity mismatch');
       const part={sha256,size:block.size,url:payloadURL(sha256),archiveSize:fs.statSync(tgz).size,archiveSha256:await fileHash(tgz)};
-      return {platform,published:!existing,part};
+      return {published:!existing,part};
   }finally{fs.rmSync(packageDir,{recursive:true,force:true});}
+  }});
+  return {platform,...result};
 },settlePending);
 const byHash=new Map(results.map(r=>[r.part.sha256,r]));
 for(const {platform,asset,transport,parent,key,desktop} of plans){

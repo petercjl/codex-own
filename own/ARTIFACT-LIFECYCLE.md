@@ -12,7 +12,7 @@ The supported boundary is manager contract 2, embedded updater contract 2 and to
 
 The native fingerprint combines declared inputs with observed downloaded program-tree hashes, resolved CLI checksum and actual updater Node/toolchain metadata. Input inventories live in `own/artifacts/current.json`; authoritative component fingerprints are published in immutable npm metadata. Ordinary reuse uses exact published manifests and durable npm payloads, never expiring Actions artifacts or caches.
 
-Manager-only QA runs on macOS ARM64 and Windows x64. It checks package contents, packed installation, Skill update/backup and lifecycle regressions, then downloads only archive blocks containing the pinned native CLI and invokes it. Desktop unpacking, overlaying, signing, canonicalization, tool remaking and unchanged payload publication are skipped.
+Current release QA runs only on Windows x64. Manager-only QA checks package contents, packed installation, Skill update/backup and lifecycle regressions, then downloads only archive blocks containing the pinned native CLI and invokes it. Desktop unpacking, overlaying, signing, canonicalization, tool remaking and unchanged payload publication are skipped.
 
 Changed native components are built/overlaid and validated once per platform, published as immutable npm blocks plus durable native release records, then bound to the manager. Tool distributions have separate preparation and platform QA. The publisher consumes verified candidates; it does not rebuild them.
 
@@ -29,3 +29,11 @@ Bindings remain in the independent manager directory. Core/auth/session isolatio
 Run [38843240913](https://github.com/petercjl/codex-own/actions/runs/38843240913) took **24m35s**. Windows platform QA took 10m45s; macOS took 8m03s. Windows prepared-artifact verification took 4m30s, canonical/incremental checks 2m44s and candidate upload 1m49s. The publishing job took 13m36s: candidate download 58s, manifest/payload preparation and verification 8m42s, manager publication 23s and registry visibility 3m15s.
 
 These are transfer, reconstruction, verification and registry-processing costs as well as build work. The audit job records actual phase durations; no fixed future duration is promised. npm-only delivery and content-defined incremental transport remain unchanged. CDN or object-storage migration is a separate decision.
+
+## Release work reuse
+
+Input inventory schema 2 hashes each component with its own classification rules and the active target toolchain. Adding a manager or documentation rule does not change the runtime fingerprint. Runtime preparation and verification scripts, source pins and dependency locks remain gated. Package file-list and description changes affect the desktop/manager but not the independent runtime. Moving from an older inventory schema conservatively establishes a fresh validated baseline on the next release; historical fingerprints and provenance are preserved.
+
+Windows full candidate installation runs once, from the canonical tar used by npm distribution, inside the canonical/incremental verification step. It retains packed-manager installation, shortcuts, independent configuration, repeated configuration backup and original-application preservation. Compressed archive construction and checksums, offline model and GUI checks, canonical byte roundtrip, local block reuse, manager update/rollback and bootstrap compatibility remain required.
+
+Before packing a content-addressed block, publication checks the verified previous catalog and exact registry identity. An identical known block reuses its recorded archive digest, size and URL without repacking or uploading. Missing proof, an unknown block or a missing registry version takes the normal packing path; contradictory identity fails. Every input block and complete local archive is still hashed, and final registry assembly downloads and validates the published blocks and complete artifact. npm pending-publication limits and waits remain bounded; this optimization does not promise to shorten npm processing of newly uploaded blocks.

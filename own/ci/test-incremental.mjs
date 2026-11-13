@@ -2,13 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {unpack,digestFile} from '../lib/manager.mjs';
+import {unpack,digestFile,tarExecutable,checkEntries} from '../lib/manager.mjs';
 import {writeCanonicalArchive,reuseInstalledBlocks,TRANSPORT} from '../lib/content-blocks.mjs';
 
 const platform=process.env.OWN_PLATFORM,version=process.env.OWN_VERSION;
 const dir=path.resolve('out',`own-release-${version}-${platform}.noindex`);
 const manifest=JSON.parse(fs.readFileSync(path.join(dir,`manifest-${platform}.json`)));
-const asset=manifest.platforms[platform].incremental;
+const legacy=manifest.platforms[platform],compressed=path.join(dir,`codex-own-${platform}.tar.gz`);
+assert.equal(fs.statSync(compressed).size,legacy.size);assert.equal(await digestFile(compressed),legacy.sha256);
+// Decode the recovery archive and check traversal/root boundaries without a second full installation.
+const entries=execFileSync(tarExecutable(),['-tzf',compressed],{encoding:'utf8',maxBuffer:32*1048576}).split(/\r?\n/).filter(Boolean);
+assert.ok(entries.length);checkEntries(entries);
+assert.ok(entries.every(name=>name===legacy.entry||name.startsWith(legacy.entry+'/')));
+const asset=legacy.incremental;
 assert.equal(asset.transport,TRANSPORT);
 const archive=path.join(dir,`codex-own-${platform}.tar`);
 assert.equal(fs.statSync(archive).size,asset.size);assert.equal(await digestFile(archive),asset.sha256);

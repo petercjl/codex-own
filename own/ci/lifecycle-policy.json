@@ -41,7 +41,8 @@
   "runtime": [
     "own/runtime/sources.json",
     "own/ci/prepare-runtimes.mjs",
-    "own/runtime/mac-development.json"
+    "own/runtime/mac-development.json",
+    "own/ci/test-runtimes.mjs"
   ],
   "release": [
     ".github/",

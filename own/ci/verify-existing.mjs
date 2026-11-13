@@ -59,5 +59,5 @@ manifest.provenance={...manifest.provenance,overlaySource:execFileSync('git',['r
 manifest.platforms[key]=canonical;
 fs.copyFileSync(path.join(dir,'manifest.json'),path.join(dir,'manifest.json.before-canonical'),fs.constants.COPYFILE_EXCL);
 fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify(manifest,null,2));
-if(key==='win32-x64')execFileSync(process.execPath,['own/ci/test-windows-install.mjs',file,path.join(dir,'manifest.json')],{stdio:'inherit'});
+// Full Windows installation is verified once from the canonical archive by test-incremental.mjs.
 fs.writeFileSync(path.join(dir,`manifest-${key}.json`),JSON.stringify({...manifest,platforms:{[key]:canonical}}),{flag:'wx'});

@@ -22,3 +22,23 @@ test('same tool bytes retain original build source while a new recipe adds valid
 test('missing, legacy and incompatible proof cannot be forced into ordinary reuse',()=>{for(const mutate of [p=>delete p.manifest.binding,p=>p.manifest.binding.desktop.updaterContract=1,p=>p.manifest.binding.runtimes.contract=9,p=>p.manifest.binding.desktop.verifiedPlatforms.pop()]){const {inputs,previous}=fixture();mutate(previous);assert.throws(()=>releasePlan({inputs,previous,managerVersion:'0.6.1',mode:'manager-only',provenanceVerified:true}),{code:'REUSE_NOT_PROVEN'});}const {inputs,previous}=fixture();assert.throws(()=>releasePlan({inputs,previous,managerVersion:'0.6.1',mode:'manager-only',provenanceVerified:false}),{code:'REUSE_NOT_PROVEN'});});
 test('fingerprints ignore npm release number and include dependency locks, overlay, icon and toolchain bytes',t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'own-inputs-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));fs.mkdirSync(path.join(root,'own'));const f=path.join(root,'own/package.json');fs.writeFileSync(f,JSON.stringify({name:'x',version:'1.0.0',dependencies:{x:'1'}}));const a=snapshot(root,{files:['own/package.json']});fs.writeFileSync(f,JSON.stringify({name:'x',version:'2.0.0',ownDesktopManifest:{changed:true},dependencies:{x:'1'}}));assert.equal(snapshot(root,{files:['own/package.json']}).native,a.native);fs.writeFileSync(f,JSON.stringify({name:'x',version:'2.0.0',dependencies:{x:'2'}}));assert.notEqual(snapshot(root,{files:['own/package.json']}).native,a.native);for(const file of ['own/lib/manager.mjs','own/builders/updater.mjs','resources/own/codex-own.icns','package-lock.json'])assert.equal(classify(file),'native');assert.equal(classify('brand-new-file'),'unknown');});
 test('published proof rejects registry tampering and requires successful source-pinned platform jobs',async()=>{const {previous}=fixture();await assert.rejects(verifyPublished(previous,{fetcher:async()=>({ok:true,json:async()=>({dist:{integrity:'wrong'},ownDesktopManifest:previous.manifest})})}),/integrity changed/);const run={conclusion:'success',head_sha:source.ref,path:source.workflow};const jobs=['darwin-arm64','win32-x64'].map(p=>({name:'native '+p,conclusion:'success',steps:[{name:'Verify canonical archive and local incremental reuse',conclusion:'success'}]}));assert.equal(verifyBuildRun(source,run,jobs,'desktop'),true);assert.throws(()=>verifyBuildRun(source,{...run,head_sha:'f'.repeat(40)},jobs,'desktop'));jobs.pop();assert.throws(()=>verifyBuildRun(source,run,jobs,'desktop'),/Missing successful/);});
+
+test('component fingerprints scope policy and package metadata while retaining runtime dependency gates',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'own-scoped-inputs-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'own/runtime'),{recursive:true});
+ const policy=JSON.parse(fs.readFileSync(new URL('../ci/lifecycle-policy.json',import.meta.url)));
+ const pkg=path.join(root,'own/package.json'),runtime=path.join(root,'own/runtime/sources.json');
+ const writePackage=extra=>fs.writeFileSync(pkg,JSON.stringify({name:'fixture',version:'1.0.0',dependencies:{tar:'1'},...extra}));
+ writePackage({files:['lib']});fs.writeFileSync(runtime,'{"version":"runtime-1"}');
+ const files=['own/package.json','own/runtime/sources.json'],read=policyOverride=>snapshot(root,{files,policyOverride});
+ const base=read(policy);assert.equal(base.schema,2);
+ const extra=structuredClone(policy);extra.manager.push('new-manager-doc.md');extra.release.push('new-release-note.md');
+ assert.equal(read(extra).runtime,base.runtime);assert.equal(read(extra).native,base.native);
+ writePackage({files:['lib','native'],description:'new manager description'});
+ assert.equal(read(policy).runtime,base.runtime);assert.notEqual(read(policy).native,base.native);
+ writePackage({dependencies:{tar:'2'}});assert.notEqual(read(policy).runtime,base.runtime);
+ writePackage({files:['lib']});fs.writeFileSync(runtime,'{"version":"runtime-2"}');assert.notEqual(read(policy).runtime,base.runtime);
+ fs.writeFileSync(runtime,'{"version":"runtime-1"}');const toolchain=structuredClone(policy);toolchain.toolchain.node='99.0.0';assert.notEqual(read(toolchain).runtime,base.runtime);
+ const target=structuredClone(policy);target.targets.push('darwin-arm64');assert.notEqual(read(target).runtime,base.runtime);
+ assert.equal(classify('own/ci/test-runtimes.mjs'),'runtime');
+});
