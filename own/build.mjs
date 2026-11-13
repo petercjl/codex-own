@@ -11,7 +11,8 @@ import {canonicalize} from './ci/canonicalize.mjs';
 import {sourceTree} from './ci/source-tree.mjs';
 import {exposeVendorResolver,withSystemTar} from './builders/upstream-resolver.mjs';
 import {nativeVersion} from './builders/native-version.mjs';
-import {officialLayout} from './builders/official-cli.mjs';
+import {officialLayout,prepareOfficialCli} from './builders/official-cli.mjs';
+import {installOfficialWindowsCli} from './builders/official-windows-cli.mjs';
 import {verifyMacReleaseSignature} from './builders/mac-signing.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 const {missingUnpacked}=require('../scripts/upstream-compat.js');
@@ -19,6 +20,7 @@ const {Pickle}=await import(pathToFileURL(path.join(path.dirname(require.resolve
 const root=path.resolve(import.meta.dirname,'..'),key=`${process.platform}-${process.arch}`,mac=key==='darwin-arm64';
 if(!mac&&key!=='win32-x64')throw Error('Unsupported build platform '+key);
 const platform=mac?'mac-arm64':'win',version=process.env.OWN_VERSION||JSON.parse(fs.readFileSync(path.join(root,'own/package.json'))).version;
+const windowsUpstream=mac?null:JSON.parse(fs.readFileSync(path.join(root,'own/builders/windows-upstream.json')));
 if(!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version))throw Error('Invalid version');
 const local=process.argv.includes('--local-only'),development=process.argv.includes('--development');
 if(mac&&!development)throw Error('macOS builds are local development only; use own/dev.mjs');
@@ -33,7 +35,7 @@ let source,provenance={upstreamCommit:process.env.OWN_UPSTREAM_SHA||null,ownSour
 const existingIndex=process.argv.indexOf('--existing-app');
 const prepared=argument('--prepared-app');
 const upstreamApp=argument('--upstream-app');
-const officialCli=argument('--official-cli');
+let officialCli=argument('--official-cli');
 if(officialCli&&(!local||!development||!mac||prepared||existingIndex>=0))throw Error('Official CLI override requires a local Mac development build from upstream');
 if(upstreamApp&&(!local||!development||!mac||prepared||existingIndex>=0))throw Error('Raw upstream input requires a local Mac development build without other input modes');
 if(existingIndex>=0){
@@ -54,6 +56,13 @@ else if(prepared){
 }
 else{
  if(!upstreamApp)run(process.execPath,['scripts/sync-upstream.js','--force','--platform',platform]);
+ if(!mac){
+  const recorded=JSON.parse(fs.readFileSync(path.join(root,'scripts/.versions.json'))).win;
+  if(windowsUpstream.schema!==1||recorded?.version!==windowsUpstream.desktop.storeVersion)throw Error('Windows Store input differs from selected release baseline');
+  const preparedCli=await prepareOfficialCli(windowsUpstream.cli.version,path.join(output,'official-cli'),{target:'win32-x64'});
+  officialCli=preparedCli.destination;
+  provenance.windowsUpstream={storeVersion:recorded.version,desktopVersion:windowsUpstream.desktop.version};
+ }
  const cache=path.join(os.tmpdir(),'codex-sync',mac?'arm64-extract':'win-extract');
  function findApp(dir,depth=0){if(depth>4)return null;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory()&&e.name.endsWith('.app'))return p;if(e.isDirectory()){const found=findApp(p,depth+1);if(found)return found;}}return null;}
  const original=upstreamApp||(mac?findApp(cache):path.join(cache,'app'));if(!original)throw Error('Missing source application');
@@ -61,6 +70,7 @@ else{
  if(mac)run('codesign',['--verify','--deep','--strict',original]);
  provenance.originalProgramTree=await sourceTree(original);
  const sourceResources=path.join(original,mac?'Contents/Resources':'resources'),archive=path.join(sourceResources,'app.asar');
+ if(!mac&&JSON.parse(asar.extractFile(archive,'package.json')).version!==windowsUpstream.desktop.version)throw Error('Windows desktop version differs from selected release baseline');
  provenance.originalAsarSha256=await digestFile(archive);
  const header=asar.getRawHeader(archive).header;
  const extract=path.join(root,'src',platform,'_asar');
@@ -82,7 +92,9 @@ else{
  const vendor=cliSource==='rebuild'?withSystemTar(()=>mod.exports.resolveCodexVendor(platform),tarExecutable()):null,cli=path.join(resources,mac?'codex':'codex.exe');
  if(cliSource==='rebuild'&&!vendor)throw Error('Selected Rebuild CLI unavailable');
  if(vendor)fs.copyFileSync(vendor,cli);else if(mac&&!fs.existsSync(cli))fs.copyFileSync(path.join(resources,'codex-cli/CodexCLI.app/Contents/MacOS/codex'),cli);
- if(officialCli){
+ if(officialCli&&!mac){
+  provenance.officialCli=installOfficialWindowsCli(resources,officialCli,path.join(output,'before-official-cli'),windowsUpstream.cli);
+ }else if(officialCli){
   const receipt=JSON.parse(fs.readFileSync(path.join(officialCli,'receipt.json'))),native=officialLayout(path.join(officialCli,'package/vendor/aarch64-apple-darwin'),receipt.version);
   if(receipt.provider!=='openai'||await digestFile(native)!==receipt.binarySha256)throw Error('Official CLI receipt mismatch');
   // Keep the full vendor tree so adjacent code-mode/executor resources follow
@@ -101,6 +113,7 @@ const cli=path.join(resources,mac?'codex-own-cli':'codex.exe');
 // Probe the completed product: on macOS the builder signs the copied binaries
 // and their containing app before they can be launched from their new location.
 provenance.cliVersion=await nativeVersion(path.join(resources,mac?'codex':'codex.exe'));
+if(!mac&&provenance.cliVersion!=='codex-cli '+windowsUpstream.cli.version)throw Error('Final Windows Harness version differs from selected release baseline');
 run(cli,['--version']);
 run(process.execPath,['own/test-app.mjs',source]);
 if(mac)run('codesign',['--verify','--deep','--strict',source]);

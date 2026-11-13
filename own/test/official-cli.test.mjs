@@ -5,7 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
-import {validateCliVersion, verifyIntegrity, officialLayout, prepareOfficialCli} from '../builders/official-cli.mjs';
+import {validateCliVersion, verifyIntegrity, officialLayout, prepareOfficialCli, officialTarget} from '../builders/official-cli.mjs';
+test('official CLI platform selection is explicit and cannot fall back across architectures', () => {
+  assert.equal(officialTarget('win32-x64').triple, 'x86_64-pc-windows-msvc');
+  assert.equal(officialTarget('darwin-arm64').suffix, '');
+  for (const target of ['win32-arm64', 'linux-x64', 'latest', '../win32-x64']) assert.throws(() => officialTarget(target));
+});
 test('official CLI pin refuses tags, prereleases and shell/path input', () => {
   assert.equal(validateCliVersion('0.167.1'), '0.167.1');
   for (const version of ['latest', '0.167.1-alpha.1', '../0.167.1', '0.167.1;id', ''])

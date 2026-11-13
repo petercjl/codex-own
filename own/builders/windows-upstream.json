@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "desktop": {
+    "storeVersion": "26.1111.2228.0",
+    "version": "26.1111.21308"
+  },
+  "cli": {
+    "version": "0.167.2",
+    "integrity": "sha512-AIkl2U3kjC4Ac9fINmSt8kf1W0lWqFfNZUpqtHd+UDvskYYZxx7Vga7RcAtOVNJ2v4BXb1QqpCqcTOGPHLIwRw==",
+    "archiveSha256": "d0bfe5f9d27d5720d98f299b9e4ddb3d65a862aa8278937fc642c96bfd6bbf1a"
+  }
+}

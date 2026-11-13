@@ -78,6 +78,7 @@ jobs:
           if [ "${{ inputs.existing }}" = "true" ]; then APP="out/own-release-$OWN_VERSION-win32-x64.noindex/unpacked/app"; else APP="out/own-release-$OWN_VERSION-win32-x64.noindex/built/app"; fi
           node own/ci/test-official-compat.mjs "$APP"
           node own/ci/test-patch-compat.mjs "$APP"
+          node own/ci/test-history-resume.mjs "$APP"
       - name: Verify desktop workbench and Owl native device service
         env:
           OWN_VERSION: ${{ inputs.version }}

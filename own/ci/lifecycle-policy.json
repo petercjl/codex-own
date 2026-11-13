@@ -49,6 +49,7 @@
     "own/installers/",
     "own/dev.mjs",
     "own/DEVELOPMENT.md",
+    "own/MAC-UPSTREAM-2026-11-13.md",
     "AGENTS.md",
     ".gitignore",
     ".npmignore",
