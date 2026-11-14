@@ -15,7 +15,7 @@ function forCore(core,{platform=process.platform,bundle=path.resolve(__dirname,'
  async function operation(mode,input){
   if(platform==='darwin')return run(mac,[mode,service],Buffer.from(input));
   if(platform==='win32'){
-   const text=await run(powershell,['-NoLogo','-NoProfile','-NonInteractive','-File',script,'-Mode',mode,'-Service',service],Buffer.from(input).toString('base64'),{encoding:'utf8'});
+   const text=await run(powershell,['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',script,'-Mode',mode,'-Service',service],Buffer.from(input).toString('base64'),{encoding:'utf8'});
    return Buffer.from(text.trim(),'base64');
   }
   throw fail();

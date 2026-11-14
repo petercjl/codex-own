@@ -3,6 +3,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {patchNativeImageSettings} from './native-image-settings.mjs';
 import {companyToolsChanges} from './company-tools.mjs';
+import {executionStatusChanges,executionPreload} from './execution-status.mjs';
 const require=createRequire(import.meta.url),acorn=require('acorn');
 const helper='var __codexOwnApiMode=()=>globalThis.codexOwnProductPolicy?.contract===1&&globalThis.codexOwnProductPolicy.apiMode===true;\n';
 const stateMarker='/* codex-own:api-mode-state-v1 */';
@@ -14,7 +15,7 @@ const preferenceMarker='/* codex-own:api-detail-write-v1 */';
 const productBridge=';(()=>{const {contextBridge,ipcRenderer}=require("electron");const p=ipcRenderer.sendSync("codex-own:product-policy:v1");if(!p||p.contract!==1||typeof p.apiMode!=="boolean")throw Error("codex-own product policy unavailable");contextBridge.exposeInMainWorld("codexOwnProductPolicy",{contract:1,apiMode:p.apiMode});})();\n';
 const accountDisplay=fs.readFileSync(new URL('../desktop/account-display-preload.js',import.meta.url),'utf8');
 const companyToolsBridge=fs.readFileSync(new URL('../desktop/company-tools-preload.js',import.meta.url),'utf8');
-export const policyPreload=productBridge+accountDisplay+companyToolsBridge;
+export const policyPreload=productBridge+accountDisplay+companyToolsBridge+executionPreload;
 function walk(node,fn){if(!node||typeof node!=='object')return;fn(node);for(const v of Object.values(node)){if(Array.isArray(v))for(const c of v)walk(c,fn);else if(v&&typeof v==='object')walk(v,fn);}}
 const key=p=>p.key?.name??p.key?.value;
 const property=(node,name)=>node?.properties?.find(p=>key(p)===name);
@@ -73,6 +74,7 @@ export function verifyProductModeSource(source){
 export function patchProductModePreload(source){
   if(source.includes(policyPreload))return source;
   if(!source.includes('exposeInMainWorld'))throw Error('Main preload contract changed');
+  if(source.includes(productBridge+accountDisplay+companyToolsBridge))return source.replace(productBridge+accountDisplay+companyToolsBridge,policyPreload);
   if(source.includes(productBridge+accountDisplay))return source.replace(productBridge+accountDisplay,policyPreload);
   if(source.includes(productBridge))return source.replace(productBridge,policyPreload);
   return policyPreload+source;
@@ -118,6 +120,7 @@ export function productModeChanges(asar,archive,{priorChanges=new Map()}={}){
   }
   if((split?Object.values(totals).some(n=>n!==1):renderers!==1)||preloads!==1||shared!==1)throw Error(`API product mode entry points missing: renderer=${renderers}, preload=${preloads}, shared=${shared}, split=${JSON.stringify(totals)}`);
   for(const [file,value]of companyToolsChanges(asar,archive,{priorChanges:new Map([...priorChanges,...changes])}))changes.set(file,value);
+  for(const [file,value]of executionStatusChanges(asar,archive,{priorChanges:new Map([...priorChanges,...changes])}))changes.set(file,value);
   return changes;
 }
 export function verifyProductMode(app,asar){

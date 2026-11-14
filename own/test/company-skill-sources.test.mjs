@@ -1,0 +1,24 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import crypto from 'node:crypto';
+import {planCompanySkillSources,reconcileCompanySkillSources,sourceInventory} from '../lib/company-skill-sources.mjs';
+const write=(file,value)=>{assert(!fs.existsSync(file));fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,typeof value==='string'?value:JSON.stringify(value),{flag:'wx',mode:0o600});};
+const skill=(directory,name)=>write(path.join(directory,'SKILL.md'),'---\nname: '+name+'\ndescription: source discovery test\n---\n');
+function fixture(t){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'company-sources-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const generation='generation-'+crypto.randomUUID(),previous='generation-'+crypto.randomUUID(),base=path.join(root,'company-tools'),canonical=path.join(root,'core/skills/company-tools');
+ write(path.join(base,'active.json'),{contract:1,package:'@petercjl/taobao-ai-ops',version:'0.4.18',generation,previous});write(path.join(base,generation,'collection.json'),{package:'@petercjl/taobao-ai-ops',version:'0.4.18',skills:[{name:'shared-skill'}]});write(path.join(base,previous,'collection.json'),{package:'@petercjl/taobao-ai-ops',version:'0.4.17',skills:[{name:'shared-skill'},{name:'retired-skill'}]});
+ write(path.join(canonical,'.codex-own-collection.json'),{contract:1,generation});skill(path.join(canonical,'shared-skill'),'shared-skill');return {root,canonical,skills:path.join(root,'core/skills')};
+}
+test('company names have one discovery source; aliases and retired copies are recoverably archived with their hidden resources',t=>{
+ const {root,canonical,skills}=fixture(t),first=path.join(skills,'personal-alias'),nested=path.join(skills,'legacy/second-copy'),retired=path.join(skills,'old-media');skill(first,'shared-skill');write(path.join(first,'.runtime/user-resource.txt'),'user-owned content');skill(nested,'shared-skill');skill(retired,'retired-skill');skill(path.join(skills,'legacy/keep'),'unique-skill');skill(path.join(skills,'.private/keep'),'shared-skill');
+ const original=sourceInventory(canonical).sha256,plan=planCompanySkillSources(root);assert.equal(plan.items.length,3);assert(plan.items.some(i=>i.reason==='retired-company-name'));assert(fs.existsSync(first));
+ const result=reconcileCompanySkillSources(root);assert.equal(result.count,3);assert.equal(sourceInventory(canonical).sha256,original);assert(!fs.existsSync(first));assert(!fs.existsSync(nested));assert(!fs.existsSync(retired));assert(fs.existsSync(path.join(skills,'legacy/keep/SKILL.md')));assert(fs.existsSync(path.join(skills,'.private/keep/SKILL.md')));
+ const manifest=JSON.parse(fs.readFileSync(result.manifest));assert.equal(manifest.status,'complete');assert.equal(fs.statSync(result.archive).mode&0o777,0o700);assert.equal(fs.statSync(result.manifest).mode&0o777,0o600);
+ for(const item of manifest.items){assert(item.moved);assert.equal(sourceInventory(item.archive).sha256,item.inventory.sha256);assert(!item.archive.startsWith(skills+path.sep));}
+ const copy=manifest.items.find(i=>i.source===first);assert.equal(fs.readFileSync(path.join(copy.archive,'.runtime/user-resource.txt'),'utf8'),'user-owned content');assert.equal(reconcileCompanySkillSources(root).count,0);
+ skill(first,'shared-skill');assert.equal(reconcileCompanySkillSources(root).count,1);assert.equal(JSON.parse(fs.readFileSync(result.manifest)).status,'complete');
+});
+test('a linked legacy entry is moved without changing the external Skill installation',t=>{
+ if(process.platform==='win32')return t.skip('Windows symlink privileges are not available in the portable fixture');
+ const {root,skills}=fixture(t),external=path.join(root,'external-skill');skill(external,'shared-skill');const before=sourceInventory(external).sha256,link=path.join(skills,'linked-copy');fs.symlinkSync(external,link,'dir');const result=reconcileCompanySkillSources(root),item=JSON.parse(fs.readFileSync(result.manifest)).items[0];assert.equal(result.count,1);assert(fs.lstatSync(item.archive).isSymbolicLink());assert.equal(fs.readlinkSync(item.archive),external);assert.equal(sourceInventory(external).sha256,before);assert(!fs.existsSync(link));
+});
+test('missing canonical ownership stops migration and leaves the manual Skill untouched',t=>{
+ const {root,canonical,skills}=fixture(t),manual=path.join(skills,'personal');skill(manual,'shared-skill');fs.unlinkSync(path.join(canonical,'.codex-own-collection.json'));assert.throws(()=>reconcileCompanySkillSources(root),{code:'COLLECTION_SKILL_SOURCE_MISSING'});assert(fs.existsSync(path.join(manual,'SKILL.md')));assert(!fs.existsSync(path.join(root,'company-tools/skill-archives')));
+});

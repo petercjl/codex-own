@@ -1,0 +1,1 @@
+export const executionUiFixture=`const __webpack_modules__={fixture(e,t,n){const jsx=n("ABep").jsx;function turnView(e){const anchor=jsx("div",{"data-above-composer-conversation-id":e.conversationId});return jsx("div",{"data-codex-composer-root":"",children:"original-composer"});}globalThis.fixtureTurn=turnView;}};`;

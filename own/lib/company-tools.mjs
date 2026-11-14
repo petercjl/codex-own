@@ -4,10 +4,13 @@ import {execFile} from 'node:child_process';import {promisify} from 'node:util';
 import {locked,rejectLinks} from './manager.mjs';import {networkFetch} from './network.mjs';
 import tools from './tool-env.cjs';import contract from './company-tools-env.cjs';
 import {fileURLToPath} from 'node:url';
+import {reconcileCompanySkillSources} from './company-skill-sources.mjs';
 const execute=promisify(execFile),{PACKAGE,selection}=contract;
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const fault=code=>Object.assign(Error('Company tools: '+code),{code});
 const stable=v=>typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v);
+const prerelease=v=>typeof v==='string'&&/^\d+\.\d+\.\d+-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$/.test(v);
+const memberVersion=m=>stable(m.version)||(m.channel==='next'&&prerelease(m.version));
 const forward=(old,next)=>stable(next)&&next.localeCompare(old,undefined,{numeric:true})>=0;
 export async function setCompanyToolsPolicy(root,autoUpdate){
  if(typeof autoUpdate!=='boolean')throw fault('COLLECTION_POLICY');
@@ -28,7 +31,7 @@ export function companyToolsState(root){
   if(fs.existsSync(file)){const match=fs.readFileSync(file,'utf8').match(/^\s*display_name:\s*(.+)$/m);if(match)label=match[1].trim().replace(/^["']|["']$/g,'').slice(0,120);}
   return {name:skill.name,label,package:skill.package,version:skill.version};
  });
- const members=(graph?.members||[]).map(member=>({id:member.id,package:member.package,version:member.version,cli:Array.isArray(member.bin)?member.bin:member.bin?[member.bin]:[],
+ const members=(graph?.members||[]).map(member=>({id:member.id,package:member.package,version:member.version,channel:member.channel||'latest',cli:Array.isArray(member.bin)?member.bin:member.bin?[member.bin]:[],
   available:checked.get(member.package)?.available||next?.members.find(m=>m.package===member.package)?.version||null,
   skills:skills.filter(s=>s.package===member.package).map(s=>({name:s.name,label:s.label}))}));
  return {contract:1,package:PACKAGE,name:'淘宝 AI 运营工具集',description:'统一安装和更新公司使用的 Skill 与 CLI',installed:!!current,version:current?.version||null,
@@ -64,7 +67,7 @@ export function verifyGraph(directory){
  rejectLinks(directory);const graph=json(path.join(directory,'collection.json'));
  if(graph.ok!==true||graph.schemaVersion!==1||graph.package!==PACKAGE||!stable(graph.version)||graph.skillsDirectory!==path.join(directory,'skills')||!Array.isArray(graph.members)||!Array.isArray(graph.skills)||!graph.skills.length)throw fault('COLLECTION_RECEIPT');
  const identities=new Map([[PACKAGE,graph.version]]);
- for(const m of graph.members){if(m.blocked||!stable(m.version)||typeof m.package!=='string'||identities.has(m.package))throw fault('COLLECTION_MEMBER');identities.set(m.package,m.version);}
+ for(const m of graph.members){if(m.blocked||!memberVersion(m)||typeof m.package!=='string'||identities.has(m.package))throw fault('COLLECTION_MEMBER');identities.set(m.package,m.version);}
  const names=new Set();
  for(const skill of graph.skills){
   if(!/^[a-z0-9][a-z0-9-]{1,99}$/.test(skill.name)||names.has(skill.name)||identities.get(skill.package)!==skill.version||skill.directory!==path.join(graph.skillsDirectory,skill.name))throw fault('COLLECTION_SKILL');names.add(skill.name);
@@ -82,6 +85,47 @@ function verifyInstalled(root){
  const marker=path.join(target,'.codex-own-collection.json');
  if(!current||!fs.existsSync(marker)||json(marker).generation!==current.generation)throw fault('UNMANAGED_COLLECTION_SKILLS');
  if(!same(hashes(target),json(path.join(current.directory,'integrity.json'))))throw fault('COLLECTION_LOCAL_EDITS');
+}
+// Explicit recovery preserves the entire discovery tree, including links, user edits,
+// standalone updater candidates and journals. Never exempt those files from hashes().
+export async function recoverCollectionDiscovery(root){
+ const base=path.join(root,'company-tools');rejectLinks(base);
+ return locked({root:base,manager:base},async()=>{
+  const current=selection(root);if(!current)throw fault('COLLECTION_NOT_INSTALLED');
+  if(fs.existsSync(path.join(base,'activation.json')))throw fault('COLLECTION_RECOVERY_REQUIRED');
+  const interrupted=path.join(base,'discovery-recovery.json');rejectLinks(interrupted);
+  if(fs.existsSync(interrupted)){
+   const record=json(interrupted),directory=record.directory;
+   if(record.contract!==1||record.generation!==current.generation||typeof directory!=='string'||path.dirname(directory)!==base||!/^discovery-recovery-[a-zA-Z0-9]+$/.test(path.basename(directory))||record.archive!==path.join(directory,'preserved-skills')||record.candidate!==path.join(directory,'restored'))throw fault('COLLECTION_RECOVERY_REQUIRED');
+   rejectLinks(directory);const target=path.join(root,'core/skills/company-tools');rejectLinks(target);
+   if(fs.existsSync(target)){if(fs.existsSync(record.archive))verifyInstalled(root);}
+   else if(fs.existsSync(record.archive))fs.renameSync(record.archive,target);
+   else throw fault('COLLECTION_RECOVERY_REQUIRED');
+   fs.renameSync(interrupted,path.join(directory,'interrupted-'+crypto.randomUUID()+'.json'));
+  }
+  const graph=verifyGraph(current.directory),target=path.join(root,'core/skills/company-tools');rejectLinks(target);
+  const marker=path.join(target,'.codex-own-collection.json');rejectLinks(marker);
+  if(!fs.existsSync(marker)||json(marker).generation!==current.generation)throw fault('UNMANAGED_COLLECTION_SKILLS');
+  try{verifyInstalled(root);return {status:'current',version:current.version};}catch(e){if(!['COLLECTION_LINK','COLLECTION_LOCAL_EDITS','COLLECTION_FILE_TYPE'].includes(e.code))throw e;}
+  const directory=fs.mkdtempSync(path.join(base,'discovery-recovery-'));fs.chmodSync(directory,0o700);
+  const candidate=path.join(directory,'restored'),archive=path.join(directory,'preserved-skills'),journal=path.join(base,'discovery-recovery.json');
+  fs.cpSync(graph.skillsDirectory,candidate,{recursive:true,errorOnExist:true,force:false});
+  fs.writeFileSync(path.join(candidate,'.codex-own-collection.json'),JSON.stringify({contract:1,generation:current.generation}),{flag:'wx',mode:0o600});
+  if(!same(hashes(candidate),json(path.join(current.directory,'integrity.json'))))throw fault('COLLECTION_COPY_FAILED');
+  // Inventory links as links (never follow them), so all original content is recoverable.
+  const inventory=dir=>{const records={};const walk=d=>{for(const n of fs.readdirSync(d).sort()){const f=path.join(d,n),s=fs.lstatSync(f),r=path.relative(dir,f);records[r]={mode:s.mode,...s.isSymbolicLink()?{link:fs.readlinkSync(f)}:s.isFile()?{size:s.size,sha256:crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')}:s.isDirectory()?{directory:true}:(()=>{throw fault('COLLECTION_FILE_TYPE');})()};if(s.isDirectory())walk(f);}};walk(dir);return records;};
+  const before=inventory(target);save(path.join(directory,'inventory.json'),before);
+  save(journal,{contract:1,generation:current.generation,directory,archive,candidate,originalTarget:target});
+  let moved=false,restored=false;
+  try{
+   fs.renameSync(target,archive);moved=true;
+   if(!same(before,inventory(archive)))throw fault('COLLECTION_RECOVERY_CHANGED');
+   fs.renameSync(candidate,target);restored=true;verifyInstalled(root);
+  }catch(e){if(restored)fs.renameSync(target,candidate);if(moved)fs.renameSync(archive,target);fs.renameSync(journal,path.join(directory,'failed.json'));throw e;}
+  fs.renameSync(journal,path.join(directory,'complete.json'));
+  const result={contract:1,status:'recovered',version:current.version,generation:current.generation,recoveryDirectory:directory};
+  save(path.join(base,'status.json'),result);return result;
+ });
 }
 export function activateCollection(root,generation){
  const base=path.join(root,'company-tools'),directory=contained(base,path.join(base,generation));
@@ -101,7 +145,11 @@ export function activateCollection(root,generation){
   save(path.join(base,'active.json'),{contract:1,package:PACKAGE,version:graph.version,generation,previous:previous?.generation||null,skillsBackup:fs.existsSync(backup)?backup:null});
  }catch(e){if(fs.existsSync(target))fs.renameSync(target,next);if(fs.existsSync(backup))fs.renameSync(backup,target);fs.renameSync(journal,path.join(base,'activation-failed-'+crypto.randomUUID()+'.json'));throw e;}
  fs.renameSync(journal,path.join(base,'activation-complete-'+crypto.randomUUID()+'.json'));
- return {status:'activated',version:graph.version,skillCount:graph.skills.length};
+ return {status:'activated',version:graph.version,skillCount:graph.skills.length,sourceMigration:reconcileCompanySkillSources(root,graph)};
+}
+export async function reconcileSkillSources(root){
+ const base=path.join(root,'company-tools');rejectLinks(base);if(!selection(root))return {status:'unchanged',count:0};
+ return locked({root:base,manager:base},async()=>{verifyInstalled(root);return reconcileCompanySkillSources(root);});
 }
 export function stableShims(root,graph){
  const bin=path.join(root,'company-tools','bin'),marker=path.join(bin,'.codex-own-company-bin.json');rejectLinks(bin);fs.mkdirSync(bin,{recursive:true,mode:0o700});rejectLinks(marker);
@@ -153,7 +201,7 @@ function shims(directory,graph){
   fs.writeFileSync(path.join(bin,name+'.cmd'),'@echo off\r\n"%CODEX_OWN_NODE%" "'+entry+'" %*\r\n',{flag:'wx',mode:0o600});
  }
 }
-export async function maintainCompanyTools(root,{activate=true,force=false,checkOnly=false,now=Date.now(),fetcher=networkFetch,run=execute,report=()=>{},signal}={}){
+export async function maintainCompanyTools(root,{activate=true,force=false,checkOnly=false,now=Date.now(),fetcher=networkFetch,run=execute,report=()=>{},signal,componentChannels}={}){
  const base=path.join(root,'company-tools');rejectLinks(base);fs.mkdirSync(base,{recursive:true,mode:0o700});
  return locked({root:base,manager:base},async()=>{
   const stateFile=path.join(base,'status.json'),pendingFile=path.join(base,'pending.json');let activation;
@@ -167,7 +215,10 @@ export async function maintainCompanyTools(root,{activate=true,force=false,check
     throw Object.assign(fault(typeof childCode==='string'&&/^[A-Z0-9_]+$/.test(childCode)?childCode:'COLLECTION_CHILD_FAILED'),{stage:args[0],exitCode:typeof e.code==='number'?e.code:null});}
   };
   try{
+   if(fs.existsSync(path.join(base,'discovery-recovery.json')))throw fault('COLLECTION_RECOVERY_REQUIRED');
    verifyInstalled(root);
+   const requested=componentChannels||{};if(!requested||typeof requested!=='object'||Array.isArray(requested)||Object.entries(requested).some(([id,channel])=>!/^[a-zA-Z0-9._-]+$/.test(id)||!['latest','next'].includes(channel)))throw fault('COLLECTION_CHANNEL_SELECTION');
+   if(componentChannels&&fs.existsSync(pendingFile))throw fault('COLLECTION_PENDING_CHANNEL_SWITCH');
    if(activate&&!checkOnly&&fs.existsSync(pendingFile)){
     const pending=json(pendingFile);
     if(pending.contract!==1)throw fault('COLLECTION_PENDING');
@@ -176,8 +227,9 @@ export async function maintainCompanyTools(root,{activate=true,force=false,check
     fs.renameSync(pendingFile,path.join(base,'applied-'+crypto.randomUUID()+'.json'));
     const result={...(fs.existsSync(stateFile)?json(stateFile):{}),...activation,status:'activated',version:selection(root).version,activation:'online'};save(stateFile,result);report({phase:'complete',label:'更新完成，已立即生效。',completed:4,total:4,indeterminate:false});return result;
    }
+   const sourceMigration=!checkOnly&&selection(root)?reconcileCompanySkillSources(root):{count:0};
    const status=fs.existsSync(stateFile)?json(stateFile):null;
-   if(!force&&status?.checkedAt&&now-status.checkedAt<6*3600000)return activation||{status:'throttled',version:selection(root)?.version||null};
+   if(!force&&status?.checkedAt&&now-status.checkedAt<6*3600000)return activation||{status:'throttled',version:selection(root)?.version||null,sourceMigration};
    save(stateFile,{contract:1,status:'checking',checkedAt:now});
    report({phase:'checking',label:'正在检查公司工具集及全部成员…',step:1,total:checkOnly?1:4,completed:0,indeterminate:true});
    const response=await fetcher('https://registry.npmjs.org/@petercjl%2ftaobao-ai-ops/latest',{signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)});
@@ -193,21 +245,27 @@ export async function maintainCompanyTools(root,{activate=true,force=false,check
     if(identity.name!==PACKAGE||identity.version!==meta.version||manifest.schemaVersion!==1||manifest.kind!=='capability-collection'||manifest.id!=='petercjl.taobao-ai-ops'||manifest.entry!=='bin/taobao-ai-ops.mjs'||!manifest.platforms?.includes(process.platform)||Object.keys({...identity.dependencies,...identity.optionalDependencies}).length)throw fault('COLLECTION_CONTRACT');
     shell=path.join(pkg,manifest.entry);
    }
+   if(componentChannels){if(!current)throw fault('COLLECTION_NOT_INSTALLED');const known=new Set(json(path.join(current.directory,'collection.json')).members.map(m=>m.id));if(Object.keys(requested).some(id=>!known.has(id)))throw fault('COLLECTION_UNKNOWN_COMPONENT');}
+   const hasChannel=componentChannels||current&&json(path.join(current.directory,'collection.json')).members.some(m=>m.channel==='next');
+   if(hasChannel){const capabilities=JSON.parse(await call(shell,['capabilities','--json'],base));const channelContract=capabilities.collectionContract?.componentChannels;if(channelContract?.option!=='--component-channels'||!channelContract.supported?.includes('next')||!channelContract.explicitSwitchMayDowngrade)throw fault('COLLECTION_CHANNEL_UNSUPPORTED');}
+   const channelArgs=componentChannels?['--component-channels',JSON.stringify(requested)]:[];
    const previous=current?['--previous',path.join(current.directory,'collection.json')]:[];
-   const check=JSON.parse(await call(shell,['collection','check','--json',...previous],base));
+   const check=JSON.parse(await call(shell,['collection','check','--json',...previous,...channelArgs],base));
    if(check.ok!==true||!Array.isArray(check.members))throw fault('COLLECTION_CHECK');
    const upgrades=[];
-   for(const m of check.members)if(m.blocked){if(!/^[a-zA-Z0-9._-]+$/.test(m.id)||!forward(m.version,m.available))throw fault('COLLECTION_MEMBER_DOWNGRADE');upgrades.push(m.id);}
+   for(const m of check.members)if(m.blocked){if(!/^[a-zA-Z0-9._-]+$/.test(m.id)||!(m.requestedChannel==='next'?(stable(m.available)||prerelease(m.available))&&m.available.localeCompare(m.version,undefined,{numeric:true})>=0:forward(m.version,m.available)))throw fault('COLLECTION_MEMBER_DOWNGRADE');upgrades.push(m.id);}
    const oldMembers=current?json(path.join(current.directory,'collection.json')).members:[],oldVersions=new Map(oldMembers.map(m=>[m.package,m.version])),newPackages=new Set(check.members.map(m=>m.package));
    const changes={added:check.members.filter(m=>!oldVersions.has(m.package)).length,upgraded:check.members.filter(m=>oldVersions.has(m.package)&&oldVersions.get(m.package)!==(m.blocked?m.available:m.version)).length,removed:oldMembers.filter(m=>!newPackages.has(m.package)).length};
-   const checked={contract:1,checkedAt:now,version:current?.version||null,availableVersion:meta.version,members:check.members,changes};
+   const checked={contract:1,checkedAt:now,version:current?.version||null,availableVersion:meta.version,members:check.members,changes,sourceMigration};
    if(checkOnly){const result={...checked,status:check.changed||upgrades.length?'available':'current'};save(stateFile,result);return result;}
    if(!check.changed&&!upgrades.length&&current){const result={...checked,status:'current'};save(stateFile,result);return activation||result;}
    const generation='generation-'+crypto.randomUUID(),directory=path.join(base,generation);
    report({phase:'preparing',label:'正在下载、安装组件并准备 Skill…',step:2,total:4,completed:1,indeterminate:true});
-   await call(shell,['collection','prepare','--directory',directory,'--yes','--json',...previous,...(upgrades.length?['--accept-component-upgrades',upgrades.join(',')]:[])],base);
+   await call(shell,['collection','prepare','--directory',directory,'--yes','--json',...previous,...channelArgs,...(upgrades.length?['--accept-component-upgrades',upgrades.join(',')]:[])],base);
    report({phase:'verifying',label:'正在校验完整性、版本与 Skill…',step:3,total:4,completed:2,indeterminate:false});
-   const graph=verifyGraph(directory);if(graph.version!==meta.version)throw fault('COLLECTION_VERSION');shims(directory,graph);
+   const graph=verifyGraph(directory);for(const [id,channel] of Object.entries(requested)){if(graph.members.find(m=>m.id===id)?.channel!==channel)throw fault('COLLECTION_CHANNEL_MISMATCH');}
+   if(componentChannels){if(graph.members.length!==oldMembers.length)throw fault('COLLECTION_CHANNEL_SCOPE');for(const member of oldMembers){const next=graph.members.find(m=>m.id===member.id);if(!next||next.package!==member.package||(!Object.hasOwn(requested,member.id)&&(next.version!==member.version||(next.channel||'latest')!==(member.channel||'latest'))))throw fault('COLLECTION_CHANNEL_SCOPE');}}
+   if(graph.version!==meta.version)throw fault('COLLECTION_VERSION');shims(directory,graph);
    verifyInstalled(root);
    const result={...checked,status:'ready',version:graph.version,generation,skillCount:graph.skills.length,activation:'next-startup'};
    save(pendingFile,{contract:1,generation});

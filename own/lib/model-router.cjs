@@ -12,7 +12,7 @@ function routing(access) {
     return {model, spec, protocol: entry.protocol, baseURL: entry.baseURL, apiKey: entry.apiKey};
   };
 }
-async function start({core, config, fetch, dispatcher,bootstrap}) {
+async function start({core, config, fetch, dispatcher,bootstrap,onTiming,requestContext}) {
   const {readModelAccess} = await import('./model-access.mjs');
   const managed=fs.existsSync(path.join(core,'managed-login.json'))?JSON.parse(fs.readFileSync(path.join(core,'managed-login.json'),'utf8')):null;
   const validBootstrap=managed?.contract===2&&managed.active===true&&bootstrap?.access&&bootstrap?.session?.credentialFile===managed.credentialFile&&bootstrap.session.subject===managed.subject;
@@ -23,7 +23,7 @@ async function start({core, config, fetch, dispatcher,bootstrap}) {
   try{
    // Keep the native app-server available for settings/login even while model access is paused.
    if(gate)await gate.start().catch(()=>{});
-   const server=await bridge.startServer({resolveRoute: routing(access), authorization: token, fetch, dispatcher,beforeRequest:()=>{if(blocked)throw Object.assign(Error('Company sign-in is required for direct model access'),{code:'AUTH_REQUIRED',status:401});return gate?.check();},prepareBody:body=>require('./image-provider.cjs').apply(require('./company-tools-env.cjs').apply(body,core),core)});
+   const server=await bridge.startServer({resolveRoute: routing(access), authorization: token, fetch, dispatcher,onTiming,requestContext,beforeRequest:()=>{if(blocked)throw Object.assign(Error('Company sign-in is required for direct model access'),{code:'AUTH_REQUIRED',status:401});return gate?.check();},prepareBody:body=>require('./image-provider.cjs').apply(require('./company-tools-env.cjs').apply(body,core),core)});
    const close=server.close;server.close=async()=>{gate?.close();await close();};return server;
   }catch(error){gate?.close();throw error;}
 }

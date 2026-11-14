@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
+import {executionUiFixture} from './fixtures/execution-status.mjs';
 import {companyUiFixture} from './fixtures/company-tools-ui.mjs';
 import {patchProductModeSource,patchProductModeShared,patchProductModePreload,productModeChanges,policyPreload} from '../builders/product-mode.mjs';
 const {apiMode,install,CHANNEL}=createRequire(import.meta.url)('../desktop/product-mode.cjs');
@@ -33,7 +34,7 @@ function renderContext(api){
 test('API credentials yield only a boolean policy, without exposing or modifying secrets',t=>{
  const core=fs.mkdtempSync(path.join(os.tmpdir(),'own-product-policy-'));t.after(()=>fs.rmSync(core,{recursive:true,force:true}));
  assert.equal(apiMode(core),false);const auth=path.join(core,'auth.json');fs.writeFileSync(auth,JSON.stringify({auth_mode:'apikey',OPENAI_API_KEY:'sk-private-fixture'}));const before=fs.readFileSync(auth);
- assert.equal(apiMode(core),true);let handler;install({ipcMain:{on:(channel,fn)=>{assert.equal(channel,CHANNEL);handler=fn;}}},core);const event={};handler(event);
+ assert.equal(apiMode(core),true);let handler;install({ipcMain:{handle:()=>{},on:(channel,fn)=>{assert.equal(channel,CHANNEL);handler=fn;}}},core);const event={};handler(event);
  assert.deepEqual(event.returnValue,{contract:1,apiMode:true});assert.ok(!JSON.stringify(event.returnValue).includes('private'));assert.deepEqual(fs.readFileSync(auth),before);
  fs.writeFileSync(auth,JSON.stringify({auth_mode:'chatgpt',tokens:{}}));assert.equal(apiMode(core),false);
  fs.writeFileSync(auth,JSON.stringify({OPENAI_API_KEY:'sk-legacy-fixture'}));assert.equal(apiMode(core),true);
@@ -71,18 +72,18 @@ test('missing policy bridge and upstream contract drift stop the patch instead o
  assert.equal(patchProductModePreload(policyPreload),policyPreload);assert.throws(()=>patchProductModePreload('unknown preload'),/contract changed/);
 });
 test('desktop patch requires renderer, execution state and preload together, and verifies an already patched archive',()=>{
- const files=new Map([['webview/assets/company-ui.js',companyUiFixture],['webview/assets/app-initial-fixture.js',fixture],['webview/assets/execution-state-a1b2.js',sharedFixture],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
+ const files=new Map([['webview/assets/execution-status.js',executionUiFixture],['webview/assets/company-ui.js',companyUiFixture],['webview/assets/app-initial-fixture.js',fixture],['webview/assets/execution-state-a1b2.js',sharedFixture],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
  const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
- const changed=productModeChanges(asar,'fixture');assert.equal(changed.size,4);
+ const changed=productModeChanges(asar,'fixture');assert.equal(changed.size,5);
  for(const [file,bytes]of changed)files.set(file,bytes.toString());assert.equal(productModeChanges(asar,'fixture').size,0);
  files.delete('webview/assets/execution-state-a1b2.js');assert.throws(()=>productModeChanges(asar,'fixture'),/shared=0/);
 });
 test('combined upstream chunks retain execution and menu policy plus an earlier Windows update menu edit',()=>{
  const combined=fixture+'\nconst saved="saved";\n'+sharedFixture.slice(sharedFixture.indexOf('const executionDetail'));
- const name='webview/assets/app-initial-combined.js',files=new Map([['webview/assets/company-ui.js',companyUiFixture],[name,combined],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
+ const name='webview/assets/app-initial-combined.js',files=new Map([['webview/assets/execution-status.js',executionUiFixture],['webview/assets/company-ui.js',companyUiFixture],[name,combined],['.vite/build/preload.js','const bridge={exposeInMainWorld(){}};']]);
  const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
  const priorChanges=new Map([[name,Buffer.from('/* preceding Windows update menu edit */\n'+combined)]]),changes=productModeChanges(asar,'fixture',{priorChanges});
- assert.equal(changes.size,3);const source=changes.get(name).toString();assert.ok(source.includes('/* preceding Windows update menu edit */'));assert.equal(source.split('var __codexOwnApiMode=').length,2);
+ assert.equal(changes.size,4);const source=changes.get(name).toString();assert.ok(source.includes('/* preceding Windows update menu edit */'));assert.equal(source.split('var __codexOwnApiMode=').length,2);
  const context=vm.createContext({codexOwnProductPolicy:{contract:1,apiMode:true}});vm.runInContext(source,context);
  assert.equal(context.fixture.derivedMode({get:()=> 'STEPS_PROSE'}),'codex');assert.equal(context.sharedFixture.executionDetail({get:()=> 'STEPS_PROSE'}),'STEPS_COMMANDS');
  assert.equal(context.fixture.Sidebar({codexAvailable:true,mode:'work',onModeSelect:()=>{throw Error('disabled')}}).work.props.onSelect,undefined);
@@ -92,7 +93,7 @@ test('split script chunks preserve API mode, disabled Work action and onboarding
  const prefix=fixture.slice(0,fixture.indexOf('const Item='));
  const sidebar='const Item="item",jsx=(type,props)=>({type,props});'+fixture.slice(fixture.indexOf('function Sidebar'),fixture.indexOf('globalThis.fixture='));
  const sources=[prefix+'globalThis.mode=derivedMode;', 'function switchMode(store,{codexLocalAccessStatus:access,nextMode:next}){store.mode=next;}globalThis.switchMode= switchMode;',sidebar+'globalThis.Sidebar=Sidebar;', 'const route=function({auth:a,codexFeatureAccess:f,backendOnboardingCompleted:done}){return done?"app":"welcome"};globalThis.route=route;',sharedFixture];
- const files=new Map(sources.map((s,i)=>['webview/assets/async/'+(100+i)+'.hash.js','(()=>{'+s+'})()']));files.set('.vite/build/early-bootstrap.js','start();');files.set('.vite/build/preload.js','const bridge={exposeInMainWorld(){}};');
+ const files=new Map(sources.map((s,i)=>['webview/assets/async/'+(100+i)+'.hash.js','(()=>{'+s+'})()']));files.set('webview/assets/execution-status.js',executionUiFixture);files.set('.vite/build/early-bootstrap.js','start();');files.set('.vite/build/preload.js','const bridge={exposeInMainWorld(){}};');
  files.set('webview/assets/company-ui.js',companyUiFixture);
  const asar={listPackage:()=>[...files.keys()],extractFile:(_archive,file)=>Buffer.from(files.get(file.replaceAll('\\','/')))};
  const changed=productModeChanges(asar,'fixture'),context=vm.createContext({codexOwnProductPolicy:{contract:1,apiMode:true},companyFixtureRequire:()=>({})});

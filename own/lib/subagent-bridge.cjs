@@ -27,16 +27,17 @@ function normalizeBody(body){
  const instructions=(typeof result.instructions==='string'?result.instructions+'\n\n':'')+'Return exactly one JSON object matching this schema. Use the required field names and types.\n'+JSON.stringify(format.schema);
  return {...result,instructions,text:{...result.text,format:{type:'json_object'}}};
 }
-function pinRequest(message,url,provider='dashscope_deepseek'){
+function pinRequest(message,url,provider='dashscope_deepseek',traceKey){
  if(!['thread/start','thread/resume','thread/fork'].includes(message?.method)||!message.params)return message;
  const p=message.params,c=p.config;
  if(p.modelProvider!=null&&p.modelProvider!==provider||c?.model_provider!=null&&c.model_provider!==provider)return message;
  const config={...(c||{}),['model_providers.'+provider+'.base_url']:url};
- if(c?.model_providers?.[provider])config.model_providers={...c.model_providers,[provider]:{...c.model_providers[provider],base_url:url}};
+ if(traceKey)config['model_providers.'+provider+'.http_headers.x-codex-own-trace']=traceKey;
+ if(c?.model_providers?.[provider])config.model_providers={...c.model_providers,[provider]:{...c.model_providers[provider],base_url:url,...(traceKey?{http_headers:{...c.model_providers[provider].http_headers,'x-codex-own-trace':traceKey}}:{})}};
  return {...message,params:{...p,config}};
 }
-function rpcInput(url,{maxFrameBytes=require('./request-budget.cjs').maxRequestBytes(),provider='dashscope_deepseek'}={}){
- return require('./request-budget.cjs').frames({maxFrameBytes,adapt:message=>pinRequest(message,url,provider)});
+function rpcInput(url,{maxFrameBytes=require('./request-budget.cjs').maxRequestBytes(),provider='dashscope_deepseek',traceRequest}={}){
+ return require('./request-budget.cjs').frames({maxFrameBytes,adapt:message=>pinRequest(message,url,provider,traceRequest?.(message))});
 }
 function invocation({cli,args,options,core,config,platform=process.platform}){
  if(!selected(config))return null;
@@ -52,12 +53,13 @@ function bridgeFailure(error){
  const code=error.code||(status?'UPSTREAM_HTTP_'+status:'AGENT_BRIDGE_FAILED');
  return {status:local[code]||status||502,error:{code,message:code==='ANTHROPIC_INPUT_UNSUPPORTED'?error.message:code==='AGENT_BRIDGE_TOO_LARGE'?'Request exceeds the available local JSON memory budget.':'The local model request could not be completed ('+code+').'}};
 }
-async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=require('./request-budget.cjs').maxRequestBytes(),resolveRoute,authorization,beforeRequest,prepareBody=body=>body}){
+async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=require('./request-budget.cjs').maxRequestBytes(),resolveRoute,authorization,beforeRequest,prepareBody=body=>body,onTiming,requestContext}){
  const http=require('node:http'),base=new URL(upstream||'http://127.0.0.1');
  if(!['http:','https:'].includes(base.protocol)||base.username||base.password)throw Error('Invalid configured API endpoint');
  const active=new Set();
  const server=http.createServer(async(req,res)=>{
   const abort=new AbortController();active.add(abort);
+  const timing=require('./execution-timing.cjs').requestTrace(req,onTiming,requestContext);let timingFailed=false;
   res.once('close',()=>{if(!res.writableEnded)abort.abort();});
   try{
    if(authorization&&req.headers.authorization!=='Bearer '+authorization){res.writeHead(401);res.end();return;}
@@ -67,20 +69,26 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=requ
    if(req.headers['content-encoding']&&req.headers['content-encoding']!=='identity')throw Object.assign(Error('Compressed request is unsupported'),{code:'AGENT_BRIDGE_ENCODING'});
    const chunks=[];let length=0;
    for await(const chunk of req){length+=chunk.length;if(length>maxBodyBytes)throw Object.assign(Error('API request exceeds limit'),{code:'AGENT_BRIDGE_TOO_LARGE'});chunks.push(chunk);}
+   timing.mark('body_read');
    const bytes=Buffer.concat(chunks),originalBody=JSON.parse(bytes.toString('utf8')),route=resolveRoute?.(originalBody.model),body=await prepareBody(route?{...originalBody,model:route.model}:originalBody);
+   timing.mark('body_prepared');
    const permissionSignal=await beforeRequest?.(body),signal=permissionSignal?AbortSignal.any([abort.signal,permissionSignal]):abort.signal;
+   timing.mark('authorized');
    if(route?.protocol==='anthropic'){
     if(pathname.pathname!=='/responses')throw Object.assign(Error('Messages API does not support remote compaction'),{code:'ANTHROPIC_COMPACTION_UNSUPPORTED'});
-    await require('./anthropic-responses.cjs').serve({body,route,response:res,signal,fetch:(url,options)=>fetchApi(url,{...options,...dispatcher?{dispatcher}:{}})});return;
+    await require('./anthropic-responses.cjs').serve({body,route,response:res,signal,fetch:async(url,options)=>{timing.mark('upstream_sent');const r=await fetchApi(url,{...options,...dispatcher?{dispatcher}:{}});timing.mark('upstream_headers',{status:r.status});return timing.observe(r);}});return;
    }
    const normalized=normalizeBody(body);
    const payload=normalized===originalBody?bytes:Buffer.from(JSON.stringify(normalized));
    const targetBase=route?new URL(route.baseURL):base,target=new URL(targetBase);target.pathname=targetBase.pathname.replace(/\/$/,'')+pathname.pathname;
    for(const [k,v] of pathname.searchParams)target.searchParams.append(k,v);
    const headers={};
-   for(const [k,v] of Object.entries(req.headers))if(!['host','connection','content-length','content-encoding','accept-encoding','transfer-encoding','proxy-authorization'].includes(k)&&v!==undefined)headers[k]=v;
+   for(const [k,v] of Object.entries(req.headers))if(!['host','connection','content-length','content-encoding','accept-encoding','transfer-encoding','proxy-authorization','x-codex-own-trace'].includes(k)&&v!==undefined)headers[k]=v;
    if(route)headers.authorization='Bearer '+route.apiKey;
-   const response=await fetchApi(target,{method:'POST',headers,body:payload,signal,...dispatcher?{dispatcher}:{}});
+   timing.mark('upstream_sent');
+   const upstreamResponse=await fetchApi(target,{method:'POST',headers,body:payload,signal,...dispatcher?{dispatcher}:{}}),response=timing.observe(upstreamResponse);
+   timing.mark('upstream_headers',{status:response.status});
+   if(!response.ok)timingFailed=true;
    res.writeHead(response.status,{'content-type':response.headers.get('content-type')||'application/json','cache-control':'no-store'});
    if(response.body&&response.ok&&body.model?.startsWith('deepseek-')&&(response.headers.get('content-type')||'').includes('application/json')){
     res.end(JSON.stringify(toolSearch.response(patchCompat.response(await response.json()))));
@@ -91,9 +99,10 @@ async function startServer({upstream,fetch:fetchApi,dispatcher,maxBodyBytes=requ
    });
    else res.end();
   }catch(error){
+   timingFailed=true;
    if(!res.headersSent&&!res.destroyed){const failure=bridgeFailure(error);res.writeHead(failure.status,{'content-type':'application/json'});res.end(JSON.stringify({error:failure.error}));}
    else res.destroy();
-  }finally{active.delete(abort);}
+  }finally{timing.finish(abort.signal.aborted?'request_cancelled':timingFailed?'request_failed':'request_complete');active.delete(abort);}
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',()=>{server.off('error',reject);resolve();});});
  return {url:'http://127.0.0.1:'+server.address().port,close:async()=>{for(const a of active)a.abort();await new Promise(resolve=>server.close(resolve));}};

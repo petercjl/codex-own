@@ -11,7 +11,7 @@ async function ensure(electron,root,apply){
  if(started.has(root))return {status:'unchanged'};started.add(root);
  const lifecycle=await import(pathToFileURL(path.join(bundle,'lib','company-tools.mjs')).href);
  try{await lifecycle.activatePending(root);apply();}catch(e){console.error('Company tools activation deferred:',e.code||'COLLECTION_FAILED');}
- const active=selection(root);if(active){lifecycle.stableShims(root,JSON.parse(fs.readFileSync(path.join(active.directory,'collection.json'),'utf8')));apply();}
+ const active=selection(root);if(active){lifecycle.stableShims(root,JSON.parse(fs.readFileSync(path.join(active.directory,'collection.json'),'utf8')));try{await lifecycle.reconcileSkillSources(root);}catch(e){console.error('Company Skill reconciliation deferred:',e.code||'COLLECTION_FAILED');}apply();}
  const manager=require('./company-tools-manager.cjs').service(root),run=manager.run;
  app.once('before-quit',()=>manager.cancel());
  const statusFile=path.join(root,'company-tools','status.json');

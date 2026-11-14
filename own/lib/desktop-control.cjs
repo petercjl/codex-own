@@ -9,12 +9,15 @@ function observeActivity(child,root){
  root=path.resolve(root);if(!child.stdin||!child.stdout)return;
  const state={ready:false,active:new Set(),pending:new Map(),refreshes:new Map()},old=activityStates.get(root);if(old?.child===child)return;
  state.child=child;activityStates.set(root,state);let initializeId;
+ const timing=require('./execution-timing.cjs').monitor(root);
  const input=frames(m=>{
+  timing.input(m);
   if(m.method==='initialize')initializeId=m.id;
   if(m.method==='initialized')state.ready=true;
   if(m.method==='turn/start'&&m.params?.threadId){state.active.add(m.params.threadId);if(m.id!==undefined)state.pending.set(m.id,m.params.threadId);}
  });
  const output=frames(m=>{
+  if(m.method===require('./execution-timing.cjs').METHOD){timing.model(m.params);return false;}timing.output(m);
   if(state.refreshes.has(m.id)&&!m.method){const request=state.refreshes.get(m.id);state.refreshes.delete(m.id);clearTimeout(request.timer);if(m.error)request.reject(error('SKILL_REFRESH_FAILED'));else{request.resolve(m.result);output.push(Buffer.from(JSON.stringify({method:'skills/changed',params:{}})+'\n'));}return false;}
   if(m.id===initializeId&&!m.method&&!m.error&&m.result)state.ready=true;
   if(state.pending.has(m.id)&&!m.method){const id=state.pending.get(m.id);state.pending.delete(m.id);if(m.error)state.active.delete(id);}
@@ -23,7 +26,7 @@ function observeActivity(child,root){
  });
  const stdin=child.stdin,stdout=child.stdout;input.on('error',()=>{});output.on('error',()=>{});stdin.on('error',()=>{});stdout.on('error',()=>{});
  input.pipe(stdin);stdout.pipe(output);child.stdin=input;child.stdout=output;state.input=input;
- child.once('exit',()=>{state.ready=false;state.active.clear();state.pending.clear();for(const r of state.refreshes.values()){clearTimeout(r.timer);r.reject(error('BACKEND_DISCONNECTED'));}state.refreshes.clear();input.destroy();output.destroy();});
+ child.once('exit',()=>{timing.disconnect();state.ready=false;state.active.clear();state.pending.clear();for(const r of state.refreshes.values()){clearTimeout(r.timer);r.reject(error('BACKEND_DISCONNECTED'));}state.refreshes.clear();input.destroy();output.destroy();});
 }
 async function refreshSkills(root){
  const state=activityStates.get(path.resolve(root));if(!state?.ready)return {status:'deferred'};
@@ -120,6 +123,10 @@ class Broker{
  async dispatch(action,p){
   if(['company.identity','company.handoff'].includes(action))return require('./company-session.cjs').invoke(this.root,action,p);
   if(action==='doctor')return {contract:1,desktopPid:process.pid,backendAttached:!!this.backend,ready:this.ready,epoch:this.epoch,transport:'desktop-owned-app-server',root:this.root};
+  if(action==='skills.list'){
+   if(p.forceReload!==undefined&&typeof p.forceReload!=='boolean'||p.cwds!==undefined&&(!Array.isArray(p.cwds)||p.cwds.length>32||p.cwds.some(c=>typeof c!=='string'||!path.isAbsolute(c))))throw error('INVALID_SKILLS_QUERY');
+   return this.rpc('skills/list',{cwds:p.cwds||[],forceReload:p.forceReload===true});
+  }
   if(action==='operations.read'){if(!/^[-a-zA-Z0-9]{8,100}$/.test(p.operationId))throw error('INVALID_OPERATION_ID');return readPrivate(path.join(this.operations,p.operationId+'.json'));}
   if(action==='chat.list')return this.rpc('thread/list',{limit:Math.min(100,p.limit||20),cursor:p.cursor||null});
   if(action==='chat.create')return this.once(action,p,async()=>{

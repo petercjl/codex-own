@@ -1,13 +1,13 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import crypto from 'node:crypto';
-import {hashes,verifyGraph,activateCollection,activatePending,maintainCompanyTools,companyToolsState,setCompanyToolsPolicy} from '../lib/company-tools.mjs';
+import {hashes,recoverCollectionDiscovery,verifyGraph,activateCollection,activatePending,maintainCompanyTools,companyToolsState,setCompanyToolsPolicy,reconcileSkillSources} from '../lib/company-tools.mjs';
 import envContract from '../lib/company-tools-env.cjs';
 import {spawnSync,spawn} from 'node:child_process';import readline from 'node:readline';import control from '../lib/desktop-control.cjs';
 const PACKAGE='@petercjl/taobao-ai-ops';
 const write=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});assert(!fs.existsSync(file));fs.writeFileSync(file,typeof value==='string'?value:JSON.stringify(value),{flag:'wx',mode:0o600});};
 function fixture(t){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-company-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;}
-function generation(root,version='0.4.17',extra=false){
- const id='generation-'+crypto.randomUUID(),directory=path.join(root,'company-tools',id),skills=path.join(directory,'skills'),entry=path.join(directory,'shell/bin/taobao-ai-ops.mjs');
+function generation(root,version='0.4.17',extra=false,id='generation-'+crypto.randomUUID()){
+ const directory=path.join(root,'company-tools',id),skills=path.join(directory,'skills'),entry=path.join(directory,'shell/bin/taobao-ai-ops.mjs');
  write(entry,'console.log(JSON.stringify({version:'+JSON.stringify(version)+',state:process.env.TAOBAO_AI_OPS_STATE_DIR}))');
  const names=['taobao-ai-operations',...(extra?['new-skill']:[])];
  const records=names.map(name=>({name,package:PACKAGE,version,directory:path.join(skills,name),runtimeEntry:entry}));
@@ -33,7 +33,7 @@ test('physical Skill discovery tree and runtime environment switch together; new
  assert(env.PATH.startsWith(path.join(root,'company-tools/bin')));
  assert.equal(env.NODE_USE_ENV_PROXY,'1','private Node adopts the host proxy for collection and member fetch calls');
  const body=envContract.apply({instructions:'Existing instructions'},path.join(root,'core'));
- assert(body.instructions.includes(JSON.stringify(path.join(root,'core/skills/company-tools'))));assert(body.instructions.includes('same Skill name'));assert(body.instructions.includes('CODEX_OWN_NODE'));assert(body.instructions.startsWith('Existing instructions'));
+ assert(body.instructions.includes(JSON.stringify(path.join(root,'core/skills/company-tools'))));assert(body.instructions.includes('canonical source'));assert(body.instructions.includes('CODEX_OWN_NODE'));assert(body.instructions.startsWith('Existing instructions'));
  assert(envContract.environment(root,{PATH:'system'},'win32').PATH.includes(';system'));
 });
 test('the same inherited PATH resolves updated and newly added CLIs; removed commands do not fall back to an old generation',t=>{
@@ -80,19 +80,87 @@ test('same shell checks all members; offline failure preserves active state and 
 });
 test('manual version checks expose same-shell member updates without preparing or activating a generation',async t=>{
  const root=fixture(t);runtime(root);const old=generation(root);activateCollection(root,old.id);let calls=0;
+ const shadow=path.join(root,'core/skills/personal-copy/SKILL.md');write(shadow,'---\nname: taobao-ai-operations\ndescription: old copy\n---\n');
  const result=await maintainCompanyTools(root,{checkOnly:true,force:true,fetcher:async()=>({ok:true,json:async()=>({name:PACKAGE,version:'0.4.17'})}),run:async(_node,args)=>{
   calls++;assert.equal(args[2],'check');return {stdout:JSON.stringify({ok:true,changed:true,members:[{id:'example',package:'@petercjl/example',version:'1.0.0',available:'2.0.0',blocked:true}]})};
  }});
  assert.equal(result.status,'available');assert.equal(calls,1);assert.equal(envContract.selection(root).generation,old.id);assert(!fs.existsSync(path.join(root,'company-tools/pending.json')));assert.equal(companyToolsState(root).phase,'available');assert.equal(companyToolsState(root).memberCount,0);
+ assert(fs.existsSync(shadow));assert.equal((await reconcileSkillSources(root)).count,1);assert(!fs.existsSync(shadow));assert.equal((await reconcileSkillSources(root)).count,0);
 });
 test('one real App Server discovers a newly activated Skill through forceReload without restarting',async t=>{
  const cli=process.env.OWN_COMPANY_TOOLS_TEST_CLI;if(!cli)return t.skip('Set OWN_COMPANY_TOOLS_TEST_CLI for the native integration check');
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'own-live-company-'))),old=generation(root);activateCollection(root,old.id);
+ write(path.join(root,'core/skills/personal-copy/SKILL.md'),'---\nname: taobao-ai-operations\ndescription: old manual installation\n---\n');
  const child=spawn(cli,['app-server'],{cwd:root,env:{...process.env,HOME:root,CODEX_HOME:path.join(root,'core')},stdio:['pipe','pipe','pipe']});let sequence=0;const requests=new Map();child.stderr.resume();control.observeActivity(child,root);const lines=readline.createInterface({input:child.stdout});
  lines.on('line',line=>{let m;try{m=JSON.parse(line);}catch{return;}const request=requests.get(m.id);if(request){requests.delete(m.id);clearTimeout(request.timer);m.error?request.reject(Error(JSON.stringify(m.error))):request.resolve(m.result);}});
  t.after(async()=>{lines.close();if(child.exitCode===null){const closed=new Promise(r=>child.once('exit',r));child.kill();await closed;}fs.rmSync(root,{recursive:true,force:true});});
  const rpc=(method,params)=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{requests.delete(id);reject(Error('Native RPC timeout: '+method));},10000);requests.set(id,{resolve,reject,timer});child.stdin.write(JSON.stringify({id,method,params})+'\n');});
  await rpc('initialize',{clientInfo:{name:'company_tools_live_test',version:'0.1.0'},capabilities:{experimentalApi:true}});child.stdin.write(JSON.stringify({method:'initialized'})+'\n');const pid=child.pid;
  const project=path.join(root,'project');fs.mkdirSync(project);const cwds=[root,project],names=result=>result.data.flatMap(d=>d.skills).map(s=>s.name),before=names(await rpc('skills/list',{cwds,forceReload:true}));assert(before.includes('taobao-ai-operations'));assert(!before.includes('new-skill'));
- const next=generation(root,'0.4.18',true);activateCollection(root,next.id);assert.equal((await control.refreshSkills(root)).status,'refreshed');const after=await rpc('skills/list',{cwds});assert(after.data.every(d=>d.skills.some(s=>s.name==='new-skill')));assert.equal(child.pid,pid);assert.equal(child.exitCode,null);
+ const next=generation(root,'0.4.18',true),activated=activateCollection(root,next.id);assert.equal(activated.sourceMigration.count,1);assert.equal((await control.refreshSkills(root)).status,'refreshed');const after=await rpc('skills/list',{cwds});assert(after.data.every(d=>d.skills.some(s=>s.name==='new-skill')));for(const cwd of after.data){const entries=cwd.skills.filter(s=>s.name==='taobao-ai-operations');assert.equal(entries.length,1);assert(entries[0].path.includes('/skills/company-tools/'));}assert.equal(child.pid,pid);assert.equal(child.exitCode,null);
+});
+
+function channelGeneration(root,version,channel,id){
+ const value=generation(root,'0.4.17',false,id),member={id:'cloud-hug-style-transfer',package:'@petercjl/cloud-hug-style-transfer',version,channel,bin:'cloud-hug-style-transfer',blocked:false};
+ const entry=path.join(value.directory,'runtime/cloud-hug.mjs'),directory=path.join(value.directory,'skills/cloud-hug-style-transfer');write(entry,'console.log('+JSON.stringify(version)+')');write(path.join(directory,'SKILL.md'),'---\nname: cloud-hug-style-transfer\ndescription: test\n---\n');write(path.join(directory,'.collection-runtime.json'),{runtimeEntry:entry,package:member.package,version});
+ value.graph.members=[member];value.graph.skills.push({name:'cloud-hug-style-transfer',package:member.package,version,directory,runtimeEntry:entry});write(path.join(value.directory,'state/components.json'),{components:{[member.id]:{package:member.package,version,entry}}});
+ for(const [file,data] of [['collection.json',value.graph],['integrity.json',hashes(path.join(value.directory,'skills'))]]){const target=path.join(value.directory,file);fs.copyFileSync(target,target+'.before-channel');fs.writeFileSync(target,JSON.stringify(data));}return value;
+}
+test('selected channel switches in place, persists next and can explicitly return to a lower latest version',async t=>{
+ const root=fixture(t);runtime(root);const old=channelGeneration(root,'0.7.0','latest');activateCollection(root,old.id);const base=path.join(root,'company-tools');
+ const capabilities={collectionContract:{componentChannels:{option:'--component-channels',supported:['latest','next'],explicitSwitchMayDowngrade:true}}};
+ const perform=async(channel,version)=>maintainCompanyTools(root,{force:true,componentChannels:{'cloud-hug-style-transfer':channel},fetcher:async()=>({ok:true,json:async()=>({name:PACKAGE,version:'0.4.17'})}),run:async(_node,args)=>{
+  if(args[1]==='capabilities')return {stdout:JSON.stringify(capabilities)};
+  const channelArgument=JSON.parse(args[args.indexOf('--component-channels')+1]);assert.equal(channelArgument['cloud-hug-style-transfer'],channel);
+  if(args[2]==='check')return {stdout:JSON.stringify({ok:true,changed:true,members:[{id:'cloud-hug-style-transfer',package:'@petercjl/cloud-hug-style-transfer',version,available:version,channel,channelSwitch:true,blocked:false}]})};
+  assert.equal(args[2],'prepare');const directory=args[args.indexOf('--directory')+1];channelGeneration(root,version,channel,path.basename(directory));return {stdout:'{}'};
+ }});
+ assert.equal((await perform('next','0.8.0-next.0')).status,'activated');assert.equal(companyToolsState(root).members[0].channel,'next');assert.equal(companyToolsState(root).members[0].version,'0.8.0-next.0');
+ assert.equal(fs.readdirSync(path.join(root,'core/skills/company-tools')).filter(n=>n==='cloud-hug-style-transfer').length,1);
+ const current=envContract.selection(root);assert(fs.existsSync(path.join(old.directory,'collection.json')));assert(fs.readdirSync(base).some(n=>n.startsWith('previous-skills-')));
+ assert.equal((await perform('latest','0.7.0')).status,'activated');assert.equal(companyToolsState(root).members[0].channel,'latest');assert.equal(companyToolsState(root).members[0].version,'0.7.0');assert.notEqual(envContract.selection(root).generation,current.generation);
+});
+test('an unsupported collection channel contract preserves the active tool and its one discovery source',async t=>{
+ const root=fixture(t);runtime(root);const old=channelGeneration(root,'0.7.0','latest');activateCollection(root,old.id);const before=fs.readFileSync(path.join(root,'company-tools/active.json'));
+ const result=await maintainCompanyTools(root,{force:true,componentChannels:{'cloud-hug-style-transfer':'next'},fetcher:async()=>({ok:true,json:async()=>({name:PACKAGE,version:'0.4.17'})}),run:async()=>({stdout:'{}'})});assert.equal(result.reason,'COLLECTION_CHANNEL_UNSUPPORTED');assert.deepEqual(fs.readFileSync(path.join(root,'company-tools/active.json')),before);assert.equal(companyToolsState(root).members[0].channel,'latest');
+});
+
+test('explicit discovery recovery archives standalone operations, links and user edits while normal updates remain strict',async t=>{
+ const root=fixture(t);runtime(root);const old=channelGeneration(root,'0.7.0','latest');activateCollection(root,old.id);
+ const target=path.join(root,'core/skills/company-tools'),operations=path.join(target,'.cloud-hug-style-transfer-operations/operation');
+ write(path.join(operations,'receipt.json'),{stage:'complete',target:path.join(target,'cloud-hug-style-transfer')});
+ write(path.join(target,'cloud-hug-style-transfer/user-notes.txt'),'preserved user change');
+ fs.symlinkSync('receipt.json',path.join(operations,'npm-bin'));
+ const before=fs.readFileSync(path.join(root,'company-tools/active.json'));
+ const failed=await maintainCompanyTools(root,{force:true,fetcher:()=>{throw Error('must reject before network');}});assert.equal(failed.reason,'COLLECTION_LINK');
+ assert.throws(()=>activateCollection(root,old.id),{code:'COLLECTION_LINK'});
+ const result=await recoverCollectionDiscovery(root);assert.equal(result.status,'recovered');
+ assert.deepEqual(fs.readFileSync(path.join(root,'company-tools/active.json')),before);
+ const archived=path.join(result.recoveryDirectory,'preserved-skills');assert.equal(fs.readFileSync(path.join(archived,'cloud-hug-style-transfer/user-notes.txt'),'utf8'),'preserved user change');
+ assert.equal(fs.readlinkSync(path.join(archived,'.cloud-hug-style-transfer-operations/operation/npm-bin')),'receipt.json');
+ assert.equal(fs.statSync(result.recoveryDirectory).mode&0o777,0o700);
+ assert.deepEqual(hashes(target),hashes(old.graph.skillsDirectory));assert.equal((await recoverCollectionDiscovery(root)).status,'current');
+ assert(fs.existsSync(path.join(result.recoveryDirectory,'inventory.json')));assert(fs.existsSync(path.join(result.recoveryDirectory,'complete.json')));
+});
+test('interrupted explicit recovery restores its preserved tree before safely repeating recovery',async t=>{
+ const root=fixture(t),old=generation(root);activateCollection(root,old.id);const base=path.join(root,'company-tools'),target=path.join(root,'core/skills/company-tools');
+ write(path.join(target,'user.txt'),'keep');const directory=fs.mkdtempSync(path.join(base,'discovery-recovery-')),archive=path.join(directory,'preserved-skills'),candidate=path.join(directory,'restored');
+ write(path.join(base,'discovery-recovery.json'),{contract:1,generation:old.id,directory,archive,candidate});fs.renameSync(target,archive);
+ const result=await recoverCollectionDiscovery(root);assert.equal(result.status,'recovered');assert.equal(fs.readFileSync(path.join(result.recoveryDirectory,'preserved-skills/user.txt'),'utf8'),'keep');assert.deepEqual(hashes(target),hashes(old.graph.skillsDirectory));
+});
+test('stable component dispatch delegates lifecycle writes to the host while allowing business commands and inspection',async()=>{
+ const {guardMaintenance}=await import('../lib/company-tools-dispatch.cjs');
+ for(const args of [['skill','install'],['skill','update'],['update','install'],['update','resume'],['update','rollback'],['update','auto','on']])assert.throws(()=>guardMaintenance('cloud-hug-style-transfer',args),{code:'COLLECTION_MANAGED_COMPONENT'});
+ for(const args of [['version'],['run'],['skill','source'],['skill','status'],['update','operation'],['update','check'],['skill','update','--help']])guardMaintenance('cloud-hug-style-transfer',args);
+});
+
+test('host refuses a single-channel candidate that also changes another installed component',async t=>{
+ const root=fixture(t);runtime(root);const old=channelGeneration(root,'0.7.0','latest');activateCollection(root,old.id);
+ const before=fs.readFileSync(path.join(root,'company-tools/active.json'));
+ const result=await maintainCompanyTools(root,{force:true,componentChannels:{'cloud-hug-style-transfer':'next'},fetcher:async()=>({ok:true,json:async()=>({name:PACKAGE,version:'0.4.17'})}),run:async(_node,args)=>{
+  if(args[1]==='capabilities')return {stdout:JSON.stringify({collectionContract:{componentChannels:{option:'--component-channels',supported:['latest','next'],explicitSwitchMayDowngrade:true}}})};
+  if(args[2]==='check')return {stdout:JSON.stringify({ok:true,changed:true,members:[]})};
+  const candidate=channelGeneration(root,'0.8.0-next.0','next',path.basename(args[args.indexOf('--directory')+1]));candidate.graph.members.push({id:'unexpected',package:'@petercjl/unexpected',version:'1.0.0',bin:'unexpected'});
+  const file=path.join(candidate.directory,'collection.json');fs.copyFileSync(file,file+'.scope-before');fs.writeFileSync(file,JSON.stringify(candidate.graph));return {stdout:'{}'};
+ }});assert.equal(result.reason,'COLLECTION_CHANNEL_SCOPE');assert.deepEqual(fs.readFileSync(path.join(root,'company-tools/active.json')),before);
 });

@@ -13,7 +13,7 @@ test('native sidebar opens a separate collection route while retaining upstream 
 test('collection page renders real counts, versions, CLI names and Skill search; delegates actions to the host',async()=>{
  const base={contract:1,name:'公司测试包',package:'@petercjl/taobao-ai-ops',version:'1.2.3',installed:true,autoUpdate:true,memberCount:1,skillCount:1,progress:{phase:'verifying',step:3,completed:2,total:4,indeterminate:false},members:[{id:'tool',package:'@petercjl/tool',version:'2.0.0',cli:['tool'],skills:[{name:'example',label:'测试技能'}]}],skills:[{name:'example',label:'测试技能',package:'@petercjl/tool',version:'2.0.0'}]};
  const calls=[],values=[base,'',''];let index=0;
- const context=vm.createContext({__JSX__:{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},__REACT__:{useState:()=>{const n=index++;return [values[n],v=>{values[n]=v;}];},useEffect:()=>{}},codexOwnCompanyTools:{check:async()=>{calls.push('check');return base;},update:async()=>{calls.push('update');return base;},setAutoUpdate:async enabled=>{calls.push(enabled);return {...base,autoUpdate:enabled};}}});
+ const context=vm.createContext({__JSX__:{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},__REACT__:{useState:()=>{const n=index++;return [values[n],v=>{values[n]=v;}];},useEffect:()=>{}},codexOwnCompanyTools:{setComponentChannel:async(id,channel)=>{calls.push([id,channel]);return base;},check:async()=>{calls.push('check');return base;},update:async()=>{calls.push('update');return base;},setAutoUpdate:async enabled=>{calls.push(enabled);return {...base,autoUpdate:enabled};}}});
  vm.runInContext(fs.readFileSync(new URL('../desktop/company-tools-page.js',import.meta.url),'utf8'),context);
  const render=()=>{index=0;return context.__codexOwnCompanyTools();};
  const nodes=node=>{if(!node||typeof node!=='object')return [];return [node,...[node.props?.children].flat(Infinity).flatMap(nodes)];};
@@ -26,7 +26,8 @@ test('collection page renders real counts, versions, CLI names and Skill search;
  values[0]={...base,members:[{...base.members[0],available:'1.9.0'}]};assert.equal(row().props.children.at(-1).props.children,'1.9.0');assert(!JSON.stringify(row()).includes('↑ 可更新'));values[0]=base;
  await all.find(n=>n.type==='button'&&n.props.children==='检查更新').props.onClick();assert.deepEqual(calls,['check']);
  await all.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:false}});assert.deepEqual(calls,['check',false]);
- assert.match(JSON.stringify(render()),/测试技能/);
+ assert.match(JSON.stringify(render()),/测试技能/);const selector=nodes(render()).find(n=>n.type==='select');assert.equal(selector.props.value,'latest');assert.equal(selector.props.style.appearance,'auto');assert.equal(nodes(render()).find(n=>n.type==='tbody').props.children[0].props.children[1].props.children.type,'select');await selector.props.onChange({target:{value:'next'}});assert.deepEqual(calls.at(-1),['tool','next']);
+ values[0]={...base,error:'COLLECTION_LINK'};assert.match(JSON.stringify(render()),/独立更新器/);assert(nodes(render()).some(n=>n.type==='button'&&n.props.children==='保留现场并恢复工具集'));
  values[0]={...values[0],pendingUpdate:true};assert(nodes(render()).some(n=>n.type==='button'&&n.props.children==='应用已下载的更新'));
  nodes(render()).find(n=>n.props?.['aria-label']==='搜索工具集内容').props.onChange({target:{value:'missing'}});assert.match(JSON.stringify(render()),/没有匹配/);
 });
@@ -45,4 +46,14 @@ test('online updates report progress and refresh the native Skill cache while an
  value={...value,version:'2.0.0'};finish(null,JSON.stringify({status:'activated'}));const request=passed.trim().split('\n').map(s=>JSON.parse(s)).find(m=>m.method==='skills/list');assert.equal(request.params.forceReload,true);reply({id:request.id,result:{data:[]}});await pending;
  assert(!(await state.read()).busy);assert.equal((await state.read()).version,'2.0.0');assert.equal((await state.read()).progress.completed,4);assert(control.activity(root).busy);assert.match(visible,/skills\/changed/);assert(!visible.includes(request.id));assert.deepEqual(events,[]);
  await invoke(event,'auto-update',{enabled:false});assert.equal((await state.read()).autoUpdate,false);reply({method:'turn/completed',params:{threadId:'task'}});assert(!control.activity(root).busy);child.emit('exit');assert(!control.activity(root).ready);app.emit('before-quit');
+});
+
+test('native IPC passes only the selected component channel and rejects concurrent switches',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'company-channel-ipc-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const app=new EventEmitter(),handlers=new Map();let args,finish;
+ const state=manager.start({app,ipcMain:{handle:(n,fn)=>handlers.set(n,fn)}},root,{load:async()=>({companyToolsState:()=>({contract:1,members:[{id:'cloud-hug-style-transfer',channel:'latest'}]})}),execute:(_node,a,_options,callback)=>{args=a;finish=callback;return {stderr:new PassThrough(),kill(){}};}});
+ const web=new EventEmitter();web.mainFrame={url:'app://-/index.html'};web.getURL=()=>web.mainFrame.url;web.isDestroyed=()=>false;web.send=()=>{};app.emit('browser-window-created',{}, {webContents:web});const event={sender:web,senderFrame:web.mainFrame},invoke=handlers.get(manager.CHANNEL);
+ await invoke(event,'component-channel',{id:'cloud-hug-style-transfer',channel:'next'});assert.equal(args[2],'update');assert.deepEqual(JSON.parse(args[3]),{'cloud-hug-style-transfer':'next'});
+ await assert.rejects(invoke(event,'component-channel',{id:'cloud-hug-style-transfer',channel:'latest'}),/正在更新/);const pending=state.run('update');finish(null,JSON.stringify({status:'failed',reason:'CHANNEL_UNAVAILABLE'}));await pending;assert(!(await state.read()).busy);assert.equal((await state.read()).members[0].channel,'latest');
+ await assert.rejects(invoke(event,'component-channel',{id:'unknown',channel:'next'}),/Unknown/);await assert.rejects(invoke(event,'component-channel',{id:'cloud-hug-style-transfer',channel:'beta'}),/Invalid/);app.emit('before-quit');
 });

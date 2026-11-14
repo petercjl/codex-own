@@ -16,11 +16,16 @@ function resolve(root,name,env=process.env){
  if(!fs.statSync(entry).isFile())throw fault('COLLECTION_ENTRY');
  return {entry,env:contract.environment(root,env)};
 }
+function guardMaintenance(name,args){
+ if(name==='taobao-ai-ops'||args.includes('--help'))return;
+ if((args[0]==='skill'&&['install','update'].includes(args[1]))||(args[0]==='update'&&['install','resume','rollback','policy','auto'].includes(args[1])))throw fault('COLLECTION_MANAGED_COMPONENT');
+}
 async function run(root,name,args){
+ guardMaintenance(name,args);
  const selected=resolve(root,name),child=spawn(process.execPath,[selected.entry,...args],{env:selected.env,stdio:'inherit',windowsHide:true}),handlers=new Map();
  for(const signal of ['SIGINT','SIGTERM','SIGHUP']){const handler=()=>child.kill(signal);handlers.set(signal,handler);process.on(signal,handler);}
  try{return await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolve(code??128+(require('node:os').constants.signals[signal]||1)));});}
  finally{for(const [signal,handler]of handlers)process.removeListener(signal,handler);}
 }
-module.exports={resolve,run};
+module.exports={resolve,run,guardMaintenance};
 if(require.main===module)run(process.argv[2],process.argv[3],process.argv.slice(4)).then(code=>{process.exitCode=code;},e=>{process.stderr.write(JSON.stringify({ok:false,error:{code:e.code||'COLLECTION_COMMAND_FAILED'}})+'\n');process.exitCode=1;});

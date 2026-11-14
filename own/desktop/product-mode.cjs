@@ -9,6 +9,7 @@ function apiMode(core){
 }
 // Expose the access mode only. Credentials never cross into the webview.
 function install({ipcMain},core){
+  ipcMain.handle('codex-own:execution-timing:v1',(_event,threadId)=>typeof threadId==='string'?require('../lib/execution-timing.cjs').monitor(path.resolve(core,'..')).read(threadId):null);
   ipcMain.on(CHANNEL,event=>{event.returnValue={contract:1,apiMode:apiMode(core)};});
 }
 module.exports={CHANNEL,apiMode,install};
