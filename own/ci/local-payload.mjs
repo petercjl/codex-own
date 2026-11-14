@@ -7,7 +7,7 @@ export function localPayload(directory,bytes,packageJson){
  const source=Buffer.from(JSON.stringify(packageJson)),check=Buffer.from("const f=require('fs'),c=require('crypto'),a=require('assert/strict'),b=f.readFileSync('payload.bin');a.equal(b.length,"+bytes.length+");a.equal(c.createHash('sha256').update(b).digest('hex'),'"+expected+"');\n");
  const policy=Buffer.from(JSON.stringify({schemaVersion:1,mode:'local',checks:[['exec','--offline','--call','node .local-check.cjs']]}));
  if(!exists)fs.mkdirSync(root,{mode:0o700});
- for(const [name,data]of [['package.json',source],['payload.bin',bytes],['.local-check.cjs',check],['.npm-release-kit.json',policy]]){const p=path.join(root,name);if(fs.existsSync(p)){if(fs.lstatSync(p).isSymbolicLink()||!fs.readFileSync(p).equals(data))throw Error('LOCAL_PAYLOAD_CHANGED');}else{if(exists)throw Error('LOCAL_PAYLOAD_INCOMPLETE');fs.writeFileSync(p,data,{flag:'wx',mode:0o600});}}
+ for(const [name,data]of [['package.json',source],['payload.bin',bytes],['.local-check.cjs',check],['.npm-release-kit.json',policy]]){const p=path.join(root,name);if(fs.existsSync(p)){if(fs.lstatSync(p).isSymbolicLink()||!fs.readFileSync(p).equals(data))throw Error('LOCAL_PAYLOAD_CHANGED');}else{if(exists)throw Error('LOCAL_PAYLOAD_INCOMPLETE');fs.writeFileSync(p,data,{flag:'wx',mode:0o644});}}
  if(!exists){execFileSync('git',['init','-q',root],{stdio:'pipe'});execFileSync('git',['-C',root,'add','--','package.json','payload.bin','.local-check.cjs','.npm-release-kit.json'],{stdio:'pipe'});}
  if(!fs.existsSync(path.join(root,'.git')))throw Error('LOCAL_PAYLOAD_GIT_REQUIRED');return root;
 }

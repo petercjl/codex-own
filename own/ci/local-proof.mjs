@@ -11,7 +11,8 @@ export function localSource(proof){validateLocalProof(proof);return {repository:
 // execution and recipe identify the actual executor. run is a local receipt ID.
 export function verifyLocalPublication(pkg,source){
  const proof=validateLocalProof(pkg.ownLocalReleaseProof,{ref:source.ref});
- if(source.execution!=='local'||source.recipe!=='own/ci/local-native-build.mjs'||source.run!==proof.run||source.receiptSha256!==identity(proof)||!/^sha512-[A-Za-z0-9+/=]+$/.test(pkg.dist?.integrity||''))throw Error('LOCAL_PROOF_MISMATCH');
+ const sri=pkg.dist?.integrity?.match(/^sha512-([A-Za-z0-9+/=]+)$/);
+ if(source.execution!=='local'||source.recipe!=='own/ci/local-native-build.mjs'||source.run!==proof.run||source.receiptSha256!==identity(proof)||!sri||Buffer.from(sri[1],'base64').length!==64)throw Error('LOCAL_PROOF_MISMATCH');
  const asset=pkg.ownDesktopManifest?.platforms?.[proof.platform];if(!asset||asset.sha256!==proof.artifact.sha256||asset.size!==proof.artifact.size)throw Error('LOCAL_PROOF_ARTIFACT_MISMATCH');
  return {ok:true,version:pkg.version,execution:'local',publicationRef:proof.sourceRef,receiptSha256:identity(proof)};
 }
