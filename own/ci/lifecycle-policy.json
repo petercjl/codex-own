@@ -48,6 +48,7 @@
     ".github/",
     "own/.github/",
     "own/ci/",
+    "own/.npm-release-kit.json",
     "own/installers/",
     "own/dev.mjs",
     "own/DEVELOPMENT.md",

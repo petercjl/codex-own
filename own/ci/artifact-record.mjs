@@ -1,4 +1,5 @@
 import fs from'node:fs';import path from'node:path';import{pathToFileURL}from'node:url';import{identity,validateBinding,manifestPlatforms}from'../lib/binding.mjs';
+import {localSource} from './local-proof.mjs';
 export function bindArtifacts(manifest,plan,previous,source,runtimeComponents){
  const m=structuredClone(manifest);
  const trusted=plan.proof?plan.proof.sourceVerified===true:true;
@@ -17,8 +18,10 @@ export function bindArtifacts(manifest,plan,previous,source,runtimeComponents){
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
  const [manifestFile,planFile,catalogFile,output]=process.argv.slice(2),plan=JSON.parse(fs.readFileSync(planFile)),previous=fs.existsSync(catalogFile)?JSON.parse(fs.readFileSync(catalogFile)):null;
- const source={repository:'petercjl/codex-own',ref:process.env.ARTIFACT_SOURCE_REF||process.env.EXPECTED_REF,run:process.env.ARTIFACT_SOURCE_RUN||process.env.GITHUB_RUN_ID,workflow:process.env.ARTIFACT_SOURCE_WORKFLOW||'.github/workflows/own-release.yml',...(process.env.ARTIFACT_TRIGGER_REF?{triggerRef:process.env.ARTIFACT_TRIGGER_REF}:{})};
- if(source.run!==process.env.GITHUB_RUN_ID)source.publication={repository:'petercjl/codex-own',ref:process.env.EXPECTED_REF,run:process.env.GITHUB_RUN_ID,workflow:'.github/workflows/own-release.yml'};
+ const proof=process.env.OWN_LOCAL_PROOF_FILE?JSON.parse(fs.readFileSync(process.env.OWN_LOCAL_PROOF_FILE)):null;
+ const source=proof?localSource(proof):{repository:'petercjl/codex-own',ref:process.env.ARTIFACT_SOURCE_REF||process.env.EXPECTED_REF,run:process.env.ARTIFACT_SOURCE_RUN||process.env.GITHUB_RUN_ID,workflow:process.env.ARTIFACT_SOURCE_WORKFLOW||'.github/workflows/own-release.yml',...(process.env.ARTIFACT_TRIGGER_REF?{triggerRef:process.env.ARTIFACT_TRIGGER_REF}:{})};
+ if(proof&&proof.nativeFingerprint!==plan.inputs.native)throw Error('LOCAL_PROOF_SOURCE_MISMATCH');
+ if(!proof&&source.run!==process.env.GITHUB_RUN_ID)source.publication={repository:'petercjl/codex-own',ref:process.env.EXPECTED_REF,run:process.env.GITHUB_RUN_ID,workflow:'.github/workflows/own-release.yml'};
  const componentFile=path.join(path.dirname(manifestFile),'runtime-components.json'),proofs=fs.existsSync(componentFile)?JSON.parse(fs.readFileSync(componentFile)):undefined;
  const m=bindArtifacts(JSON.parse(fs.readFileSync(manifestFile)),plan,previous,source,proofs);
  fs.writeFileSync(output,JSON.stringify(m,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({managerVersion:m.binding.managerVersion,desktopVersion:m.version,runtimeVersion:m.runtimes.version,desktopIdentity:m.binding.desktop.identity,runtimeIdentity:m.binding.runtimes.identity}));

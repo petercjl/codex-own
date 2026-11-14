@@ -13,7 +13,7 @@ export function classify(file,policyOverride=policy){
 }
 function semantic(file,bytes){const p=JSON.parse(bytes);
  if(file.endsWith('package-lock.json')){delete p.version;if(p.packages?.[''])delete p.packages[''].version;return p;}
- return Object.fromEntries(Object.entries(p).filter(([key])=>!['version','ownDesktopManifest','codexOwnBinding'].includes(key)));
+ return Object.fromEntries(Object.entries(p).filter(([key])=>!['version','ownDesktopManifest','codexOwnBinding','ownLocalReleaseProof'].includes(key)));
 }
 export function componentFingerprint(entries,kind,selectedPolicy=policy){
  const toolchain=Object.fromEntries(Object.entries(selectedPolicy.toolchain).filter(([key])=>key!=='macos'||selectedPolicy.targets.includes('darwin-arm64')));

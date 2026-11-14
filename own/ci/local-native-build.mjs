@@ -1,0 +1,22 @@
+// Windows-owned build and QA. No registry mutation or live profile writes.
+import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+import {snapshot} from './artifact-inputs.mjs';import {validateLocalProof} from './local-proof.mjs';
+const hash=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+export function nativeSteps(app,gui){return [['official-protocol',['own/ci/test-official-compat.mjs',app]],['patch-protocol',['own/ci/test-patch-compat.mjs',app]],['history-resume',['own/ci/test-history-resume.mjs',app]],['desktop-gui',['own/ci/test-desktop-startup.mjs',app,gui]],['canonical-install',['own/ci/test-incremental.mjs']]];}
+export function buildLocal({version,output}){
+ if(process.platform!=='win32'||process.arch!=='x64')throw Error('WINDOWS_X64_REQUIRED');if(!/^\d+\.\d+\.\d+$/.test(version||''))throw Error('EXACT_VERSION_REQUIRED');
+ const root=process.cwd(),dir=path.resolve(output);if(fs.existsSync(dir))throw Error('FRESH_OUTPUT_REQUIRED');fs.mkdirSync(dir,{recursive:true});
+ const ref=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),inputs=snapshot(root,{ref});
+ if(execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim())throw Error('COMMITTED_SOURCE_REQUIRED');
+ const env={...process.env,OWN_VERSION:version,OWN_PLATFORM:'win32-x64'},checks=[];
+ function run(name,args,cwd=root){const file=path.join(dir,name+'.log'),fd=fs.openSync(file,'wx');let ok=false;try{execFileSync(process.execPath,args,{cwd,env,stdio:['ignore',fd,fd],windowsHide:true});ok=true;}finally{fs.closeSync(fd);checks.push({name,ok,logSha256:hash(file)});fs.writeFileSync(path.join(dir,name+'.json'),JSON.stringify(checks.at(-1)),{flag:'wx'});}if(!ok)throw Error('LOCAL_CHECK_FAILED: '+name);console.log(name+' passed');}
+ const tests=fs.readdirSync('own/test').filter(n=>n.endsWith('.test.mjs')).sort().map(n=>'test/'+n);run('source-tests',['--test','--test-concurrency=2',...tests],path.join(root,'own'));
+ const build=path.join(root,'out','own-release-'+version+'-win32-x64.noindex');if(fs.existsSync(build))throw Error('BUILD_OUTPUT_EXISTS');run('build',['own/build.mjs']);
+ const app=path.join(build,'built/app');env.OWN_GUI_MANIFEST=path.join(build,'manifest-win32-x64.json');
+ for(const [name,args]of nativeSteps(app,path.join(dir,'gui')))run(name,args);
+ if(snapshot(root).native!==inputs.native)throw Error('SOURCE_CHANGED');
+ const m=JSON.parse(fs.readFileSync(env.OWN_GUI_MANIFEST)),a=m.platforms['win32-x64'];
+ const proof=validateLocalProof({schema:1,execution:'local',platform:'win32-x64',sourceRef:ref,run:String(Date.now()),nativeFingerprint:inputs.native,runtimeFingerprint:inputs.runtime,checks,artifact:{sha256:a.incremental.sha256,size:a.incremental.size,cliVersion:a.probe.version}});
+ fs.writeFileSync(path.join(dir,'local-proof.json'),JSON.stringify(proof,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({ok:true,build,proof:path.join(dir,'local-proof.json')}));return proof;
+}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){if(process.argv.includes('--help'))console.log('node own/ci/local-native-build.mjs VERSION NEW_EVIDENCE_DIR');else buildLocal({version:process.argv[2],output:process.argv[3]});}

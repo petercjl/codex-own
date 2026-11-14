@@ -4,7 +4,7 @@ import {releaseTargets,assertReleaseTargets} from './release-targets.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {execFile} from 'node:child_process';
+import {execFile,spawn} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileHash} from '../lib/network.mjs';
 import {payloadVersion, payloadURL, validateParts} from '../lib/npm-assets.mjs';
@@ -12,11 +12,15 @@ import {packResult} from './npm-pack-result.mjs';
 import {TRANSPORT} from '../lib/content-blocks.mjs';
 import {mapPublicationWindows,submitPayload} from './publication-pool.mjs';
 import {trustedPayloads,planPayloadJobs} from './payload-reuse.mjs';
+import {validateLocalProof} from './local-proof.mjs';
+import {localPayload} from './local-payload.mjs';
 
-if(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
+const local=process.argv.includes('--local'),proofArg=process.argv.indexOf('--proof');
+if(!local&&(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_URL))
   throw Error('Payload publication requires GitHub Actions OIDC');
 const dir=path.resolve(process.argv[2]), file=path.join(dir,'manifest.json');
 const manifest=JSON.parse(fs.readFileSync(file));
+if(local){if(proofArg<0||!process.argv[proofArg+1])throw Error('LOCAL_PROOF_REQUIRED');const proof=validateLocalProof(JSON.parse(fs.readFileSync(process.argv[proofArg+1]))),a=manifest.platforms['win32-x64']?.incremental;if(!a||a.sha256!==proof.artifact.sha256||a.size!==proof.artifact.size)throw Error('LOCAL_PROOF_ARTIFACT_MISMATCH');}
 delete manifest.binding; // The verified release binding is made after publication.
 const output=path.join(dir,'npm-manifest.json');
 if(fs.existsSync(output))throw Error('Output already exists');
@@ -76,23 +80,26 @@ async function settlePending(){
 }
 const queue=await planPayloadJobs(jobs,known,metadata);
 console.log(JSON.stringify({payloadPreparation:{reusedWithoutPacking:queue.reused.length,requiresPacking:queue.needed.length}}));
-const uploaded=await mapPublicationWindows(queue.needed,async({platform,archive,block,index})=>{
-  const sha256=block.sha256,version=payloadVersion(sha256),packageDir=fs.mkdtempSync(path.join(dir,'payload-'));
+const upload=async({platform,archive,block,index})=>{
+  const sha256=block.sha256,version=payloadVersion(sha256),pkg={name:'@petercjl/codex-own',version,description:'Internal codex-own desktop data. Install @petercjl/codex-own@latest instead.',files:['payload.bin'],repository:{type:'git',url:'git+https://github.com/petercjl/codex-own.git',directory:'own'},publishConfig:{access:'public'}};
+  const packageDir=local?localPayload(dir,readBlock(archive,block),pkg):fs.mkdtempSync(path.join(dir,'payload-'));
   try{
-      fs.writeFileSync(path.join(packageDir,'payload.bin'),readBlock(archive,block),{flag:'wx'});
-      fs.writeFileSync(path.join(packageDir,'package.json'),JSON.stringify({name:'@petercjl/codex-own',version,description:'Internal codex-own desktop data. Install @petercjl/codex-own@latest instead.',files:['payload.bin'],repository:{type:'git',url:'git+https://github.com/petercjl/codex-own.git',directory:'own'},publishConfig:{access:'public'}}),{flag:'wx'});
-      const packed=packResult(await npm(['pack','--json'],packageDir),'@petercjl/codex-own'),tgz=path.join(packageDir,packed.filename);
+      if(!local){fs.writeFileSync(path.join(packageDir,'payload.bin'),readBlock(archive,block),{flag:'wx'});fs.writeFileSync(path.join(packageDir,'package.json'),JSON.stringify(pkg),{flag:'wx'});}
+      const prepared=local?JSON.parse((await execute('npm-release-kit',['prepare','--root',packageDir,'--release',version,'--tag','desktop-assets','--json'],{encoding:'utf8',maxBuffer:4*1048576})).stdout):null;
+      const packed=prepared?{integrity:prepared.integrity}:packResult(await npm(['pack','--json'],packageDir),'@petercjl/codex-own'),tgz=prepared?.tarball||path.join(packageDir,packed.filename);
       const existing=await metadata(version);
       if(!existing){
         console.log(`Publishing npm desktop payload ${platform} ${index+1}`);
-        await submitPayload(()=>npm(['publish',tgz,'--provenance','--access','public','--tag','desktop-assets'],packageDir),{report:message=>console.log(message)});
+        if(local)await new Promise((resolve,reject)=>{const child=spawn('npm-release-kit',['publish','--mode','local','--root',packageDir,'--release',version,'--tag','desktop-assets','--yes'],{stdio:'inherit'});child.once('error',reject);child.once('exit',code=>code===0?resolve():reject(Error('LOCAL_PAYLOAD_PUBLICATION_PENDING: '+version)));});
+        else await submitPayload(()=>npm(['publish',tgz,'--provenance','--access','public','--tag','desktop-assets'],packageDir),{report:message=>console.log(message)});
         pending.push({version,integrity:packed.integrity,url:payloadURL(sha256)});
       }
       if(existing && (existing.dist?.integrity!==packed.integrity||existing.dist?.tarball!==payloadURL(sha256)))throw Error('Existing payload identity mismatch');
       const part={sha256,size:block.size,url:payloadURL(sha256),archiveSize:fs.statSync(tgz).size,archiveSha256:await fileHash(tgz)};
       return {platform,published:!existing,part};
-  }finally{fs.rmSync(packageDir,{recursive:true,force:true});}
-},settlePending);
+  }finally{if(!local)fs.rmSync(packageDir,{recursive:true,force:true});}
+};
+const uploaded=[];if(local){for(const job of queue.needed){uploaded.push(await upload(job));await settlePending();}}else uploaded.push(...await mapPublicationWindows(queue.needed,upload,settlePending));
 const results=[...queue.reused,...uploaded];
 const byHash=new Map(results.map(r=>[r.part.sha256,r]));
 for(const {platform,asset,transport,parent,key,desktop} of plans){

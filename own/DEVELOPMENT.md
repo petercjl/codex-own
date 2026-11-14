@@ -10,7 +10,7 @@
 
 开发版配置、凭据及对话保留在独立目录，替换应用前创建恢复备份。正式版与原版 Codex 保持各自的安装和数据，只有用户明确要求时才更新正式版。
 
-用户确认测试通过并要求发布后，通过现有 npm-release-kit / GitHub Actions OIDC 流程发布，执行 Windows 自动构建和基础检查，发布后核对准确版本与渠道。日常更新通过 npm；完整离线安装包和 NAS 交付仅在用户明确要求时手动执行。每日上游同步保留自动检查、验证和无冲突合并，后续只运行 `verify_only` 发布前检查，等待开发版实测后再正式发布。
+用户确认测试通过并要求发布后，在自有 Windows 电脑完成构建和检查，再通过 npm-release-kit 的 local 模式发布，发布后核对准确版本与渠道。日常更新通过 npm；完整离线安装包和 NAS 交付仅在用户明确要求时手动执行。GitHub Actions/OIDC 为用户明确选择的独立路线，仓库云端任务保留显式调度入口。
 
 ## 构建入口
 
@@ -38,7 +38,7 @@ node own/dev.mjs --install --launch
 
 开发版继续使用 `~/.codex-own-dev/Library/Application Support/codex-own-independent`，固定 Bundle ID 为 `local.codex-own.development`。配置、认证与对话保持原位，npm 自动更新处于关闭状态。
 
-结果入口为本次目录中的 `result.json`，其中包含旧 App 和数据备份路径。签名证书与密钥由既有本机开发签名配置管理。脚本不执行发布；正式版发布由仓库现有流程管理。
+结果入口为本次目录中的 `result.json`，其中包含旧 App 和数据备份路径。签名证书与密钥由既有本机开发签名配置管理。脚本不执行发布；正式版发布由仓库本地发布入口管理。
 
 ## 构建副本自动保留
 
@@ -63,3 +63,12 @@ Tuda 与 codex-own 分别安装、版本管理和发布。codex-own 仅打包经
 私有数据根目录的 `core/execution-timing/` 保存 JSONL 元数据日志。通过 threadId、turnId、requestId 关联提交、请求体接收与准备、鉴权完成、向上游发出、响应头、首个响应字节、推理/正文/工具参数、请求结束，以及运行时收到内容和工具起止。请求内耗时使用单调时钟；跨进程关联使用系统时间。响应头等待包含网络和服务端处理，尚不能单凭该值区分网络传输与服务端排队。
 
 日志不保存请求正文、响应正文、命令、URL、HTTP 头或凭据。每份日志约 4 MiB 轮换，最多保留八份；日志失败不阻断执行。此诊断不改变模型、推理强度或请求中的业务内容。
+
+
+## 自有 Windows 本地发布
+
+在干净、已提交的源码检出中运行 `node own/ci/local-native-build.mjs 版本 全新证据目录`。入口执行源码测试、固定官方输入构建、模型与补丁协议、历史恢复、桌面和原生设备服务、规范归档及真实安装更新检查。local-proof.json 记录 execution=local、源码提交与输入指纹、检查日志摘要和制品摘要，不包含账号配置。
+
+在发布电脑组合已验证的 Windows 制品和未变化的固定工具运行时，运行 `node own/ci/publish-npm-assets.mjs 制品目录 --local --proof 本地回执` 发布缺少的内容块。内容块使用 npm-release-kit 的固定待发布包，稳定候选目录与私有回执跨认证重试保留。账户验证在普通 Google Chrome 完成。规范归档和 registry 内容复核通过后，绑定本地回执，通过 npm-release-kit prepare/publish 的 local 模式发布主包，并校验精确版本、integrity、dist-tag 及本机 Codex 配套 Skill。
+
+新本地记录的 execution 和 recipe 标明实际执行器；兼容字段 workflow 引用历史发布配方，run 是本地回执编号。既有云端构建与运行时的来源记录继续保留，核验时按真实执行方式分别处理。

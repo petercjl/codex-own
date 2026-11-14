@@ -1,6 +1,8 @@
-// Bind registry integrity to its public npm-hosted GitHub SLSA provenance.
+import {verifyLocalPublication} from './local-proof.mjs';
+// Bind registry integrity to the declared local receipt or GitHub SLSA provenance.
 // Registry TLS is the trust boundary; no account credentials or tokens are used.
 export async function verifyPackageProvenance(pkg,source,{fetcher=url=>fetch(url,{signal:AbortSignal.timeout(30000)})}={}){
+ if((source?.publication||source)?.execution==='local')return verifyLocalPublication(pkg,source.publication||source);
  const publisher=source?.publication||source,url=pkg.dist?.attestations?.url;
  if(!publisher||!/^[a-f0-9]{40}$/.test(publisher.ref||'')||!/^\d+$/.test(String(publisher.run||''))||publisher.workflow!=='.github/workflows/own-release.yml')throw Error('NPM_PROVENANCE_REQUIRED: publication identity missing');
  if(!url||new URL(url).origin!=='https://registry.npmjs.org'||!new URL(url).pathname.startsWith('/-/npm/v1/attestations/'))throw Error('NPM_PROVENANCE_REQUIRED: trusted registry attestation missing');

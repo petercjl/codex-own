@@ -1,7 +1,6 @@
 name: codex-own daily upstream merge
 on:
-  schedule:
-    - cron: '10 4 * * *'
+  # Local release mode: cloud execution is available only on explicit dispatch.
   workflow_dispatch:
 permissions:
   contents: read
