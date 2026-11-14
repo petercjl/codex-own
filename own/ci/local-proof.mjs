@@ -1,5 +1,5 @@
 import {identity} from '../lib/binding.mjs';
-export const LOCAL_CHECKS=['source-tests','official-protocol','patch-protocol','history-resume','desktop-gui','canonical-install'];
+export const LOCAL_CHECKS=['source-tests','official-protocol','patch-protocol','history-resume','desktop-gui','canonical-install','tool-runtime'];
 export function validateLocalProof(proof,{ref,platform='win32-x64'}={}){
  if(proof?.schema!==1||proof.execution!=='local'||proof.platform!==platform||!/^[a-f0-9]{40}$/.test(proof.sourceRef||'')||ref&&proof.sourceRef!==ref||!/^\d+$/.test(proof.run||'')||!['nativeFingerprint','runtimeFingerprint'].every(k=>/^[a-f0-9]{64}$/.test(proof[k]||'')))throw Error('LOCAL_PROOF_IDENTITY');
  if(!Array.isArray(proof.checks)||new Set(proof.checks.map(c=>c.name)).size!==proof.checks.length||LOCAL_CHECKS.some(name=>!proof.checks.some(c=>c.name===name&&c.ok===true&&/^[a-f0-9]{64}$/.test(c.logSha256||''))))throw Error('LOCAL_PROOF_CHECKS');

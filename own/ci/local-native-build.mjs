@@ -14,6 +14,7 @@ export function buildLocal({version,output}){
  const build=path.join(root,'out','own-release-'+version+'-win32-x64.noindex');if(fs.existsSync(build))throw Error('BUILD_OUTPUT_EXISTS');run('build',['own/build.mjs']);
  const app=path.join(build,'built/app');env.OWN_GUI_MANIFEST=path.join(build,'manifest-win32-x64.json');
  for(const [name,args]of nativeSteps(app,path.join(dir,'gui')))run(name,args);
+ const tools=path.join(dir,'tools');fs.mkdirSync(tools);run('prepare-tools',['own/ci/prepare-runtimes.mjs',tools,'win32-x64','own/artifacts/current.json']);run('tool-runtime',['own/ci/test-runtimes.mjs',tools]);
  if(snapshot(root).native!==inputs.native)throw Error('SOURCE_CHANGED');
  const m=JSON.parse(fs.readFileSync(env.OWN_GUI_MANIFEST)),a=m.platforms['win32-x64'];
  const proof=validateLocalProof({schema:1,execution:'local',platform:'win32-x64',sourceRef:ref,run:String(Date.now()),nativeFingerprint:inputs.native,runtimeFingerprint:inputs.runtime,checks,artifact:{sha256:a.incremental.sha256,size:a.incremental.size,cliVersion:a.probe.version}});
