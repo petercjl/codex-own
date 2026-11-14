@@ -138,7 +138,7 @@ test('explicit discovery recovery archives standalone operations, links and user
  assert.deepEqual(fs.readFileSync(path.join(root,'company-tools/active.json')),before);
  const archived=path.join(result.recoveryDirectory,'preserved-skills');assert.equal(fs.readFileSync(path.join(archived,'cloud-hug-style-transfer/user-notes.txt'),'utf8'),'preserved user change');
  assert.equal(fs.readlinkSync(path.join(archived,'.cloud-hug-style-transfer-operations/operation/npm-bin')),'receipt.json');
- assert.equal(fs.statSync(result.recoveryDirectory).mode&0o777,0o700);
+ if(process.platform!=='win32')assert.equal(fs.statSync(result.recoveryDirectory).mode&0o777,0o700);
  assert.deepEqual(hashes(target),hashes(old.graph.skillsDirectory));assert.equal((await recoverCollectionDiscovery(root)).status,'current');
  assert(fs.existsSync(path.join(result.recoveryDirectory,'inventory.json')));assert(fs.existsSync(path.join(result.recoveryDirectory,'complete.json')));
 });
