@@ -59,7 +59,7 @@ else{
  if(!mac){
   const recorded=JSON.parse(fs.readFileSync(path.join(root,'scripts/.versions.json'))).win;
   if(windowsUpstream.schema!==1||recorded?.version!==windowsUpstream.desktop.storeVersion)throw Error('Windows Store input differs from selected release baseline');
-  const preparedCli=await prepareOfficialCli(windowsUpstream.cli.version,path.join(output,'official-cli'),{target:'win32-x64'});
+  const preparedCli=await prepareOfficialCli(windowsUpstream.cli.version,path.join(output,'official-cli'),{target:'win32-x64',cacheRoot:path.join(os.tmpdir(),'codex-own-official-cli')});
   officialCli=preparedCli.destination;
   provenance.windowsUpstream={storeVersion:recorded.version,desktopVersion:windowsUpstream.desktop.version};
  }
