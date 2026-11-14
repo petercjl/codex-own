@@ -36,7 +36,7 @@ test('per-thread states isolate concurrent requests, show tools, stop on complet
  m.output({method:'item/completed',params:{threadId:'A',item:{id:'tool-A',type:'commandExecution',durationMs:10}}});assert.equal(m.read('A').phase,'runtime');
  m.output({method:'turn/completed',params:{threadId:'A',turn:{status:'completed'}}});m.model({requestId:'req-A',threadId:'A',phase:'reasoning'});assert.equal(m.read('A').active,false);assert.equal(m.read('A').phase,'complete');
  m.disconnect();assert.equal(m.read('B').phase,'disconnected');
- const f=m.read('A').logFile,log=fs.readFileSync(f,'utf8');assert.ok(!log.includes('private command'));assert.ok(!log.includes('never log'));assert.equal(fs.statSync(f).mode&0o777,0o600);assert.equal(fs.statSync(path.dirname(f)).mode&0o777,0o700);
+ const f=m.read('A').logFile,log=fs.readFileSync(f,'utf8');assert.ok(!log.includes('private command'));assert.ok(!log.includes('never log'));if(process.platform!=='win32'){assert.equal(fs.statSync(f).mode&0o777,0o600);assert.equal(fs.statSync(path.dirname(f)).mode&0o777,0o700);}
 });
 test('renderer patch is idempotent, retains original output, and shows real phase with elapsed time',()=>{
  const p=patchExecutionStatus(executionUiFixture);assert.equal(p.count,1);assert.equal(patchExecutionStatus(p.source).source,p.source);
