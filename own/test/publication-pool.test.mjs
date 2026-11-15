@@ -49,3 +49,5 @@ test('capacity timeouts, authentication errors and unknown upload failures canno
   const error=Error('unexpected registry failure');await assert.rejects(submitPayload(async()=>{throw error;}),e=>e===error);
   let settlements=0;await assert.rejects(mapPublicationWindows([1,2,3],async()=>{throw error;},async()=>{settlements++;}),e=>e===error);assert.equal(settlements,0);
 });
+
+test('local publication uses one publisher and bounds unconfirmed versions to four',async()=>{let active=0,peak=0,pending=0,settlements=0;const result=await mapPublicationWindows([0,1,2,3,4,5],async i=>{active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,1));active--;pending++;assert(pending<=4);return i;},async()=>{pending=0;settlements++;},{window:4,concurrency:1});assert.equal(peak,1);assert.equal(pending,0);assert.equal(settlements,2);assert.deepEqual(result,[0,1,2,3,4,5]);});

@@ -100,7 +100,7 @@ const upload=async({platform,archive,block,index})=>{
       return {platform,published:!existing,part};
   }finally{if(!local)fs.rmSync(packageDir,{recursive:true,force:true});}
 };
-const uploaded=[];if(local){for(const job of queue.needed){uploaded.push(await upload(job));await settlePending();}}else uploaded.push(...await mapPublicationWindows(queue.needed,upload,settlePending));
+const uploaded=await mapPublicationWindows(queue.needed,upload,settlePending,local?{window:4,concurrency:1}:undefined);
 const results=[...queue.reused,...uploaded];
 const byHash=new Map(results.map(r=>[r.part.sha256,r]));
 for(const {platform,asset,transport,parent,key,desktop} of plans){
