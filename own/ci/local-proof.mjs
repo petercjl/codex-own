@@ -2,7 +2,11 @@ import {identity} from '../lib/binding.mjs';
 export const LOCAL_CHECKS=['source-tests','official-protocol','patch-protocol','history-resume','desktop-gui','canonical-install','tool-runtime'];
 export function validateLocalProof(proof,{ref,platform='win32-x64'}={}){
  if(proof?.schema!==1||proof.execution!=='local'||proof.platform!==platform||!/^[a-f0-9]{40}$/.test(proof.sourceRef||'')||ref&&proof.sourceRef!==ref||!/^\d+$/.test(proof.run||'')||!['nativeFingerprint','runtimeFingerprint'].every(k=>/^[a-f0-9]{64}$/.test(proof[k]||'')))throw Error('LOCAL_PROOF_IDENTITY');
- if(!Array.isArray(proof.checks)||new Set(proof.checks.map(c=>c.name)).size!==proof.checks.length||LOCAL_CHECKS.some(name=>!proof.checks.some(c=>c.name===name&&c.ok===true&&/^[a-f0-9]{64}$/.test(c.logSha256||''))))throw Error('LOCAL_PROOF_CHECKS');
+ const installation=proof.installationVerification;
+ const delegated=installation?.status==='pending'&&installation.owner==='user'&&installation.authorization==='explicit-user-request'&&installation.platform===platform;
+ if(installation&&!delegated)throw Error('LOCAL_PROOF_INSTALLATION');
+ const required=LOCAL_CHECKS.map(name=>delegated&&name==='canonical-install'?'canonical-archive':name);
+ if(!Array.isArray(proof.checks)||new Set(proof.checks.map(c=>c.name)).size!==proof.checks.length||required.some(name=>!proof.checks.some(c=>c.name===name&&c.ok===true&&/^[a-f0-9]{64}$/.test(c.logSha256||'')))||delegated&&proof.checks.some(c=>c.name==='canonical-install'&&c.ok===true))throw Error('LOCAL_PROOF_CHECKS');
  const a=proof.artifact;if(!a||!/^[a-f0-9]{64}$/.test(a.sha256||'')||!Number.isSafeInteger(a.size)||a.size<1||!/^codex(?:-cli)?\s+/.test(a.cliVersion||''))throw Error('LOCAL_PROOF_ARTIFACT');
  return proof;
 }

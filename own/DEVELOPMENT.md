@@ -72,3 +72,5 @@ Tuda 与 codex-own 分别安装、版本管理和发布。codex-own 仅打包经
 在发布电脑组合已验证的 Windows 制品和未变化的固定工具运行时，运行 `node own/ci/publish-npm-assets.mjs 制品目录 --local --proof 本地回执` 发布缺少的内容块。内容块使用 npm-release-kit 的固定待发布包，稳定候选目录与私有回执跨认证重试保留。账户验证在普通 Google Chrome 完成。规范归档和 registry 内容复核通过后，绑定本地回执，通过 npm-release-kit prepare/publish 的 local 模式发布主包，并校验精确版本、integrity、dist-tag 及本机 Codex 配套 Skill。
 
 新本地记录的 execution 和 recipe 标明实际执行器；兼容字段 workflow 引用历史发布配方，run 是本地回执编号。既有云端构建与运行时的来源记录继续保留，核验时按真实执行方式分别处理。
+
+用户明确指定自行进行 Windows 安装验收时，本机发布保留构建、源码测试、协议、界面、工具运行时和规范化归档校验；发布凭据中的 `installationVerification` 记录 `owner: user`、`status: pending` 和显式授权来源。`canonical-archive` 只证明归档往返与本地分片复用，安装验收由用户发布后完成。默认自动安装检查入口保持可用。
