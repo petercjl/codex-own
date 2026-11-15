@@ -14,6 +14,7 @@ import {mapPublicationWindows,submitPayload} from './publication-pool.mjs';
 import {trustedPayloads,planPayloadJobs} from './payload-reuse.mjs';
 import {validateLocalProof} from './local-proof.mjs';
 import {localPayload} from './local-payload.mjs';
+import {registryConfirmationPending} from './local-publish.mjs';
 
 const local=process.argv.includes('--local'),proofArg=process.argv.indexOf('--proof');
 if(!local&&(process.env.GITHUB_ACTIONS!=='true'||!process.env.ACTIONS_ID_TOKEN_REQUEST_URL))
@@ -90,7 +91,7 @@ const upload=async({platform,archive,block,index})=>{
       const existing=await metadata(version);
       if(!existing){
         console.log(`Publishing npm desktop payload ${platform} ${index+1}`);
-        if(local)await new Promise((resolve,reject)=>{const child=spawn('npm-release-kit',['publish','--mode','local','--root',packageDir,'--release',version,'--tag','desktop-assets','--yes'],{stdio:'inherit'});child.once('error',reject);child.once('exit',code=>code===0?resolve():reject(Error('LOCAL_PAYLOAD_PUBLICATION_PENDING: '+version)));});
+        if(local)await new Promise((resolve,reject)=>{const child=spawn('npm-release-kit',['publish','--mode','local','--root',packageDir,'--release',version,'--tag','desktop-assets','--yes'],{stdio:['inherit','pipe','inherit']});let output='';child.stdout.on('data',bytes=>{process.stdout.write(bytes);output=(output+bytes.toString()).slice(-131072);});child.once('error',reject);child.once('exit',code=>code===0||registryConfirmationPending(output,code)?resolve():reject(Error('LOCAL_PAYLOAD_PUBLICATION_PENDING: '+version)));});
         else await submitPayload(()=>npm(['publish',tgz,'--provenance','--access','public','--tag','desktop-assets'],packageDir),{report:message=>console.log(message)});
         pending.push({version,integrity:packed.integrity,url:payloadURL(sha256)});
       }
