@@ -5,6 +5,8 @@ import os from 'node:os';
 import {assembleNpmAsset} from '../lib/npm-assets.mjs';
 import {validateManifest,tarExecutable} from '../lib/manager.mjs';
 import {identity} from '../lib/binding.mjs';
+import {fileHash} from '../lib/network.mjs';
+const verifiedCache=process.argv[4]?path.resolve(process.argv[4]):null;
 const manifest=JSON.parse(fs.readFileSync(process.argv[2]));
 const plan=process.argv[3]?JSON.parse(fs.readFileSync(process.argv[3])):null;
 const catalog='own/artifacts/current.json',previous=fs.existsSync(catalog)?JSON.parse(fs.readFileSync(catalog)).manifest:null;
@@ -14,6 +16,14 @@ for(const platform of releaseTargets){
   if(plan?.components.desktop==='reuse'){if(identity(manifest.platforms)!==identity(previous?.platforms))throw Error('Reused desktop differs from published binding');continue;}
   const asset=validateManifest(manifest,platform),dir=fs.mkdtempSync(path.join(os.tmpdir(),'own-registry-'));
   try{
+    if(verifiedCache){
+      const cache=path.join(dir,'cache');fs.mkdirSync(cache);
+      for(const part of new Map(asset.parts.map(p=>[p.sha256,p])).values()){
+        const source=path.join(verifiedCache,part.sha256+'.bin');if(!fs.existsSync(source))continue;
+        const st=fs.lstatSync(source);if(!st.isFile()||st.isSymbolicLink()||st.size!==part.size||await fileHash(source)!==part.sha256)throw Error('INVALID_VERIFIED_CACHE');
+        fs.copyFileSync(source,path.join(cache,part.sha256+'.bin'),fs.constants.COPYFILE_EXCL);
+      }
+    }
     const deadline=Date.now()+15*60*1000;
     for(;;){
       try{await assembleNpmAsset(asset,path.join(dir,'verified.tar.gz'),path.join(dir,'cache'),tarExecutable());break;}
