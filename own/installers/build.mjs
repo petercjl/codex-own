@@ -18,7 +18,8 @@ import {withMacSigning} from '../builders/mac-signing.mjs';
 const source=path.dirname(fileURLToPath(import.meta.url)),platform=process.platform+'-'+process.arch;
 const [version,destination,...options]=process.argv.slice(2),mode=options.includes('--online')?'online':'offline',keepPayload=options.includes('--keep-payload');
 const localIndex=options.indexOf('--local-input'),localInput=localIndex<0?null:path.resolve(options[localIndex+1]||'');
-if(!/^\d+\.\d+\.\d+$/.test(version||'')||!destination||platform!=='win32-x64'||options.some((x,i)=>!['--online','--keep-payload','--local-input'].includes(x)&&!(localIndex>=0&&i===localIndex+1))||localIndex>=0&&(!options[localIndex+1]||options[localIndex+1].startsWith('--'))||localInput&&mode!=='offline')throw Error('Usage: build.mjs <exact-version> <new-output-directory> [--online] [--keep-payload] [--local-input <directory>] on Windows x64');
+const cacheIndex=options.indexOf('--cache'),sharedCache=cacheIndex<0?null:path.resolve(options[cacheIndex+1]||'');
+if(!/^\d+\.\d+\.\d+$/.test(version||'')||!destination||platform!=='win32-x64'||options.some((x,i)=>!['--online','--keep-payload','--local-input','--cache'].includes(x)&&!(localIndex>=0&&i===localIndex+1)&&!(cacheIndex>=0&&i===cacheIndex+1))||localIndex>=0&&(!options[localIndex+1]||options[localIndex+1].startsWith('--'))||cacheIndex>=0&&(!options[cacheIndex+1]||options[cacheIndex+1].startsWith('--'))||localInput&&mode!=='offline')throw Error('Usage: build.mjs <exact-version> <new-output-directory> [--online] [--keep-payload] [--local-input <directory>] [--cache <directory>] on Windows x64');
 const output=path.resolve(destination);if(fs.existsSync(output))throw Error('Output already exists');fs.mkdirSync(output,{recursive:true});
 const work=fs.mkdtempSync(path.join(os.tmpdir(),'own-full-installer-build-'));
 function write(file,data,mode=0o644){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,data,{flag:'wx',mode});}
@@ -30,7 +31,7 @@ try{
  else{const response=await networkFetch(`https://registry.npmjs.org/@petercjl%2fcodex-own/${version}`,{signal:AbortSignal.timeout(30000)});if(!response.ok)throw Error('Exact public release unavailable: '+response.status);
  const published=await response.json();manifest=packageManifest(published,version);validateManifest(manifest,platform);await verifyPackageProvenance(published,manifest.binding.managerSource);}
  const payload=path.join(work,'payload');fs.mkdirSync(payload);write(path.join(payload,'release.json'),JSON.stringify(manifest,null,2)+'\n');
- const archive=path.join(work,'desktop.tar'),cache=path.join(work,'cache');
+ const archive=path.join(work,'desktop.tar'),cache=sharedCache||path.join(work,'cache');
  if(localInput)fs.copyFileSync(path.join(localInput,'desktop.tar.gz'),path.join(payload,'desktop.tar.gz'),fs.constants.COPYFILE_EXCL);
  else if(mode==='offline'){
   await assembleNpmAsset(manifest.platforms[platform],archive,cache,tarExecutable());
@@ -47,9 +48,9 @@ try{
  }else{
  const packages=path.join(work,'packages');fs.mkdirSync(packages);write(path.join(packages,'package.json'),JSON.stringify({private:true,dependencies:{'@petercjl/codex-own':version}}));
  npm(['install','--prefix',packages,'--omit=dev','--ignore-scripts','--no-audit','--no-fund','--registry=https://registry.npmjs.org']);
- const packageDir=path.join(packages,'node_modules/@petercjl/codex-own');fs.cpSync(packageDir,engine,{recursive:true,force:false,errorOnExist:true});
+ const packageDir=path.join(packages,'node_modules/@petercjl/codex-own');fs.cpSync(packageDir,engine,{recursive:true,force:false,errorOnExist:true,filter:f=>!path.relative(packageDir,f).split(path.sep).includes('node_modules')});
  if(JSON.parse(fs.readFileSync(path.join(engine,'package.json'))).version!==version)throw Error('Installed manager version mismatch');
- fs.mkdirSync(path.join(engine,'node_modules'));for(const entry of fs.readdirSync(path.join(packages,'node_modules'),{withFileTypes:true})){if(entry.name.startsWith('.')||entry.name==='@petercjl')continue;fs.cpSync(path.join(packages,'node_modules',entry.name),path.join(engine,'node_modules',entry.name),{recursive:true,force:false,errorOnExist:true});}
+ copyRuntimeDependencies(Object.keys(JSON.parse(fs.readFileSync(path.join(packageDir,'package.json'))).dependencies||{}),createRequire(path.join(packageDir,'package.json')),engine);
  }
  fs.copyFileSync(nodeBinary,path.join(engine,process.platform==='win32'?'node.exe':'node'),fs.constants.COPYFILE_EXCL);if(process.platform==='darwin')fs.chmodSync(path.join(engine,'node'),0o755);
  for(const file of ['offline-install.mjs','uninstall-check.cjs','bootstrap-node.ps1','local-input.mjs'])fs.copyFileSync(path.join(source,file),path.join(payload,file),fs.constants.COPYFILE_EXCL);
@@ -76,7 +77,8 @@ try{
  }
  const installerSources={};for(const file of ['build.mjs','offline-install.mjs','local-input.mjs','windows.nsi','bootstrap-node.ps1','uninstall-check.cjs'])installerSources[file]=await hashFile(path.join(source,file));
  const installerSourceFingerprint=crypto.createHash('sha256').update(JSON.stringify(installerSources)).digest('hex');
- const record={schema:1,mode,version,...(localInput?{channel:'local-candidate',published:false,sourceFingerprint:manifest.localCandidate.sourceFingerprint,desktopSourceFingerprint:manifest.localCandidate.sourceFingerprint,installerSourceFingerprint,installerSources}:{}),desktopVersion:manifest.version,platform,artifact:path.basename(artifact),size:fs.statSync(artifact).size,sha256:await hashFile(artifact),sourceRun:process.env.GITHUB_RUN_ID||null,sourceRef:process.env.GITHUB_SHA||null,desktopIdentity:manifest.platforms[platform].sha256,runtimeVersion:manifest.runtimes.version,offline:mode==='offline',updateSource:'https://registry.npmjs.org/@petercjl%2fcodex-own/latest',macSigning:process.platform==='darwin'?'self-signed; not notarized':undefined};
+ let sourceRef=null;try{sourceRef=execFileSync('git',['-C',path.resolve(source,'../..'),'rev-parse','HEAD'],{encoding:'utf8',windowsHide:true}).trim();}catch{}
+ const record={schema:1,mode,version,installerSourceFingerprint,installerSources,execution:process.env.GITHUB_ACTIONS==='true'?'github-actions':'local',...(localInput?{channel:'local-candidate',published:false,sourceFingerprint:manifest.localCandidate.sourceFingerprint,desktopSourceFingerprint:manifest.localCandidate.sourceFingerprint,installerSourceFingerprint,installerSources}:{}),desktopVersion:manifest.version,platform,artifact:path.basename(artifact),size:fs.statSync(artifact).size,sha256:await hashFile(artifact),sourceRun:process.env.GITHUB_RUN_ID||null,sourceRef:process.env.GITHUB_SHA||sourceRef,desktopIdentity:manifest.platforms[platform].sha256,runtimeVersion:manifest.runtimes.version,offline:mode==='offline',updateSource:'https://registry.npmjs.org/@petercjl%2fcodex-own/latest',macSigning:process.platform==='darwin'?'self-signed; not notarized':undefined};
  write(path.join(output,`installer-${platform}.json`),JSON.stringify(record,null,2)+'\n');write(path.join(output,`SHA256-${platform}.txt`),record.sha256+'  '+record.artifact+'\n');console.log(JSON.stringify(record));
  if(keepPayload)fs.renameSync(payload,path.join(output,'test-payload'));
 }finally{fs.rmSync(work,{recursive:true,force:true});}
